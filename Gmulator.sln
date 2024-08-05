@@ -1,0 +1,55 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35027.167
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gmulator", "Gmulator\Gmulator.csproj", "{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|ARM64 = Debug|ARM64
+		Debug|x64 = Debug|x64
+		DeckDebug|Any CPU = DeckDebug|Any CPU
+		DeckDebug|ARM64 = DeckDebug|ARM64
+		DeckDebug|x64 = DeckDebug|x64
+		DeckRelease|Any CPU = DeckRelease|Any CPU
+		DeckRelease|ARM64 = DeckRelease|ARM64
+		DeckRelease|x64 = DeckRelease|x64
+		Release|Any CPU = Release|Any CPU
+		Release|ARM64 = Release|ARM64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|ARM64.ActiveCfg = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|ARM64.Build.0 = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Debug|x64.Build.0 = Debug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|Any CPU.ActiveCfg = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|Any CPU.Build.0 = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|ARM64.ActiveCfg = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|ARM64.Build.0 = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|x64.ActiveCfg = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckDebug|x64.Build.0 = DeckDebug|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|Any CPU.ActiveCfg = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|Any CPU.Build.0 = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|ARM64.ActiveCfg = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|ARM64.Build.0 = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|x64.ActiveCfg = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.DeckRelease|x64.Build.0 = DeckRelease|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|ARM64.ActiveCfg = Release|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|ARM64.Build.0 = Release|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|x64.ActiveCfg = Release|Any CPU
+		{FED714CE-B0F6-48B8-B629-0BE07BC5C58C}.Release|x64.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {D6AE1A78-1FA4-41FA-BA23-D7A9D4CAE93B}
+	EndGlobalSection
+EndGlobal

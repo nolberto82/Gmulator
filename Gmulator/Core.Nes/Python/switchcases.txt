@@ -1,0 +1,311 @@
+switch ()
+{
+case opcid::RTS:
+{
+	break;
+}
+case opcid::PHP:
+{
+	break;
+}
+case opcid::SED:
+{
+	break;
+}
+case opcid::BVS:
+{
+	break;
+}
+case opcid::TXA:
+{
+	break;
+}
+case opcid::TAY:
+{
+	break;
+}
+case opcid::RRA:
+{
+	break;
+}
+case opcid::LDY:
+{
+	break;
+}
+case opcid::BPL:
+{
+	break;
+}
+case opcid::SEC:
+{
+	break;
+}
+case opcid::DEC:
+{
+	break;
+}
+case opcid::BVC:
+{
+	break;
+}
+case opcid::PHA:
+{
+	break;
+}
+case opcid::LAX:
+{
+	break;
+}
+case opcid::AAX:
+{
+	break;
+}
+case opcid::AXA:
+{
+	break;
+}
+case opcid::SXA:
+{
+	break;
+}
+case opcid::INC:
+{
+	break;
+}
+case opcid::BMI:
+{
+	break;
+}
+case opcid::BNE:
+{
+	break;
+}
+case opcid::TSX:
+{
+	break;
+}
+case opcid::BEQ:
+{
+	break;
+}
+case opcid::JMP:
+{
+	break;
+}
+case opcid::BRK:
+{
+	break;
+}
+case opcid::STY:
+{
+	break;
+}
+case opcid::LSR:
+{
+	break;
+}
+case opcid::ASL:
+{
+	break;
+}
+case opcid::TXS:
+{
+	break;
+}
+case opcid::LDX:
+{
+	break;
+}
+case opcid::ASR:
+{
+	break;
+}
+case opcid::SBC:
+{
+	break;
+}
+case opcid::XAS:
+{
+	break;
+}
+case opcid::CLI:
+{
+	break;
+}
+case opcid::CPX:
+{
+	break;
+}
+case opcid::INX:
+{
+	break;
+}
+case opcid::ORA:
+{
+	break;
+}
+case opcid::PLP:
+{
+	break;
+}
+case opcid::ATX:
+{
+	break;
+}
+case opcid::DEX:
+{
+	break;
+}
+case opcid::SYA:
+{
+	break;
+}
+case opcid::SEI:
+{
+	break;
+}
+case opcid::BCS:
+{
+	break;
+}
+case opcid::TYA:
+{
+	break;
+}
+case opcid::ROR:
+{
+	break;
+}
+case opcid::CLV:
+{
+	break;
+}
+case opcid::CPY:
+{
+	break;
+}
+case opcid::TOP:
+{
+	break;
+}
+case opcid::RTI:
+{
+	break;
+}
+case opcid::DCP:
+{
+	break;
+}
+case opcid::DEY:
+{
+	break;
+}
+case opcid::ARR:
+{
+	break;
+}
+case opcid::SRE:
+{
+	break;
+}
+case opcid::CMP:
+{
+	break;
+}
+case opcid::RLA:
+{
+	break;
+}
+case opcid::ADC:
+{
+	break;
+}
+case opcid::CLC:
+{
+	break;
+}
+case opcid::EOR:
+{
+	break;
+}
+case opcid::LAR:
+{
+	break;
+}
+case opcid::NOP:
+{
+	break;
+}
+case opcid::XAA:
+{
+	break;
+}
+case opcid::INY:
+{
+	break;
+}
+case opcid::ANC:
+{
+	break;
+}
+case opcid::KIL:
+{
+	break;
+}
+case opcid::PLA:
+{
+	break;
+}
+case opcid::AND:
+{
+	break;
+}
+case opcid::BIT:
+{
+	break;
+}
+case opcid::CLD:
+{
+	break;
+}
+case opcid::JSR:
+{
+	break;
+}
+case opcid::LDA:
+{
+	break;
+}
+case opcid::ISB:
+{
+	break;
+}
+case opcid::ROL:
+{
+	break;
+}
+case opcid::AXS:
+{
+	break;
+}
+case opcid::STX:
+{
+	break;
+}
+case opcid::TAX:
+{
+	break;
+}
+case opcid::SLO:
+{
+	break;
+}
+case opcid::STA:
+{
+	break;
+}
+case opcid::BCC:
+{
+	break;
+}
+}
