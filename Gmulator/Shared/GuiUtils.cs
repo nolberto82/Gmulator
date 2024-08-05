@@ -5,31 +5,6 @@ using System.Numerics;
 namespace Gmulator;
 public static class GuiUtils
 {
-    public static void DrawScreen(RenderTexture2D Screen, float menuheight, bool isdeck, bool debug)
-    {
-        var width = Raylib.GetScreenWidth();
-        var height = Raylib.GetScreenHeight();
-        var texwidth = Screen.Texture.Width;
-        var texheight = Screen.Texture.Height;
-        var scale = Math.Min((float)width / texwidth, (float)height / texheight);
-        var posx = (int)((width - texwidth * scale) / 2);
-        var posy = (int)(((height - texheight * scale) / 2) + menuheight + 3);
-
-        Raylib.SetTextureFilter(Screen.Texture, TextureFilter.Point);
-        Raylib.DrawTexturePro(
-            Screen.Texture,
-            new Rectangle(0, 0, texwidth, texheight),
-            new Rectangle((width - texwidth * scale) / 2,
-           ((height - (texheight) * scale) / 2) + menuheight,
-            texwidth * scale,
-            texheight * scale - menuheight),
-            Vector2.Zero, 0, Color.White);
-
-        var fontsize = debug ? 15 : 30;
-        Raylib.DrawFPS(width - 100, (int)(5 + menuheight));
-        Notifications.Render((int)((width - texwidth * scale) / 2), (int)menuheight, width, height);
-    }
-
     public static Vector2 DrawGrid(Texture2D texture, Vector2 pos, Vector2 region, Vector2 mp, Vector2 gridsize, ImDrawListPtr list)
     {
         Vector2 size = new(region.X, region.Y);

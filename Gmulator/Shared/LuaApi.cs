@@ -20,6 +20,7 @@ public class LuaApi(ImFontPtr[] consolas)
     public Func<int, byte> Read;
 
     public byte ReadByte(int a) => Read(a);
+    public ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
     public void AddCheat(string name, string code)
     {
         if (code.Length == 6 || code.Length == 8)
@@ -133,6 +134,7 @@ public class LuaApi(ImFontPtr[] consolas)
 
         Lua.RegisterFunction("mem.addcheat", this, typeof(LuaApi).GetMethod("AddCheat"));
         Lua.RegisterFunction("mem.readbyte", this, typeof(LuaApi).GetMethod("ReadByte"));
+        Lua.RegisterFunction("mem.readword", this, typeof(LuaApi).GetMethod("ReadWord"));
 
         if (LuaCwd == "" || LuaCwd is null)
         {
@@ -166,6 +168,13 @@ public class LuaApi(ImFontPtr[] consolas)
         }
 
         Error = "";
+    }
+
+    public void CheckLuaFile(string name)
+    {
+        name = $"{Environment.CurrentDirectory}\\{LuaDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
+        if (File.Exists(name))
+            LoadFile(name);
     }
 
     public static void LuaPrint(object text) => System.Console.WriteLine($"{text}");

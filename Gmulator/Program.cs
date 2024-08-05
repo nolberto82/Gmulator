@@ -60,7 +60,9 @@ public class Program
                 LuaApi.Update();
             }
             UpdateInput();
+            ImGui.PushFont(Consolas[1]);
             RenderMenuBar();
+            ImGui.PopFont();
 
             ImGui.PushFont(Consolas[0]);
             Menu.Render(IsDeck, RomLoaded, MenuHeight, Cheats);
@@ -185,9 +187,8 @@ public class Program
 
     public static void RenderText(string[] text, int x, int y, int width, int height, Color c)
     {
-        var scale = Math.Min((float)width / NesWidth, (float)height / NesHeight);
         var fontsize = DebuggerEnabled ? 15 : 30;
-        Raylib.DrawRectangle(x, y, (int)(NesWidth * scale) + 2, fontsize * text.Length, new(0, 0, 0, 192));
+        Raylib.DrawRectangle(x, y, width + 2, fontsize * text.Length, new(0, 0, 0, 192));
         foreach (var item in text)
         {
             Raylib.DrawText(item, x + 5, y, fontsize, c);
@@ -200,12 +201,11 @@ public class Program
         var io = ImGui.GetIO();
         if ((io.ConfigFlags & ImGuiConfigFlags.NavEnableGamepad) > 0)
         {
+            //GetPressedKey(io);
             unsafe
             {
-                //io.NativePtr->KeysData_123.Down = 0; //disable triangle/Y
+                io.NativePtr->KeysData_121.Down = 0; //disable Circle/B button in Deck mode
             }
-
-            //GetPressedKey(io);
         }
     }
     private static void GetPressedKey(ImGuiIOPtr io)
@@ -306,11 +306,12 @@ public class Program
         }
 
         Emu?.Reset(name, false, DebuggerEnabled);
+        LuaApi?.CheckLuaFile(name);
 
         if (!DebuggerEnabled)
             State = Running;
         else
-            State = Debugging; ;
+            State = Debugging;
     }
 
     public static void BreakpointTriggered() => State = Debugging;

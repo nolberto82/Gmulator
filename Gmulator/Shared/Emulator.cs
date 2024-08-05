@@ -32,8 +32,8 @@ namespace Gmulator.Shared
             if (debug)
             {
                 scale = Console != GbcSystem ? 1.5f : 2.5f;
-                posy = (int)MenuHeight;
-                posx = posx * 2;
+                posy = (int)MenuHeight + 1;
+                posx += 5;
 
                 if (ImGui.Begin("Debugger"))
                 {
@@ -70,10 +70,10 @@ namespace Gmulator.Shared
                 Vector2.Zero, 0, Color.White);
 
             Raylib.DrawFPS(width - 100, (int)(5 + MenuHeight));
-            Notifications.Render((int)((width - texwidth * scale) / 2), (int)MenuHeight, width, height);
+            Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), (int)(texheight * scale));
         }
 
-        public virtual void Reset(string name,bool reset, bool debug) { }
+        public virtual void Reset(string name, bool reset, bool debug) { }
         public virtual void Update() { }
         public virtual void Close(Dictionary<int, Breakpoint> Breakpoints) { }
         public virtual void SaveState() { }

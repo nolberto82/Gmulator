@@ -138,7 +138,7 @@ public class Nes : Emulator
 
     public override void SaveState()
     {
-        if (!Mmu.RomLoaded) return;
+        if (Mapper == null) return;
         Program.State = Paused;
         var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
         using (BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write)))
@@ -156,7 +156,7 @@ public class Nes : Emulator
 
     public override void LoadState()
     {
-        if (!Mmu.RomLoaded) return;
+        if (Mapper == null) return;
         Program.State = Paused;
         var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
         if (!File.Exists(name)) return;
