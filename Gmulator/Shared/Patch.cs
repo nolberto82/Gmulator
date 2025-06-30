@@ -3,37 +3,122 @@
 namespace Gmulator;
 public class Patch
 {
-    private byte[] PatchFile { get; set; }
-
     private string Header { get; set; }
-    private record Record
+    private record Ips
     {
         public int Offset { get; set; }
         public int Size { get; set; }
         public byte[] Data { get; set; }
     }
 
-    public void Run(byte[] rom, string filename)
+    public byte[] Run(byte[] rom, string filename)
     {
-        var name = Path.GetFullPath($"Roms/{Path.GetFileNameWithoutExtension(filename)}.ips");
-        if (!File.Exists(name)) return;
-        using (BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read)))
+        var path = Path.GetDirectoryName(filename);
+        var name = Path.GetFileNameWithoutExtension(filename);
+        name = $"{path}/{name}";
+        if (File.Exists($"{name}.bps"))
+            return RunBPS(rom, $"{name}.bps");
+        else if (File.Exists($"{name}.ips"))
+            return RunIPS(rom, name);
+        return rom;
+    }
+
+    private byte[] RunBPS(byte[] source, string filename)
+    {
+        using BinaryReader br = new(new FileStream(filename, FileMode.Open, FileAccess.Read));
+        if (Encoding.Default.GetString(br.ReadBytes(4)) != "BPS1") return source;
+
+        var outputOff = 0;
+        ulong sourceRelOff = 0;
+        ulong targetRelOff = 0;
+        var sourcesize = new byte[Decode(br)];
+        var target = new byte[Decode(br)];
+        var metadatasize = Decode(br);
+        string metadata = Encoding.Default.GetString(br.ReadBytes((int)metadatasize));
+        //if (metadatasize > 0)
+        //var pos = br.BaseStream.Position;
+        //var srccrc = br.ReadUInt32();
+        //var tarcrc = br.ReadUInt32();
+        //var patcrc = br.ReadUInt32();
+        //br.BaseStream.Position = pos;
+
+        while (br.BaseStream.Position < br.BaseStream.Length - 12)
         {
-            Header = Encoding.Default.GetString(br.ReadBytes(5));
-            while (br.BaseStream.Position < br.BaseStream.Length - 3)
+            var data = Decode(br);
+            int length = (int)((data >> 2) + 1);
+            switch (data & 3)
             {
-                var offset = br.ReadBytes(3).Int24();
-                var size = br.ReadBytes(2).Int16();
-                if (size == 0)
-                {
-                    size = br.ReadBytes(2).Int16();
-                    var b = br.ReadByte();
-                    Array.Fill(rom, b, offset, size);
-                    continue;
-                }
-                var data = br.ReadBytes(size);
-                Array.Copy(data, 0, rom, offset, data.Length);
+                case 0:
+                    while (length-- > 0)
+                        target[outputOff] = source[outputOff++];
+                    break;
+                case 1:
+                    while (length-- > 0)
+                        target[outputOff++] = br.ReadByte();
+                    break;
+                case 2:
+                    var off = Decode(br);
+                    if ((ulong)(off & 1) > 0)
+                        sourceRelOff -= (ulong)(off >> 1);
+                    else
+                        sourceRelOff += (ulong)(off >> 1);
+                    while (length-- > 0)
+                        target[outputOff++] = source[sourceRelOff++];
+                    break;
+                case 3:
+                    off = Decode(br);
+                    if ((ulong)(off & 1) > 0)
+                        targetRelOff -= (ulong)(off >> 1);
+                    else
+                        targetRelOff += (ulong)(off >> 1);
+                    while (length-- > 0)
+                        target[outputOff++] = target[targetRelOff++];
+                    break;
             }
         }
+        return target;
+    }
+
+    private byte[] RunIPS(byte[] rom, string filename)
+    {
+        var name = Path.GetFullPath($"Roms/{filename}.ips");
+        if (!File.Exists(name)) return rom;
+        using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
+        Header = Encoding.Default.GetString(br.ReadBytes(5));
+        while (br.BaseStream.Position < br.BaseStream.Length - 3)
+        {
+            var offset = br.ReadBytes(3).Int24();
+            var size = br.ReadBytes(2).Int16();
+            if (size == 0)
+            {
+                size = br.ReadBytes(2).Int16();
+                var b = br.ReadByte();
+                Array.Fill(rom, b, offset, size);
+                continue;
+            }
+            var data = br.ReadBytes(size);
+            if (data.Length + br.BaseStream.Position > rom.Length)
+            {
+                Notifications.Init("Patch Error");
+                break;
+            }
+            Array.Copy(data, 0, rom, offset, data.Length);
+        }
+        return rom;
+    }
+
+    private static ulong Decode(BinaryReader br)
+    {
+        ulong data = 0, shift = 1;
+        while (true)
+        {
+            byte b = br.ReadByte();
+            data += (ulong)(b & 0x7f) * shift;
+            if ((b & 0x80) > 0)
+                break;
+            shift <<= 7;
+            data += shift;
+        }
+        return data;
     }
 }

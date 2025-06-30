@@ -1,6 +1,6 @@
 ﻿
 namespace GNes.Core.Mappers;
-public class BaseMapper(Header Header) : SaveState
+public class BaseMapper(Header Header) : EmuState
 {
     public byte[] Prg { get; set; }
     public byte[] Chr { get; set; }
@@ -19,10 +19,7 @@ public class BaseMapper(Header Header) : SaveState
 
     public Header Header { get; set; } = Header;
 
-    public virtual byte ReadPrg(int a)
-    {
-        return Prom[a % Prom.Length];
-    }
+    public virtual byte ReadPrg(int a) => Prom[a % Prom.Length];
 
     public virtual byte ReadChr(int a)
     {
@@ -30,20 +27,14 @@ public class BaseMapper(Header Header) : SaveState
         return Vrom[a % Vrom.Length];
     }
 
-    public virtual void WritePrg(int a, byte v)
-    {
-        Prom[a % Prom.Length] = v;
-    }
+    public virtual void WritePrg(int a, byte v) => Prom[a % Prom.Length] = v;
 
     public virtual void Write(int a, byte v)
     {
 
     }
 
-    public virtual byte ReadVram(int a)
-    {
-        return Header.Mmu.Vram[a % 0x4000];
-    }
+    public virtual byte ReadVram(int a) => Header.Mmu.Vram[a % 0x4000];
 
     public virtual void SetLatch(int a, byte v)
     {

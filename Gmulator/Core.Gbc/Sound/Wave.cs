@@ -1,5 +1,7 @@
 ﻿
-namespace GBoy.Core.Sound;
+using Gmulator.Core.Gbc;
+
+namespace Gmulator.Core.Gbc.Sound;
 public class Wave : BaseChannel
 {
     public byte NR30 { get; private set; }
@@ -8,13 +10,13 @@ public class Wave : BaseChannel
     public byte NR33 { get; private set; }
     public byte NR34 { get; private set; }
 
-    private byte[] WaveRamReset =
+    private readonly byte[] WaveRamReset =
     [
         0x84, 0x40, 0x43, 0xaa, 0x2d, 0x78, 0x92, 0x3c,
         0x60, 0x59, 0x59, 0xb0, 0x34, 0xb8, 0x2e, 0xda
     ];
 
-    private GbcMmu Mmu;
+    private readonly GbcMmu Mmu;
 
     public Wave() { }
     public Wave(GbcMmu mmu) => Mmu = mmu;

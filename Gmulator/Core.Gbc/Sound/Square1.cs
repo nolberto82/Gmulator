@@ -1,5 +1,5 @@
 ﻿
-namespace GBoy.Core.Sound;
+namespace Gmulator.Core.Gbc.Sound;
 public class Square1 : BaseChannel
 {
     public int SweepPeriod { get; private set; }
@@ -31,14 +31,10 @@ public class Square1 : BaseChannel
 
             if (SweepEnabled && SweepPeriod > 0)
             {
-                UpdateFrequency(out var freq);
-                UpdateFrequency(out freq);
+                UpdateFrequency();
+                var freq = UpdateFrequency();
                 if (freq < 2048 && SweepShift > 0)
-                {
                     Frequency = ShadowFrequency = freq;
-                    //NR13 = (byte)freq;
-                    //NR14 = (byte)((NR14 & ~0x07) | (freq >> 8));
-                }
             }
         }
     }
@@ -94,7 +90,7 @@ public class Square1 : BaseChannel
             SweepEnabled = SweepPeriod > 0 || SweepShift > 0;
 
             if (SweepShift > 0)
-                UpdateFrequency(out var freq);
+              UpdateFrequency();
 
             if (v.GetBit(7))
                 Trigger(64, 4);
@@ -102,11 +98,12 @@ public class Square1 : BaseChannel
         }
     }
 
-    private void UpdateFrequency(out int freq)
+    private int UpdateFrequency()
     {
-        freq = ShadowFrequency + SweepNegate * (ShadowFrequency >> SweepShift);
+        var freq = ShadowFrequency + SweepNegate * (ShadowFrequency >> SweepShift);
         if (freq > 2047)
             Enabled = false;
+        return freq;
     }
 
     public override void Reset()

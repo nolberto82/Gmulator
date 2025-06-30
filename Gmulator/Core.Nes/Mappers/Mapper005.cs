@@ -108,15 +108,9 @@ namespace GNes.Core.Mappers
             return base.ReadChr(0x0400 * Chr[a >> 10] + a % 0x0400);
         }
 
-        public override void WritePrg(int a, byte v)
-        {
-            base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
-        }
+        public override void WritePrg(int a, byte v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
 
-        public override byte ReadVram(int a)
-        {
-            return base.ReadVram(0x400 * NametableBank + a % 0x400 + 0x2000);
-        }
+        public override byte ReadVram(int a) => base.ReadVram(0x400 * NametableBank + a % 0x400 + 0x2000);
 
         public override void Reset()
         {
@@ -125,15 +119,9 @@ namespace GNes.Core.Mappers
             base.Reset();
         }
 
-        public override void Scanline()
-        {
-            base.Scanline();
-        }
+        public override void Scanline() => base.Scanline();
 
-        public override void SetLatch(int a, byte v)
-        {
-            base.SetLatch(a, v);
-        }
+        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
 
         private void UpdatePrgBanks(int a, byte v)
         {

@@ -14,7 +14,7 @@ public class Dmc : BaseChannel
     private int OutputBits;
     public Func<int, byte> Read;
 
-    private int[] Rate =
+    private readonly int[] Rate =
     [
        428, 380, 340, 320, 286, 254, 226, 214,
        190, 160, 142, 128, 106,  84,  72,  54
@@ -56,10 +56,7 @@ public class Dmc : BaseChannel
         base.Reset();
     }
 
-    public byte GetSample()
-    {
-        return (byte)OutputLevel;
-    }
+    public byte GetSample() => (byte)OutputLevel;
 
     public void Step()
     {
@@ -109,12 +106,12 @@ public class Dmc : BaseChannel
         LengthValue = SampleLength;
     }
 
-    public void Length()
+    public static void Length()
     {
 
     }
 
-    public void Envelope()
+    public static void Envelope()
     {
 
     }

@@ -1,8 +1,7 @@
 ﻿using Gmulator.Shared;
 
-namespace GBoy.Core;
-
-public partial class GbcCpu : SaveState
+namespace Gmulator.Core.Gbc;
+public partial class GbcCpu : EmuState
 {
     public int Cycles { get; set; }
     public bool Halt { get; set; }
@@ -27,7 +26,7 @@ public partial class GbcCpu : SaveState
 
     public int CyclesInstruction { get; private set; }
 
-    public ushort GetWord(byte l, byte h) => (ushort)(l | h << 8);
+    public static ushort GetWord(byte l, byte h) => (ushort)(l | h << 8);
     public ushort AF
     {
         get { return (ushort)(A << 8 | F); }
@@ -66,7 +65,7 @@ public partial class GbcCpu : SaveState
     }
     public GbcCpu() { }
 
-    public void Reset(bool isbios, bool cgb, bool debug)
+    public void Reset(bool isbios, bool cgb)
     {
         if (!cgb)
         {
@@ -167,7 +166,7 @@ public partial class GbcCpu : SaveState
     {
         if (Halt)
         {
-            byte op = ReadCycle(PC);
+            ReadCycle(PC);
             if (!Halt)
                 PC++;
 
@@ -259,16 +258,6 @@ public partial class GbcCpu : SaveState
         SetF((((A & 0xf) + (r1 & 0xf) + c) & 0x10) > 0, FH);
         SetF(v > 0xff, FC);
         A = (byte)v;
-    }
-
-    private ushort OpAdc(int r1, int r2)
-    {
-        int c = F & FC;
-        int v = r1 + r2 + c;
-        SetF((v & 0xffff) == 0, FZ); SetF(false, FN);
-        SetF((((r1 & 0xfff) + (r2 & 0xfff) + c) & 0x1000) > 0, FH);
-        SetF(v > 0xffff, FC);
-        return (ushort)v;
     }
 
     private void OpAdd8(int r1)
@@ -377,7 +366,6 @@ public partial class GbcCpu : SaveState
 
     private byte OpDec8(int r1)
     {
-        int o = r1;
         int v = r1 - 1;
         SetF((v & 0xff) == 0, FZ); SetF(true, FN);
         SetF((v & 0x0f) == 0x0f, FH);
@@ -388,12 +376,6 @@ public partial class GbcCpu : SaveState
     {
         Tick();
         return (ushort)(r1 - 1);
-    }
-
-    private void OpDecHL(int r1, int r2)
-    {
-        ushort a = GetAddr(r1, r2);
-        WriteCycle(a, OpDec8(ReadCycle(a)));
     }
 
     private void OpDI() => IME = false;
@@ -418,12 +400,6 @@ public partial class GbcCpu : SaveState
     {
         Tick();
         return (ushort)(r1 + 1);
-    }
-
-    private void OpIncHL(int r1, int r2)
-    {
-        ushort a = GetAddr(r1, r2);
-        WriteCycle(a, OpInc8(ReadCycle(a)));
     }
 
     private void OpJp(bool flag)
@@ -470,9 +446,8 @@ public partial class GbcCpu : SaveState
 
     private ushort OpPop(bool af = false)
     {
-        int h = 0, l = 0;
-        l = ReadCycle(SP++);
-        h = ReadCycle(SP++);
+        int l = ReadCycle(SP++);
+        int h = ReadCycle(SP++);
 
         if (af)
         {
@@ -564,7 +539,7 @@ public partial class GbcCpu : SaveState
     private void OpRrca()
     {
         int c = (byte)(A & 1);
-        int v = A = (byte)(A >> 1);
+        A = (byte)(A >> 1);
 
         SetF(false, FZ); SetF(false, FN);
         SetF(false, FH); SetF(c > 0, FC);
@@ -591,16 +566,6 @@ public partial class GbcCpu : SaveState
         A = (byte)v;
     }
 
-    private ushort OpSbc(int r1, int r2)
-    {
-        int cf = (byte)(F & 1);
-        int v = r1 - r2 - cf;
-
-        SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-        SetF((((r1 & 0xfff) - (r2 & 0xfff) - cf) & 0x1000) > 0, FH);
-        return (ushort)v;
-    }
-
     private void OpScf()
     {
         SetF(false, FN); SetF(false, FH); SetF(true, FC);
@@ -608,7 +573,6 @@ public partial class GbcCpu : SaveState
 
     private void OpSub8(int r1)
     {
-        int o = A;
         int v = A - r1;
 
         SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
@@ -627,10 +591,9 @@ public partial class GbcCpu : SaveState
     #endregion
 
     #region CB Instructions
-    private void OpBit(int r1, int r2, int addr = -1)
+    private void OpBit(int r1, int r2)
     {
         int v = r2 & (1 << r1);
-
         SetF((v & 0xff) == 0, FZ); SetF(false, FN); SetF(true, FH);
     }
 
@@ -639,7 +602,7 @@ public partial class GbcCpu : SaveState
         int c;
         int v = r1;
         c = (byte)(v >> 7);
-        v = v << 1;
+        v <<= 1;
 
         SetF(v == 0, FZ); SetF(false, FN);
         SetF(false, FH); SetF(c > 0, FC);
@@ -681,8 +644,9 @@ public partial class GbcCpu : SaveState
 
     private byte OpSwap(int r1)
     {
-        int n1 = 0, n2 = 0;
         int v = r1;
+        int n1;
+        int n2;
         (n1, n2) = (v & 0x0f, v >> 4);
         v = (n1 << 4 | n2);
 
@@ -695,7 +659,7 @@ public partial class GbcCpu : SaveState
     {
         int v = r1;
         int c = (byte)(r1 & 1);
-        v = (v >> 1);
+        v >>= 1;
 
         SetF((v & 0xff) == 0, FZ);
         SetF(false, FN);
@@ -704,10 +668,9 @@ public partial class GbcCpu : SaveState
         return (byte)v;
     }
 
-    private byte OpRes(int r1, byte r2) => (byte)(r2 & ~(1 << r1));
+    private static byte OpRes(int r1, byte r2) => (byte)(r2 & ~(1 << r1));
     private void OpResHL(int r1) => OpLdWr(HL, (OpLdReg(HL) & ~(1 << r1)));
-    private byte OpSet(int r1, byte r2) => (byte)(r2 | (1 << r1));
+    private static byte OpSet(int r1, byte r2) => (byte)(r2 | (1 << r1));
     private void OpSetHL(int r1) => OpLdWr(HL, (OpLdReg(HL) | (1 << r1)));
-    private ushort GetAddr(int a1, int a2) => (ushort)(a1 + ReadCycle((ushort)a2));
     #endregion
 }

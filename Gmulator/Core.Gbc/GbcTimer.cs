@@ -1,5 +1,5 @@
 ﻿
-namespace GBoy.Core;
+namespace Gmulator.Core.Gbc;
 public class GbcTimer
 {
     public int DivideRegister { get; private set; }

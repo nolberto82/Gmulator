@@ -1,8 +1,11 @@
-﻿using GBoy.Core;
+﻿
 using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
+using Gmulator.Core.Snes;
 using ImGuiNET;
 using Raylib_cs;
+using rlImGui_cs;
+using System;
 using System.Dynamic;
 using System.Numerics;
 using System.Text.Json;
@@ -11,82 +14,170 @@ namespace Gmulator.Shared
 {
     public class Emulator
     {
-        public DebugWindow DebugWindow { get; set; }
         public int Console { get; set; }
-        public Gbc Gbc { get; set; }
-        public Nes Nes { get; set; }
+        public string GameName { get; set; }
+        public Config Config { get; set; }
+        public RenderTexture2D Screen { get; set; }
+        public Dictionary<int, Cheat> Cheats { get; set; } = [];
+        public Cheat Cheat { get; set; } = new();
+        public LuaApi LuaApi { get; set; }
+        public DebugWindow DebugWindow { get; set; }
+        public CheatConverter CheatConverter { get; set; }
 
-        public virtual void Execute(int State, bool debug)
-        { }
+        public int State { get; set; }
+        public bool FastForward { get; set; }
+        public bool Debug { get; set; }
+        public bool IsScreenWindow { get; set; }
+        public bool IsDeck { get; set; }
+        public Vector2 Dimensions { get; set; } = new(GbWidth, GbHeight);
+        public object StateLock { get; set; } = new object();
+        public SortedDictionary<int, Breakpoint> Breakpoints { get; set; } = [];
 
-        public virtual void Render(float MenuHeight, bool debug)
+        public enum StateResult
+        {
+            Success, Failed, Mismatch
+        }
+
+        public Emulator() { GameName = ""; }
+        public Emulator(DebugWindow debugwindow)
+        {
+            DebugWindow = debugwindow;
+            Breakpoints = [];
+        }
+
+        public void Init(int width, int height, int console, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
+        {
+            Screen = Raylib.LoadRenderTexture(width, height);
+            Dimensions = new(width, height);
+            Console = console;
+            LuaApi = new(Screen.Texture, imguifont, raylibfont, menuheight, Debug);
+        }
+
+        public virtual void Reset(string name, string lastname, bool reset)
+        {
+            if (!Debug)
+                State = Running;
+            else
+                State = Break;
+            LuaApi?.SetDebug(Debug);
+        }
+
+        public void SetLua() => LuaApi.SetDebug(Debug);
+
+        public virtual void SetState(int v) => State = v;
+
+        public virtual void Execute(bool opened, int times) { }
+
+        public virtual void Render(float MenuHeight)
         {
             var width = Raylib.GetScreenWidth();
             var height = Raylib.GetScreenHeight();
-            var texwidth = Program.Screen.Texture.Width;
-            var texheight = Program.Screen.Texture.Height;
+            var texwidth = Dimensions.X;
+            var texheight = Dimensions.Y;
             var scale = Math.Min((float)width / texwidth, (float)height / texheight);
             var posx = (int)((width - texwidth * scale) / 2);
             var posy = (int)(((height - texheight * scale) / 2) + MenuHeight);
 
-            if (debug)
+            IsScreenWindow = false;
+
+            if (Debug)
             {
-                scale = Console != GbcSystem ? 1.5f : 2.5f;
-                posy = (int)MenuHeight + 1;
-                posx += 5;
-
-                if (ImGui.Begin("Debugger"))
+                ImGui.SetNextWindowPos(new(5, MenuHeight + 5));
+                ImGui.SetNextWindowSize(new(320, 330));
+                if (ImGui.Begin("Screen"))
                 {
-                    DebugWindow.Render(DebugWindow.Breakpoints, false);
-                    ImGui.End();
-                }
+                    if (ImGui.IsWindowFocused())
+                        IsScreenWindow = true;
+                    ImGui.Image((nint)Screen.Texture.Id, ImGui.GetContentRegionAvail());
 
-                ImGui.SetNextWindowSize(new(400, 270));
+                    Notifications.RenderDebug();
+                }
+                ImGui.End();
+
+                ImGui.SetNextWindowPos(new(320 + 10, MenuHeight + 5), ImGuiCond.Once);
+                ImGui.SetNextWindowSize(new(220, 475));
+                if (ImGui.Begin("Debugger", NoScrollFlags))
+                {
+                    DebugWindow?.Draw();
+                }
+                ImGui.End();
+
+                ImGui.SetNextWindowPos(new(5, height - 300), ImGuiCond.Once);
+                ImGui.SetNextWindowSize(new(430, 300));
                 if (ImGui.Begin("Memory", NoScrollFlags))
-                {
-                    DebugWindow.RenderMemory();
-                    ImGui.End();
-                }
+                    DebugWindow?.DrawMemory();
+                ImGui.End();
 
+                ImGui.SetNextWindowPos(new(5 + 435, height - 300));
+                ImGui.SetNextWindowSize(new(275, 300));
                 if (ImGui.Begin("Breakpoints", NoScrollFlags))
-                {
-                    DebugWindow.RenderBreakpoints();
-                    ImGui.End();
-                }
+                    DebugWindow?.DrawBreakpoints();
+                ImGui.End();
 
-                if (ImGui.Begin("Cpu Info", NoScrollFlags))
+                if (Console == SnesConsole)
                 {
-                    DebugWindow.RenderCpuInfo();
+                    ImGui.SetNextWindowPos(new(5 + 715, height - 300));
+                    ImGui.SetNextWindowSize(new(230, 300));
+                    if (ImGui.Begin("DMA", NoScrollFlags))
+                        DebugWindow?.DrawDmaInfo();
                     ImGui.End();
                 }
             }
+            else
+            {
+                if (Raylib.IsWindowFocused())
+                    IsScreenWindow = true;
 
-            Raylib.DrawTexturePro(
-                Program.Screen.Texture,
-                new Rectangle(0, 0, texwidth, texheight),
-                new Rectangle(posx, posy,
-                texwidth * scale,
-                texheight * scale - MenuHeight),
-                Vector2.Zero, 0, Color.White);
+                Raylib.DrawTexturePro(
+                    Screen.Texture,
+                    new Rectangle(0, 0, texwidth, texheight),
+                    new Rectangle(posx, posy,
+                    texwidth * scale,
+                    texheight * scale - MenuHeight),
+                    Vector2.Zero, 0, Color.White);
 
-            Raylib.DrawFPS(width - 100, (int)(5 + MenuHeight));
-            Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), (int)(texheight * scale));
+                Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), (int)(texheight * scale), Debug);
+                Raylib.DrawFPS(width - 100, (int)(5 + MenuHeight));
+            }
         }
 
-        public virtual void Reset(string name, bool reset, bool debug) { }
+        public T GetConsole<T>()
+        {
+            return (T)Convert.ChangeType(this, typeof(T));
+        }
+
         public virtual void Update() { }
-        public virtual void Close(Dictionary<int, Breakpoint> Breakpoints) { }
-        public virtual void SaveState() { }
-        public virtual void LoadState() { }
-        public virtual dynamic GetConsole() { return default; }
-        public virtual T GetRam<T>() { return default; }
-        public virtual T GetPc<T>() { return default; }
-        public virtual T GetCpuInfo<T>(int i) { return default; }
-        public virtual T GetPpuInfo<T>() { return default; }
+        public virtual void Close() { }
+        public virtual void SaveState(int slot, StateResult res)
+        {
+            switch (res)
+            {
+                case StateResult.Success:
+                    Notifications.Init($"State {slot} Saved Successfully");
+                    break;
+                case StateResult.Failed:
+                    Notifications.Init($"Error Saving Save State {slot}");
+                    break;
+            }
+        }
 
-        public virtual void SaveRam() { }
+        public virtual void LoadState(int slot, StateResult res)
+        {
+            switch (res)
+            {
+                case StateResult.Success:
+                    Notifications.Init($"State {slot} Loaded Successfully");
+                    break;
+                case StateResult.Failed:
+                    Notifications.Init($"Save State {slot} Doesn't Exist");
+                    break;
+                case StateResult.Mismatch:
+                    Notifications.Init($"Save State {slot} Version Mismatch");
+                    break;
+            }
+        }
 
-        public virtual void LoadBreakpoints(Dictionary<int, Breakpoint> Breakpoints, string name)
+        public virtual void LoadBreakpoints(string name)
         {
             Breakpoints.Clear();
             var file = @$"{DebugDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
@@ -95,16 +186,15 @@ namespace Gmulator.Shared
                 var res = JsonSerializer.Deserialize<List<Breakpoint>>(File.ReadAllText(file), GEmuJsonContext.Default.Options);
                 foreach (var bp in res)
                 {
-                    //InsertRemove(bp.Addr, bp.Type, bp.Enabled);
                     Breakpoints.Add(bp.Addr, bp);
                 }
             }
         }
 
-        public virtual void SaveBreakpoints(Dictionary<int, Breakpoint> Breakpoints, string name)
+        public virtual void SaveBreakpoints(string name)
         {
-
-            if (name == "" && Breakpoints.Count == 0) return;
+            if (!Directory.Exists(DebugDirectory)) return;
+            if (name == null || (name == "" && Breakpoints.Count == 0)) return;
             var bps = Breakpoints.Values.DistinctBy(c => c.Addr).ToList();
             var file = @$"{DebugDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
             var json = JsonSerializer.Serialize(bps, GEmuJsonContext.Default.Options);

@@ -1,6 +1,6 @@
-﻿using static GBoy.Core.GbcCpu;
+﻿using static Gmulator.Core.Gbc.GbcCpu;
 
-namespace GBoy.Core;
+namespace Gmulator.Core.Gbc;
 public class GbcLogger
 {
     public StreamWriter Outfile { get; private set; }
@@ -8,7 +8,8 @@ public class GbcLogger
 
     public delegate byte Read(int a);
     public event Read ReadByte;
-    public Func<Dictionary<string,bool>> GetFlags;
+    public Func<Dictionary<string, bool>> GetFlags;
+
     public delegate Dictionary<string, byte> GetRegs();
     public event GetRegs OnGetRegs;
 
@@ -21,7 +22,7 @@ public class GbcLogger
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
             bool gamedoctor = false;
-            DisasmEntry e = Disassemble(pc, true);
+            DisasmEntry e = Disassemble(0, pc, true);
             if (gamedoctor)
                 Outfile.WriteLine($"{e.regtext}");
             else
@@ -29,24 +30,22 @@ public class GbcLogger
         }
     }
 
-    public void Toggle(bool log = true)
+    public void Toggle()
     {
-        if (!log)
-            Logging = false;
-        else
-            Logging = !Logging;
-
-        if (Logging)
+        Logging = !Logging;
+        if (Logging == true)
             Outfile = new StreamWriter(Environment.CurrentDirectory + "\\trace.log");
         else
-        {
-            if (Outfile != null)
-                Outfile.Close();
-        }
+            Outfile?.Close();
     }
 
-    public void Reset() => Toggle(false);
-    public DisasmEntry Disassemble(int pc, bool get_registers, bool gamedoctor = false)
+    public void Reset()
+    {
+        Logging = false;
+        Outfile?.Close();
+    }
+
+    public DisasmEntry Disassemble(int bank, int pc, bool get_registers, bool gamedoctor = false)
     {
         string data = string.Empty;
         string bytes = string.Empty;
@@ -56,7 +55,6 @@ public class GbcLogger
         byte b3 = ReadByte(pc + 3);
 
         Opcode d;
-
         byte op = ReadByte(pc);
         if (op == 0xcb)
             d = OpInfoCB[ReadByte(pc + 1)];
@@ -69,8 +67,8 @@ public class GbcLogger
                 data = $"{d.Name}";
             else
             {
-                if (d.Oper.Contains(","))
-                    data = $"{d.Name} {d.Oper.Insert(d.Oper.IndexOf(",") + 1, " ")}";
+                if (d.Oper.Contains(','))
+                    data = $"{d.Name} {d.Oper.Insert(d.Oper.IndexOf(',') + 1, " ")}";
                 else
                     data = $"{d.Name} {d.Oper}";
             }
@@ -78,7 +76,7 @@ public class GbcLogger
         }
         else if (d.Size == 2)
         {
-            if (d.Name.Contains("j"))
+            if (d.Name.Contains('j'))
             {
                 ushort offset = (ushort)(pc + (sbyte)b1 + 2);
                 if (d.Oper != string.Empty)
@@ -165,13 +163,12 @@ public class GbcLogger
                 var Regs = OnGetRegs();
                 var F = GetFlags();
                 char[] flags =
-                    [
-                        F["Z"] ? 'Z' : 'z',
-                        F["N"] ? 'N' : 'n',
-                        F["H"] ? 'H' : 'h',
-                        F["C"] ? 'C' : 'c'
-                    ];
-
+                [
+                    F["Z"] ? 'Z' : 'z',
+                    F["N"] ? 'N' : 'n',
+                    F["H"] ? 'H' : 'h',
+                    F["C"] ? 'C' : 'c'
+                ];
 
                 foreach (var v in Regs.Values)
                 {

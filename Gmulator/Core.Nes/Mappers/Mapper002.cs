@@ -35,10 +35,7 @@ internal class Mapper002 : BaseMapper
             return base.ReadPrg(0x4000 * Prg[1] + a % 0x4000);
     }
 
-    public override byte ReadChr(int a)
-    {
-        return base.ReadChr(0x4000 * Prg[0] + a % 0x4000);
-    }
+    public override byte ReadChr(int a) => base.ReadChr(0x4000 * Prg[0] + a % 0x4000);
 
     public override void WritePrg(int a, byte v)
     {
@@ -63,13 +60,7 @@ internal class Mapper002 : BaseMapper
         base.Reset();
     }
 
-    public override void Scanline()
-    {
-        base.Scanline();
-    }
+    public override void Scanline() => base.Scanline();
 
-    public override void SetLatch(int a, byte v)
-    {
-        base.SetLatch(a, v);
-    }
+    public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
 }

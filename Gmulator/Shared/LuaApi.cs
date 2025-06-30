@@ -6,12 +6,15 @@ using Raylib_cs;
 using Color = Raylib_cs.Color;
 using Lua = NLua.Lua;
 
-namespace Gmulator;
-public class LuaApi(ImFontPtr[] consolas)
+namespace Gmulator.Shared;
+public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float menuheight, bool debug)
 {
     public Lua Lua { get; private set; } = new();
+    public Texture2D Screen { get; } = screen;
     public ImFontPtr[] Consolas { get; } = consolas;
-    public int ConsoleHeight { get; set; }
+    private Font GuiFont = font;
+    public float MenuHeight { get; } = menuheight;
+    public bool Debug { get; private set; } = debug;
 
     private string LuaCwd;
     private string Error;
@@ -19,31 +22,20 @@ public class LuaApi(ImFontPtr[] consolas)
 
     public Func<int, byte> Read;
 
+    public void SetDebug(bool v) => Debug = v;
     public byte ReadByte(int a) => Read(a);
     public ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
-    public void AddCheat(string name, string code)
-    {
-        if (code.Length == 6 || code.Length == 8)
-        {
-            //if (name == null || Cheat.ConvertCodes == null)
-            //     return;
-
-            string cheatout = "";
-            //Cheat.ConvertCodes(name, code, ref cheatout, true);
-        }
-    }
 
     public void DrawWindow(string name, LuaTable text)
     {
         var width = Raylib.GetScreenWidth();
         var height = Raylib.GetScreenHeight();
-        var texwidth = Program.Screen.Texture.Width;
-        var scale = Math.Min((float)width / texwidth, (float)height / ConsoleHeight);
-        var leftpos = (width - texwidth * scale) / 2;
+        var scale = Math.Min((float)width / Screen.Width, (float)height / Screen.Height);
+        var leftpos = (width - Screen.Width * scale) / 2;
         var t = text.Values;
 
-        ImGui.SetNextWindowPos(new(0, Program.MenuHeight));
-        ImGui.SetNextWindowSize(new(leftpos, Program.DebuggerEnabled ? height / 2 : height));
+        ImGui.SetNextWindowPos(new(0, !Debug ? MenuHeight : 360));
+        ImGui.SetNextWindowSize(new(!Debug ? leftpos : 230, !Debug ? height : 130));
         ImGui.PushFont(Consolas[0]);
         if (ImGui.Begin(name, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoNavFocus))
         {
@@ -56,20 +48,27 @@ public class LuaApi(ImFontPtr[] consolas)
         ImGui.PopFont();
     }
 
-    public static void DrawText(params object[] args)
+    public void DrawText(params object[] args)
     {
         if (args.Length < 3)
             return;
 
-        var c = "ffffffff";
+        int c = 0xffffff;
         if (args.Length == 4 && $"{args[3]}".Length == 8)
-            c = $"{args[3]}";
+            c = Convert.ToInt32(args[3]);
 
-        var x = Convert.ToInt32(args[0]);
-        var y = Convert.ToInt32(args[1]);
+        var width = Raylib.GetRenderWidth();
+        var height = Raylib.GetRenderHeight();
+        var scale = Math.Min((float)width / Screen.Width, (float)height / Screen.Height);
+        var left = (width - Screen.Width * scale) / 2;
+        var top = ((height - Screen.Height * scale) / 2) + MenuHeight;
+        var x = (int)(Convert.ToInt32(args[0]) * scale + left);
+        var y = (int)(Convert.ToInt32(args[1]) * scale + top);
         var text = $"{args[2]}";
+        var fontsize = 32;
 
-        Raylib.DrawText(text, x, y, 14, GetColor(c));
+        Raylib.DrawRectangle(x - 0, y - 4, (int)(Raylib.MeasureText(text, fontsize)) + 10, fontsize - 2, Color.Black);
+        Raylib.DrawTextEx(GuiFont, text, new(x, y), fontsize, 1f, GetColor(c));
     }
 
     public static void DrawRectangle(params object[] args)
@@ -87,15 +86,15 @@ public class LuaApi(ImFontPtr[] consolas)
         Raylib.DrawRectangle(x, y, w, h, GetColor(args[4]));
     }
 
-    public static Color GetColor(object hexstr)
+    public static Color GetColor(object color)
     {
-        var c = Convert.ToInt32($"{hexstr}", 16);
+        var c = Convert.ToInt32(color);
         return new((byte)(c >> 24), (byte)(c >> 16), (byte)(c >> 8), (byte)c);
     }
 
-    public void Update()
+    public void Update(bool opened)
     {
-        if (Lua.State != null && Lua.Globals.Count() > 0)
+        if (Lua.State != null && Lua.Globals.Any())
         {
             try
             {
@@ -107,15 +106,15 @@ public class LuaApi(ImFontPtr[] consolas)
             }
         }
 
-        if (Raylib.IsGamepadButtonPressed(0, GamepadButton.LeftTrigger1) && !Menu.Opened)
+        if (Raylib.IsGamepadButtonPressed(0, GamepadButton.LeftTrigger1) && !opened)
         {
-            LoadFile(LuaFile);
+            Load(LuaFile);
             if (Lua.State != null)
                 Notifications.Init("Lua File Loaded Successfully");
         }
     }
 
-    public void LoadFile(string filename)
+    public void Load(string filename)
     {
         LuaFile = filename;
 
@@ -132,7 +131,6 @@ public class LuaApi(ImFontPtr[] consolas)
 
         Lua.NewTable("mem");
 
-        Lua.RegisterFunction("mem.addcheat", this, typeof(LuaApi).GetMethod("AddCheat"));
         Lua.RegisterFunction("mem.readbyte", this, typeof(LuaApi).GetMethod("ReadByte"));
         Lua.RegisterFunction("mem.readword", this, typeof(LuaApi).GetMethod("ReadWord"));
 
@@ -170,11 +168,21 @@ public class LuaApi(ImFontPtr[] consolas)
         Error = "";
     }
 
+    public void Save(string name)
+    {
+        if (File.Exists(LuaFile))
+        {
+            name = $"{Environment.CurrentDirectory}\\{LuaDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
+            var text = File.ReadAllText(LuaFile);
+            File.WriteAllText(name, text);
+        }
+    }
+
     public void CheckLuaFile(string name)
     {
         name = $"{Environment.CurrentDirectory}\\{LuaDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
         if (File.Exists(name))
-            LoadFile(name);
+            Load(name);
     }
 
     public static void LuaPrint(object text) => System.Console.WriteLine($"{text}");

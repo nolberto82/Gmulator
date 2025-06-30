@@ -1,15 +1,12 @@
 ﻿using Gmulator.Shared;
 
-namespace GBoy.Core;
-public class GbcPpu : SaveState
+namespace Gmulator.Core.Gbc;
+public class GbcPpu : EmuState
 {
     private const byte HBLANK = 0;
     private const byte VBLANK = 1;
     private const byte OAM = 2;
     private const byte LCD = 3;
-
-    private const int MaxDots = 456;
-    private const int HblankDots = 252;
     private const int VblankDots = 456;
     private const int OamDots = 80;
     private const int LcdDots = 172;
@@ -18,7 +15,6 @@ public class GbcPpu : SaveState
     public GbcMmu Mmu { get; private set; }
     public GbcIO IO { get; private set; }
 
-    public uint[] ScreenBuffer { get; private set; }
     public byte[] LineBGColors { get; private set; }
 
     public bool LCDOn { get; private set; }
@@ -37,27 +33,27 @@ public class GbcPpu : SaveState
     public int TileAddr { get => IO.LCDC.GetBit(4) ? 0x8000 : 0x8800; }
     public int MapAddr { get => IO.LCDC.GetBit(3) ? 0x9c00 : 0x9800; }
 
+    private uint[] ScreenBuffer;
+
     public readonly uint[][] GbColors =
-    {
+    [
         [0xffe7ffd6, 0xff88c070, 0xff346856, 0xff082432],
         [0xffffffff, 0xffaaaaaa, 0xff555555, 0xff000000]
-    };
-
+    ];
+    private readonly Gbc Gbc;
     public List<Sprite> sprites;
 
-    public uint[] ClearBuffer(uint[] buffer)
-    {
-        return Enumerable.Repeat(GbColors[1][3], buffer.Length).ToArray();
-    }
+    public uint[] ClearBuffer(uint[] buffer) => Enumerable.Repeat(GbColors[1][3], buffer.Length).ToArray();
 
-    public GbcPpu(GbcMmu mmu, GbcIO io)
+    public GbcPpu(Gbc gbc)
     {
-        Mmu = mmu;
-        IO = io;
+        Gbc = gbc;
+        Mmu = gbc.Mmu;
+        IO = gbc.IO;
 
         ScreenBuffer = new uint[GbWidth * GbHeight * 4];
         LineBGColors = new byte[GbWidth * 4]; ;
-        sprites = new();
+        sprites = [];
         CGBBkgPal = new byte[64];
         CGBObjPal = new byte[64];
     }
@@ -113,7 +109,7 @@ public class GbcPpu : SaveState
                         IO.LY = 0;
                         WLY = 0;
                         FrameCounter++;
-                        Texture.Update(Program.Screen.Texture, ScreenBuffer);
+                        Texture.Update(Gbc.Screen.Texture, ScreenBuffer);
                     }
                 }
                 break;
@@ -152,12 +148,15 @@ public class GbcPpu : SaveState
 
     private void DrawScanline()
     {
-        Array.Fill<byte>(LineBGColors, 0);
-        DrawBackground();
-        if (WindowOn)
-            DrawWindow();
-        if (SpriteOn)
-            DrawSprites();
+        if (!Gbc.FastForward || Gbc.FastForward && FrameCounter % Gbc.Config.FrameSkip == 0)
+        {
+            Array.Fill<byte>(LineBGColors, 0);
+            DrawBackground();
+            if (WindowOn)
+                DrawWindow();
+            if (SpriteOn)
+                DrawSprites();
+        }
     }
 
     private void DrawBackground()
@@ -274,14 +273,10 @@ public class GbcPpu : SaveState
             if (!sprites[i])
                 continue;
 
-            if (i == 28)
-            { }
-
             int fy = flipY ? (IO.LY - sy ^ (size - 1)) : IO.LY - sy;
 
             int tile = size == 16 ? ti & 0xfe : ti;
             int bgaddr = 0x8000 + tile * 16 + fy * 2;
-            uint rgb = 0xff000000;
             for (int xx = 0; xx < 8; xx++)
             {
                 if (sx + xx < 0 || sx + xx > GbWidth || sy >= GbHeight)
@@ -293,6 +288,7 @@ public class GbcPpu : SaveState
                 var fx = flipX ? xx : xx ^ 7;
                 var bank = CGB ? ((at >> 3) & 1) * 0x2000 : 0;
 
+                uint rgb;
                 if (!CGB)
                 {
                     color = (Mmu.Ram[(ushort)bgaddr] >> (fx & 7) & 1) |
@@ -392,7 +388,7 @@ public class GbcPpu : SaveState
             _ => null,
         };
 
-        if (srcbytes != null)
+        if (!srcbytes.IsEmpty)
         {
             Span<byte> dstbytes = new(Mmu.Ram, 0xfe00, 0xa0);
             srcbytes.CopyTo(dstbytes);
@@ -435,20 +431,11 @@ public class GbcPpu : SaveState
     }
 }
 
-public class Sprite
+public class Sprite(int i, byte x, byte y, byte tile, byte attribute)
 {
-    public int ID;
-    public byte X;
-    public byte Y;
-    public byte Tile;
-    public byte Attribute;
-
-    public Sprite(int i, byte x, byte y, byte tile, byte attribute)
-    {
-        ID = i;
-        X = x;
-        Y = y;
-        Tile = tile;
-        Attribute = attribute;
-    }
+    public int ID = i;
+    public byte X = x;
+    public byte Y = y;
+    public byte Tile = tile;
+    public byte Attribute = attribute;
 }

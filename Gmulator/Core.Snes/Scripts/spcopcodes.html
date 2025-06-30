@@ -1,0 +1,2062 @@
+<table>
+<thead>
+<tr>
+<th>Assembler Example</th>
+<th>Operation</th>
+<th>HEX</th>
+<th>Flags Set</th>
+<th>Bytes</th>
+<th>Cycles</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ADC   (X), (Y)    </code></td>
+<td><code>(X) = (X)+(Y)+C                                    </code></td>
+<td>99</td>
+<td>NV--H-ZC</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ADC   A, #i       </code></td>
+<td><code>A = A+i+C                                          </code></td>
+<td>88</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>ADC   A, (X)      </code></td>
+<td><code>A = A+(X)+C                                        </code></td>
+<td>86</td>
+<td>NV--H-ZC</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>ADC   A, [d]+Y    </code></td>
+<td><code>A = A+([d]+Y)+C                                    </code></td>
+<td>97</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>ADC   A, [d+X]    </code></td>
+<td><code>A = A+([d+X])+C                                    </code></td>
+<td>87</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>ADC   A, d        </code></td>
+<td><code>A = A+(d)+C                                        </code></td>
+<td>84</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>ADC   A, d+X      </code></td>
+<td><code>A = A+(d+X)+C                                      </code></td>
+<td>94</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ADC   A, !a       </code></td>
+<td><code>A = A+(a)+C                                        </code></td>
+<td>85</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ADC   A, !a+X     </code></td>
+<td><code>A = A+(a+X)+C                                      </code></td>
+<td>95</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ADC   A, !a+Y     </code></td>
+<td><code>A = A+(a+Y)+C                                      </code></td>
+<td>96</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ADC   dd, ds      </code></td>
+<td><code>(dd) = (dd)+(d)+C                                  </code></td>
+<td>89</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>ADC   d, #i       </code></td>
+<td><code>(d) = (d)+i+C                                      </code></td>
+<td>98</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ADDW  YA, d       </code></td>
+<td><code>YA  = YA + (d), H on high byte                     </code></td>
+<td>7A</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>AND   (X), (Y)    </code></td>
+<td><code>(X) = (X) &amp; (Y)                                    </code></td>
+<td>39</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>AND   A, #i       </code></td>
+<td><code>A = A &amp; i                                          </code></td>
+<td>28</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>AND   A, (X)      </code></td>
+<td><code>A = A &amp; (X)                                        </code></td>
+<td>26</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>AND   A, [d]+Y    </code></td>
+<td><code>A = A &amp; ([d]+Y)                                    </code></td>
+<td>37</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>AND   A, [d+X]    </code></td>
+<td><code>A = A &amp; ([d+X])                                    </code></td>
+<td>27</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>AND   A, d        </code></td>
+<td><code>A = A &amp; (d)                                        </code></td>
+<td>24</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>AND   A, d+X      </code></td>
+<td><code>A = A &amp; (d+X)                                      </code></td>
+<td>34</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>AND   A, !a       </code></td>
+<td><code>A = A &amp; (a)                                        </code></td>
+<td>25</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>AND   A, !a+X     </code></td>
+<td><code>A = A &amp; (a+X)                                      </code></td>
+<td>35</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>AND   A, !a+Y     </code></td>
+<td><code>A = A &amp; (a+Y)                                      </code></td>
+<td>36</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>AND   dd, ds      </code></td>
+<td><code>(dd) = (dd) &amp; (ds)                                 </code></td>
+<td>29</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>AND   d, #i       </code></td>
+<td><code>(d) = (d) &amp; i                                      </code></td>
+<td>38</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>AND1  C, /m.b     </code></td>
+<td><code>C = C &amp; ~(m.b)                                     </code></td>
+<td>6A</td>
+<td>-------C</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>AND1  C, m.b      </code></td>
+<td><code>C = C &amp; (m.b)                                      </code></td>
+<td>4A</td>
+<td>-------C</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ASL   A           </code></td>
+<td><code>Left shift A: high-&gt;C, 0-&gt;low                      </code></td>
+<td>1C</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>ASL   d           </code></td>
+<td><code>Left shift (d) as above                            </code></td>
+<td>0B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ASL   d+X         </code></td>
+<td><code>Left shift (d+X) as above                          </code></td>
+<td>1B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ASL   !a          </code></td>
+<td><code>Left shift (a) as above                            </code></td>
+<td>0C</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>BBC   d.0, r      </code></td>
+<td><code>PC+=r  if d.0 == 0                                 </code></td>
+<td>13</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.1, r      </code></td>
+<td><code>PC+=r  if d.1 == 0                                 </code></td>
+<td>33</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.2, r      </code></td>
+<td><code>PC+=r  if d.2 == 0                                 </code></td>
+<td>53</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.3, r      </code></td>
+<td><code>PC+=r  if d.3 == 0                                 </code></td>
+<td>73</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.4, r      </code></td>
+<td><code>PC+=r  if d.4 == 0                                 </code></td>
+<td>93</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.5, r      </code></td>
+<td><code>PC+=r  if d.5 == 0                                 </code></td>
+<td>B3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.6, r      </code></td>
+<td><code>PC+=r  if d.6 == 0                                 </code></td>
+<td>D3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBC   d.7, r      </code></td>
+<td><code>PC+=r  if d.7 == 0                                 </code></td>
+<td>F3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.0, r      </code></td>
+<td><code>PC+=r  if d.0 == 1                                 </code></td>
+<td>03</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.1, r      </code></td>
+<td><code>PC+=r  if d.1 == 1                                 </code></td>
+<td>23</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.2, r      </code></td>
+<td><code>PC+=r  if d.2 == 1                                 </code></td>
+<td>43</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.3, r      </code></td>
+<td><code>PC+=r  if d.3 == 1                                 </code></td>
+<td>63</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.4, r      </code></td>
+<td><code>PC+=r  if d.4 == 1                                 </code></td>
+<td>83</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.5, r      </code></td>
+<td><code>PC+=r  if d.5 == 1                                 </code></td>
+<td>A3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.6, r      </code></td>
+<td><code>PC+=r  if d.6 == 1                                 </code></td>
+<td>C3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BBS   d.7, r      </code></td>
+<td><code>PC+=r  if d.7 == 1                                 </code></td>
+<td>E3</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>BCC   r           </code></td>
+<td><code>PC+=r  if C == 0                                   </code></td>
+<td>90</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BCS   r           </code></td>
+<td><code>PC+=r  if C == 1                                   </code></td>
+<td>B0</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BEQ   r           </code></td>
+<td><code>PC+=r  if Z == 1                                   </code></td>
+<td>F0</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BMI   r           </code></td>
+<td><code>PC+=r  if N == 1                                   </code></td>
+<td>30</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BNE   r           </code></td>
+<td><code>PC+=r  if Z == 0                                   </code></td>
+<td>D0</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BPL   r           </code></td>
+<td><code>PC+=r  if N == 0                                   </code></td>
+<td>10</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BVC   r           </code></td>
+<td><code>PC+=r  if V == 0                                   </code></td>
+<td>50</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BVS   r           </code></td>
+<td><code>PC+=r  if V == 1                                   </code></td>
+<td>70</td>
+<td>--------</td>
+<td>2</td>
+<td>2/4</td>
+</tr>
+<tr>
+<td><code>BRA   r           </code></td>
+<td><code>PC+=r                                              </code></td>
+<td>2F</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>BRK               </code></td>
+<td><code>Push PC and Flags, PC = [$FFDE]                    </code></td>
+<td>0F</td>
+<td>---1-0--</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>CALL  !a          </code></td>
+<td><code>(SP--)=PCh, (SP--)=PCl, PC=a                       </code></td>
+<td>3F</td>
+<td>--------</td>
+<td>3</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>CBNE  d+X, r      </code></td>
+<td><code>CMP A, (d+X) then BNE                              </code></td>
+<td>DE</td>
+<td>--------</td>
+<td>3</td>
+<td>6/8</td>
+</tr>
+<tr>
+<td><code>CBNE  d, r        </code></td>
+<td><code>CMP A, (d) then BNE                                </code></td>
+<td>2E</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>CLR1  d.0         </code></td>
+<td><code>d.0 = 0                                            </code></td>
+<td>12</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.1         </code></td>
+<td><code>d.1 = 0                                            </code></td>
+<td>32</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.2         </code></td>
+<td><code>d.2 = 0                                            </code></td>
+<td>52</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.3         </code></td>
+<td><code>d.3 = 0                                            </code></td>
+<td>72</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.4         </code></td>
+<td><code>d.4 = 0                                            </code></td>
+<td>92</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.5         </code></td>
+<td><code>d.5 = 0                                            </code></td>
+<td>B2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.6         </code></td>
+<td><code>d.6 = 0                                            </code></td>
+<td>D2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLR1  d.7         </code></td>
+<td><code>d.7 = 0                                            </code></td>
+<td>F2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CLRC              </code></td>
+<td><code>C = 0                                              </code></td>
+<td>60</td>
+<td>-------0</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CLRP              </code></td>
+<td><code>P = 0                                              </code></td>
+<td>20</td>
+<td>--0-----</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CLRV              </code></td>
+<td><code>V = 0, H = 0                                       </code></td>
+<td>E0</td>
+<td>-0--0---</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CMP   (X), (Y)    </code></td>
+<td><code>(X) - (Y)                                          </code></td>
+<td>79</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>CMP   A, #i       </code></td>
+<td><code>A - i                                              </code></td>
+<td>68</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CMP   A, (X)      </code></td>
+<td><code>A - (X)                                            </code></td>
+<td>66</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>CMP   A, [d]+Y    </code></td>
+<td><code>A - ([d]+Y)                                        </code></td>
+<td>77</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>CMP   A, [d+X]    </code></td>
+<td><code>A - ([d+X])                                        </code></td>
+<td>67</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>CMP   A, d        </code></td>
+<td><code>A - (d)                                            </code></td>
+<td>64</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>CMP   A, d+X      </code></td>
+<td><code>A - (d+X)                                          </code></td>
+<td>74</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CMP   A, !a       </code></td>
+<td><code>A - (a)                                            </code></td>
+<td>65</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CMP   A, !a+X     </code></td>
+<td><code>A - (a+X)                                          </code></td>
+<td>75</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>CMP   A, !a+Y     </code></td>
+<td><code>A - (a+Y)                                          </code></td>
+<td>76</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>CMP   X, #i       </code></td>
+<td><code>X - i                                              </code></td>
+<td>C8</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CMP   X, d        </code></td>
+<td><code>X - (d)                                            </code></td>
+<td>3E</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>CMP   X, !a       </code></td>
+<td><code>X - (a)                                            </code></td>
+<td>1E</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CMP   Y, #i       </code></td>
+<td><code>Y - i                                              </code></td>
+<td>AD</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>CMP   Y, d        </code></td>
+<td><code>Y - (d)                                            </code></td>
+<td>7E</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>CMP   Y, !a       </code></td>
+<td><code>Y - (a)                                            </code></td>
+<td>5E</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>CMP   dd, ds      </code></td>
+<td><code>(dd) - (ds)                                        </code></td>
+<td>69</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>CMP   d, #i       </code></td>
+<td><code>(d) - i                                            </code></td>
+<td>78</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>CMPW  YA, d       </code></td>
+<td><code>YA - (d)                                           </code></td>
+<td>5A</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>DAA   A           </code></td>
+<td><code>decimal adjust for addition                        </code></td>
+<td>DF</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>DAS   A           </code></td>
+<td><code>decimal adjust for subtraction                     </code></td>
+<td>BE</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>DBNZ  Y, r        </code></td>
+<td><code>Y-- then JNZ                                       </code></td>
+<td>FE</td>
+<td>--------</td>
+<td>2</td>
+<td>4/6</td>
+</tr>
+<tr>
+<td><code>DBNZ  d, r        </code></td>
+<td><code>(d)-- then JNZ                                     </code></td>
+<td>6E</td>
+<td>--------</td>
+<td>3</td>
+<td>5/7</td>
+</tr>
+<tr>
+<td><code>DEC   A           </code></td>
+<td><code>A--                                                </code></td>
+<td>9C</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>DEC   X           </code></td>
+<td><code>X--                                                </code></td>
+<td>1D</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>DEC   Y           </code></td>
+<td><code>Y--                                                </code></td>
+<td>DC</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>DEC   d           </code></td>
+<td><code>(d)--                                              </code></td>
+<td>8B</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>DEC   d+X         </code></td>
+<td><code>(d+X)--                                            </code></td>
+<td>9B</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>DEC   !a          </code></td>
+<td><code>(a)--                                              </code></td>
+<td>8C</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>DECW  d           </code></td>
+<td><code>Word (d)--                                         </code></td>
+<td>1A</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>DI                </code></td>
+<td><code>I = 0                                              </code></td>
+<td>C0</td>
+<td>-----0--</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>DIV   YA, X       </code></td>
+<td><code>A=YA/X, Y=mod(YA,X)                                </code></td>
+<td>9E</td>
+<td>NV--H-Z-</td>
+<td>1</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code>EI                </code></td>
+<td><code>I = 1                                              </code></td>
+<td>A0</td>
+<td>-----1--</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>EOR   (X), (Y)    </code></td>
+<td><code>(X) = (X) EOR (Y)                                  </code></td>
+<td>59</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>EOR   A, #i       </code></td>
+<td><code>A = A EOR i                                        </code></td>
+<td>48</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>EOR   A, (X)      </code></td>
+<td><code>A = A EOR (X)                                      </code></td>
+<td>46</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>EOR   A, [d]+Y    </code></td>
+<td><code>A = A EOR ([d]+Y)                                  </code></td>
+<td>57</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>EOR   A, [d+X]    </code></td>
+<td><code>A = A EOR ([d+X])                                  </code></td>
+<td>47</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>EOR   A, d        </code></td>
+<td><code>A = A EOR (d)                                      </code></td>
+<td>44</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>EOR   A, d+X      </code></td>
+<td><code>A = A EOR (d+X)                                    </code></td>
+<td>54</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>EOR   A, !a       </code></td>
+<td><code>A = A EOR (a)                                      </code></td>
+<td>45</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>EOR   A, !a+X     </code></td>
+<td><code>A = A EOR (a+X)                                    </code></td>
+<td>55</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>EOR   A, !a+Y     </code></td>
+<td><code>A = A EOR (a+Y)                                    </code></td>
+<td>56</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>EOR   dd, ds      </code></td>
+<td><code>(dd) = (dd) EOR (ds)                               </code></td>
+<td>49</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>EOR   d, #i       </code></td>
+<td><code>(d) = (d) EOR i                                    </code></td>
+<td>58</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>EOR1  C, m.b      </code></td>
+<td><code>C = C EOR (m.b)                                    </code></td>
+<td>8A</td>
+<td>-------C</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>INC   A           </code></td>
+<td><code>A++                                                </code></td>
+<td>BC</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>INC   X           </code></td>
+<td><code>X++                                                </code></td>
+<td>3D</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>INC   Y           </code></td>
+<td><code>Y++                                                </code></td>
+<td>FC</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>INC   d           </code></td>
+<td><code>(d)++                                              </code></td>
+<td>AB</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>INC   d+X         </code></td>
+<td><code>(d+X)++                                            </code></td>
+<td>BB</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>INC   !a          </code></td>
+<td><code>(a)++                                              </code></td>
+<td>AC</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>INCW  d           </code></td>
+<td><code>Word (d)++                                         </code></td>
+<td>3A</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>JMP   [!a+X]      </code></td>
+<td><code>PC = [a+X]                                         </code></td>
+<td>1F</td>
+<td>--------</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>JMP   !a          </code></td>
+<td><code>PC = a                                             </code></td>
+<td>5F</td>
+<td>--------</td>
+<td>3</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>LSR   A           </code></td>
+<td><code>Right shift A: 0-&gt;high, low-&gt;C                     </code></td>
+<td>5C</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>LSR   d           </code></td>
+<td><code>Right shift (d) as above                           </code></td>
+<td>4B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>LSR   d+X         </code></td>
+<td><code>Right shift (d+X) as above                         </code></td>
+<td>5B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>LSR   !a          </code></td>
+<td><code>Right shift (a) as above                           </code></td>
+<td>4C</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   (X)+, A     </code></td>
+<td><code>(X++) = A      (no read)                           </code></td>
+<td>AF</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   (X), A      </code></td>
+<td><code>(X) = A        (read)                              </code></td>
+<td>C6</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   [d]+Y, A    </code></td>
+<td><code>([d]+Y) = A    (read)                              </code></td>
+<td>D7</td>
+<td>--------</td>
+<td>2</td>
+<td>7</td>
+</tr>
+<tr>
+<td><code>MOV   [d+X], A    </code></td>
+<td><code>([d+X]) = A    (read)                              </code></td>
+<td>C7</td>
+<td>--------</td>
+<td>2</td>
+<td>7</td>
+</tr>
+<tr>
+<td><code>MOV   A, #i       </code></td>
+<td><code>A = i                                              </code></td>
+<td>E8</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   A, (X)      </code></td>
+<td><code>A = (X)                                            </code></td>
+<td>E6</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>MOV   A, (X)+     </code></td>
+<td><code>A = (X++)                                          </code></td>
+<td>BF</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   A, [d]+Y    </code></td>
+<td><code>A = ([d]+Y)                                        </code></td>
+<td>F7</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>MOV   A, [d+X]    </code></td>
+<td><code>A = ([d+X])                                        </code></td>
+<td>E7</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>MOV   A, X        </code></td>
+<td><code>A = X                                              </code></td>
+<td>7D</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   A, Y        </code></td>
+<td><code>A = Y                                              </code></td>
+<td>DD</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   A, d        </code></td>
+<td><code>A = (d)                                            </code></td>
+<td>E4</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>MOV   A, d+X      </code></td>
+<td><code>A = (d+X)                                          </code></td>
+<td>F4</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   A, !a       </code></td>
+<td><code>A = (a)                                            </code></td>
+<td>E5</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   A, !a+X     </code></td>
+<td><code>A = (a+X)                                          </code></td>
+<td>F5</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   A, !a+Y     </code></td>
+<td><code>A = (a+Y)                                          </code></td>
+<td>F6</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   SP, X       </code></td>
+<td><code>SP = X                                             </code></td>
+<td>BD</td>
+<td>--------</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   X, #i       </code></td>
+<td><code>X = i                                              </code></td>
+<td>CD</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   X, A        </code></td>
+<td><code>X = A                                              </code></td>
+<td>5D</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   X, SP       </code></td>
+<td><code>X = SP                                             </code></td>
+<td>9D</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   X, d        </code></td>
+<td><code>X = (d)                                            </code></td>
+<td>F8</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>MOV   X, d+Y      </code></td>
+<td><code>X = (d+Y)                                          </code></td>
+<td>F9</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   X, !a       </code></td>
+<td><code>X = (a)                                            </code></td>
+<td>E9</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   Y, #i       </code></td>
+<td><code>Y = i                                              </code></td>
+<td>8D</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   Y, A        </code></td>
+<td><code>Y = A                                              </code></td>
+<td>FD</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>MOV   Y, d        </code></td>
+<td><code>Y = (d)                                            </code></td>
+<td>EB</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>MOV   Y, d+X      </code></td>
+<td><code>Y = (d+X)                                          </code></td>
+<td>FB</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   Y, !a       </code></td>
+<td><code>Y = (a)                                            </code></td>
+<td>EC</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   dd, ds      </code></td>
+<td><code>(dd) = (ds)    (no read)                           </code></td>
+<td>FA</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   d+X, A      </code></td>
+<td><code>(d+X) = A      (read)                              </code></td>
+<td>D4</td>
+<td>--------</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   d+X, Y      </code></td>
+<td><code>(d+X) = Y      (read)                              </code></td>
+<td>DB</td>
+<td>--------</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   d+Y, X      </code></td>
+<td><code>(d+Y) = X      (read)                              </code></td>
+<td>D9</td>
+<td>--------</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   d, #i       </code></td>
+<td><code>(d) = i        (read)                              </code></td>
+<td>8F</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   d, A        </code></td>
+<td><code>(d) = A        (read)                              </code></td>
+<td>C4</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   d, X        </code></td>
+<td><code>(d) = X        (read)                              </code></td>
+<td>D8</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   d, Y        </code></td>
+<td><code>(d) = Y        (read)                              </code></td>
+<td>CB</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV   !a+X, A     </code></td>
+<td><code>(a+X) = A      (read)                              </code></td>
+<td>D5</td>
+<td>--------</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>MOV   !a+Y, A     </code></td>
+<td><code>(a+Y) = A      (read)                              </code></td>
+<td>D6</td>
+<td>--------</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>MOV   !a, A       </code></td>
+<td><code>(a) = A        (read)                              </code></td>
+<td>C5</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   !a, X       </code></td>
+<td><code>(a) = X        (read)                              </code></td>
+<td>C9</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV   !a, Y       </code></td>
+<td><code>(a) = Y        (read)                              </code></td>
+<td>CC</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOV1  C, m.b      </code></td>
+<td><code>C = (m.b)                                          </code></td>
+<td>AA</td>
+<td>-------C</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>MOV1  m.b, C      </code></td>
+<td><code>(m.b) = C                                          </code></td>
+<td>CA</td>
+<td>--------</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>MOVW  YA, d       </code></td>
+<td><code>YA = word (d)                                      </code></td>
+<td>BA</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MOVW  d, YA       </code></td>
+<td><code>word (d) = YA  (read low only)                     </code></td>
+<td>DA</td>
+<td>--------</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>MUL   YA          </code></td>
+<td><code>YA = Y * A, NZ on Y only                           </code></td>
+<td>CF</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>9</td>
+</tr>
+<tr>
+<td><code>NOP               </code></td>
+<td><code>do nothing                                         </code></td>
+<td>00</td>
+<td>--------</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>NOT1  m.b         </code></td>
+<td><code>m.b = ~m.b                                         </code></td>
+<td>EA</td>
+<td>--------</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>NOTC              </code></td>
+<td><code>C = !C                                             </code></td>
+<td>ED</td>
+<td>-------C</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>OR    (X), (Y)    </code></td>
+<td><code>(X) = (X) &amp;#124; (Y)                               </code></td>
+<td>19</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>OR    A, #i       </code></td>
+<td>A = A | i</td>
+<td>08</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>OR    A, (X)      </code></td>
+<td>A = A | (X)</td>
+<td>06</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>OR    A, [d]+Y    </code></td>
+<td>A = A | <code>([d]+Y)</code></td>
+<td>17</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>OR    A, [d+X]    </code></td>
+<td>A = A | <code>([d+X])</code></td>
+<td>07</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>OR    A, d        </code></td>
+<td>A = A | (d)</td>
+<td>04</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>OR    A, d+X      </code></td>
+<td>A = A | (d+X)</td>
+<td>14</td>
+<td>N-----Z-</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>OR    A, !a       </code></td>
+<td>A = A | (a)</td>
+<td>05</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>OR    A, !a+X     </code></td>
+<td>A = A | (a+X)</td>
+<td>15</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>OR    A, !a+Y     </code></td>
+<td>A = A | (a+Y)</td>
+<td>16</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>OR    dd, ds      </code></td>
+<td><code>(dd) = (dd) &amp;#124; (ds)                            </code></td>
+<td>09</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>OR    d, #i       </code></td>
+<td><code>(d) = (d) &amp;#124; i                                 </code></td>
+<td>18</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>OR1   C, /m.b     </code></td>
+<td><code>C = C &amp;#124; ~(m.b)                                </code></td>
+<td>2A</td>
+<td>-------C</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>OR1   C, m.b      </code></td>
+<td><code>C = C &amp;#124; (m.b)                                 </code></td>
+<td>0A</td>
+<td>-------C</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>PCALL u           </code></td>
+<td><code>CALL $FF00+u                                       </code></td>
+<td>4F</td>
+<td>--------</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>POP   A           </code></td>
+<td><code>A = (++SP)                                         </code></td>
+<td>AE</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>POP   PSW         </code></td>
+<td><code>Flags = (++SP)                                     </code></td>
+<td>8E</td>
+<td>NVPBHIZC</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>POP   X           </code></td>
+<td><code>X = (++SP)                                         </code></td>
+<td>CE</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>POP   Y           </code></td>
+<td><code>Y = (++SP)                                         </code></td>
+<td>EE</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>PUSH  A           </code></td>
+<td><code>(SP--) = A                                         </code></td>
+<td>2D</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>PUSH  PSW         </code></td>
+<td><code>(SP--) = Flags                                     </code></td>
+<td>0D</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>PUSH  X           </code></td>
+<td><code>(SP--) = X                                         </code></td>
+<td>4D</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>PUSH  Y           </code></td>
+<td><code>(SP--) = Y                                         </code></td>
+<td>6D</td>
+<td>--------</td>
+<td>1</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>RET               </code></td>
+<td><code>Pop PC                                             </code></td>
+<td>6F</td>
+<td>--------</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>RETI              </code></td>
+<td><code>Pop Flags, PC                                      </code></td>
+<td>7F</td>
+<td>NVPBHIZC</td>
+<td>1</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>ROL   A           </code></td>
+<td><code>Left shift A: low=C, C=high                        </code></td>
+<td>3C</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>ROL   d           </code></td>
+<td><code>Left shift (d) as above                            </code></td>
+<td>2B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ROL   d+X         </code></td>
+<td><code>Left shift (d+X) as above                          </code></td>
+<td>3B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ROL   !a          </code></td>
+<td><code>Left shift (a) as above                            </code></td>
+<td>2C</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ROR   A           </code></td>
+<td><code>Right shift A: high=C, C=low                       </code></td>
+<td>7C</td>
+<td>N-----ZC</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>ROR   d           </code></td>
+<td><code>Right shift (d) as above                           </code></td>
+<td>6B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>ROR   d+X         </code></td>
+<td><code>Right shift (d+X) as above                         </code></td>
+<td>7B</td>
+<td>N-----ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>ROR   !a          </code></td>
+<td><code>Right shift (a) as above                           </code></td>
+<td>6C</td>
+<td>N-----ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>SBC   (X), (Y)    </code></td>
+<td><code>(X) = (X)-(Y)-!C                                   </code></td>
+<td>B9</td>
+<td>NV--H-ZC</td>
+<td>1</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>SBC   A, #i       </code></td>
+<td><code>A = A-i-!C                                         </code></td>
+<td>A8</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>SBC   A, (X)      </code></td>
+<td><code>A = A-(X)-!C                                       </code></td>
+<td>A6</td>
+<td>NV--H-ZC</td>
+<td>1</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>SBC   A, [d]+Y    </code></td>
+<td><code>A = A-([d]+Y)-!C                                   </code></td>
+<td>B7</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>SBC   A, [d+X]    </code></td>
+<td><code>A = A-([d+X])-!C                                   </code></td>
+<td>A7</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>SBC   A, d        </code></td>
+<td><code>A = A-(d)-!C                                       </code></td>
+<td>A4</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>3</td>
+</tr>
+<tr>
+<td><code>SBC   A, d+X      </code></td>
+<td><code>A = A-(d+X)-!C                                     </code></td>
+<td>B4</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SBC   A, !a       </code></td>
+<td><code>A = A-(a)-!C                                       </code></td>
+<td>A5</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SBC   A, !a+X     </code></td>
+<td><code>A = A-(a+X)-!C                                     </code></td>
+<td>B5</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>SBC   A, !a+Y     </code></td>
+<td><code>A = A-(a+Y)-!C                                     </code></td>
+<td>B6</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>SBC   dd, ds      </code></td>
+<td><code>(dd) = (dd)-(ds)-!C                                </code></td>
+<td>A9</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>SBC   d, #i       </code></td>
+<td><code>(d) = (d)-i-!C                                     </code></td>
+<td>B8</td>
+<td>NV--H-ZC</td>
+<td>3</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>SET1  d.0         </code></td>
+<td><code>d.0 = 1                                            </code></td>
+<td>02</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.1         </code></td>
+<td><code>d.1 = 1                                            </code></td>
+<td>22</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.2         </code></td>
+<td><code>d.2 = 1                                            </code></td>
+<td>42</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.3         </code></td>
+<td><code>d.3 = 1                                            </code></td>
+<td>62</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.4         </code></td>
+<td><code>d.4 = 1                                            </code></td>
+<td>82</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.5         </code></td>
+<td><code>d.5 = 1                                            </code></td>
+<td>A2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.6         </code></td>
+<td><code>d.6 = 1                                            </code></td>
+<td>C2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SET1  d.7         </code></td>
+<td><code>d.7 = 1                                            </code></td>
+<td>E2</td>
+<td>--------</td>
+<td>2</td>
+<td>4</td>
+</tr>
+<tr>
+<td><code>SETC              </code></td>
+<td><code>C = 1                                              </code></td>
+<td>80</td>
+<td>-------1</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>SETP              </code></td>
+<td><code>P = 1                                              </code></td>
+<td>40</td>
+<td>--1-----</td>
+<td>1</td>
+<td>2</td>
+</tr>
+<tr>
+<td><code>SLEEP             </code></td>
+<td><code>Halts the processor                                </code></td>
+<td>EF</td>
+<td>--------</td>
+<td>1</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>STOP              </code></td>
+<td><code>Halts the processor                                </code></td>
+<td>FF</td>
+<td>--------</td>
+<td>1</td>
+<td>?</td>
+</tr>
+<tr>
+<td><code>SUBW  YA, d       </code></td>
+<td><code>YA  = YA - (d), H on high byte                     </code></td>
+<td>9A</td>
+<td>NV--H-ZC</td>
+<td>2</td>
+<td>5</td>
+</tr>
+<tr>
+<td><code>TCALL 0           </code></td>
+<td><code>CALL [$FFDE]                                       </code></td>
+<td>01</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 1           </code></td>
+<td><code>CALL [$FFDC]                                       </code></td>
+<td>11</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 2           </code></td>
+<td><code>CALL [$FFDA]                                       </code></td>
+<td>21</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 3           </code></td>
+<td><code>CALL [$FFD8]                                       </code></td>
+<td>31</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 4           </code></td>
+<td><code>CALL [$FFD6]                                       </code></td>
+<td>41</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 5           </code></td>
+<td><code>CALL [$FFD4]                                       </code></td>
+<td>51</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 6           </code></td>
+<td><code>CALL [$FFD2]                                       </code></td>
+<td>61</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 7           </code></td>
+<td><code>CALL [$FFD0]                                       </code></td>
+<td>71</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 8           </code></td>
+<td><code>CALL [$FFCE]                                       </code></td>
+<td>81</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 9           </code></td>
+<td><code>CALL [$FFCC]                                       </code></td>
+<td>91</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 10          </code></td>
+<td><code>CALL [$FFCA]                                       </code></td>
+<td>A1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 11          </code></td>
+<td><code>CALL [$FFC8]                                       </code></td>
+<td>B1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 12          </code></td>
+<td><code>CALL [$FFC6]                                       </code></td>
+<td>C1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 13          </code></td>
+<td><code>CALL [$FFC4]                                       </code></td>
+<td>D1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 14          </code></td>
+<td><code>CALL [$FFC2]                                       </code></td>
+<td>E1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCALL 15          </code></td>
+<td><code>CALL [$FFC0]                                       </code></td>
+<td>F1</td>
+<td>--------</td>
+<td>1</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code>TCLR1 !a          </code></td>
+<td><code>(a) = (a)&amp;~A, ZN as for A-(a)                      </code></td>
+<td>4E</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>TSET1 !a          </code></td>
+<td>(a) = (a)|A, ZN as for A-(a)</td>
+<td>0E</td>
+<td>N-----Z-</td>
+<td>3</td>
+<td>6</td>
+</tr>
+<tr>
+<td><code>XCN   A           </code></td>
+<td>A = (A&gt;&gt;4) | (A&lt;&lt;4)</td>
+<td>9F</td>
+<td>N-----Z-</td>
+<td>1</td>
+<td>5</td>
+</tr>
+</tbody>
+</table>

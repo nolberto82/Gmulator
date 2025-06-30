@@ -1,11 +1,13 @@
 ﻿using GNes.Core;
-using GNes.Core;
 using Gmulator;
 using System;
+using Raylib_cs;
+using Gmulator.Core.Nes;
+using Gmulator.Core.Snes;
 
 namespace GNes.Core
 {
-    public class NesPpu(NesMmu mmu) : SaveState
+    public class NesPpu(NesMmu mmu) : EmuState
     {
         public int[] MirrorHor = [0, 0, 1, 1];
         public int[] MirrorVer = [0, 1, 0, 1];
@@ -78,10 +80,10 @@ namespace GNes.Core
         public int FineY => (Lp.V & 0x7000) >> 12;
 
         public NesMmu Mmu { get; private set; } = mmu;
-        public uint[] ScreenBuffer { get; private set; } = new uint[NesWidth * NesHeight * 4];
         public uint[] NametableBuffer { get; private set; } = new uint[NesWidth * NesWidth * 4];
+        private uint[] ScreenBuffer;
 
-        private Action<int> ApuStep;
+        public Nes Nes { get; private set; }
 
         private readonly uint[] pixPalettes = new uint[192 / 3];
         private readonly byte[] palBuffer =
@@ -100,9 +102,10 @@ namespace GNes.Core
             0xB8,0xB2,0xEB,0xC8,0xB7,0xE5,0xEB,0xAC,0xAC,0xAC,0x00,0x00,0x00,0x00,0x00,0x00
         ];
 
-        public void Init(NesApu apu)
+        public void Init(Nes nes)
         {
-            ApuStep = apu.Step;
+            Nes = nes;
+            ScreenBuffer = new uint[NesWidth * NesHeight * 4];
         }
 
         public void Reset()
@@ -135,8 +138,7 @@ namespace GNes.Core
         public void Step(int c)
         {
             FrameCycles += c;
-            if (!Program.FastForward)
-                ApuStep(1);
+            Nes.Apu.Step(1);
 
             //if (Cart.Region == 1)
             //    c = 2;
@@ -174,13 +176,7 @@ namespace GNes.Core
                     if (Cycle == 1)
                     {
                         FrameCounter++;
-                        if (Program.FastForward)
-                        {
-                            if ((FrameCounter % 8) == 0)
-                                Texture.Update(Program.Screen.Texture, ScreenBuffer);
-                        }
-                        else
-                            Texture.Update(Program.Screen.Texture, ScreenBuffer);
+                        Texture.Update(Nes.Screen.Texture, ScreenBuffer);
                     }
                 }
                 else if (Scanline == ScanVblank)
@@ -288,10 +284,7 @@ namespace GNes.Core
             return v;
         }
 
-        public void OamAddressW(byte v)
-        {
-            OamAddr = v;
-        }
+        public void OamAddressW(byte v) => OamAddr = v;
 
         public void OamDataW(byte v)
         {
@@ -380,6 +373,8 @@ namespace GNes.Core
 
         private void RenderPixels()
         {
+            if (Nes.FastForward && FrameCounter % Nes.Config.FrameSkip == 0) return;
+
             int x = Cycle - 1;
             int y = Scanline;
             int bg_pixel = 0;
@@ -790,23 +785,20 @@ namespace GNes.Core
             Totalcycles = br.ReadUInt64();
         }
 
-        public Dictionary<string, dynamic> GetPpuInfo()
+        public Dictionary<string, dynamic> GetPpuInfo() => new()
         {
-            return new()
-            {
-                ["Cycle"] = $"{Cycle}",
-                ["Scanline"] = $"{Scanline}",
-                ["Total Cycles"] = $"{Totalcycles}",
-                ["V"] = $"{Lp.V:X4}",
-                ["T"] = $"{Lp.T:X4}",
-                ["X"] = $"{Lp.Fx:X2}",
-                ["Background"] = $"{Background}",
-                ["Sprite"] = $"{Sprite}",
-                ["Sprite 0 Hit"] = $"{Sprite0hit}",
-                ["VBlank"] = $"{Vblank}",
-                ["Nmi"] = $"{Nmi}",
-            };
-        }
+            ["Cycle"] = $"{Cycle}",
+            ["Scanline"] = $"{Scanline}",
+            ["Total Cycles"] = $"{Totalcycles}",
+            ["V"] = $"{Lp.V:X4}",
+            ["T"] = $"{Lp.T:X4}",
+            ["X"] = $"{Lp.Fx:X2}",
+            ["Background"] = $"{Background}",
+            ["Sprite"] = $"{Sprite}",
+            ["Sprite 0 Hit"] = $"{Sprite0hit}",
+            ["VBlank"] = $"{Vblank}",
+            ["Nmi"] = $"{Nmi}",
+        };
 
         public struct PpuRegisters
         {

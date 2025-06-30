@@ -30,20 +30,11 @@ internal class Mapper004 : BaseMapper
         Reset();
     }
 
-    public override byte ReadPrg(int a)
-    {
-        return base.ReadPrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000);
-    }
+    public override byte ReadPrg(int a) => base.ReadPrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000);
 
-    public override byte ReadChr(int a)
-    {
-        return base.ReadChr(0x0400 * Chr[a >> 10] + a % 0x0400);
-    }
+    public override byte ReadChr(int a) => base.ReadChr(0x0400 * Chr[a >> 10] + a % 0x0400);
 
-    public override void WritePrg(int a, byte v)
-    {
-        base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
-    }
+    public override void WritePrg(int a, byte v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
 
     public override void Write(int a, byte v)
     {
@@ -181,8 +172,5 @@ internal class Mapper004 : BaseMapper
             Fire = true;
     }
 
-    public override void SetLatch(int a, byte v)
-    {
-        base.SetLatch(a, v);
-    }
+    public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
 }

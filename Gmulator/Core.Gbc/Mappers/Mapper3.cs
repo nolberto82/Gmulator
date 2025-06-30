@@ -1,4 +1,4 @@
-﻿namespace GBoy.Core.Mappers;
+﻿namespace Gmulator.Core.Gbc.Mappers;
 public class Mapper3 : BaseMapper
 {
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
@@ -27,7 +27,7 @@ public class Mapper3 : BaseMapper
         else
         {
             if (a <= 0x1fff)
-                CartRamOn = v == 0x0a ? true : false;
+                CartRamOn = v == 0x0a;
             else if (a <= 0x3fff)
                 Rombank = v == 0 ? 1 : v & 0x7f;
         }

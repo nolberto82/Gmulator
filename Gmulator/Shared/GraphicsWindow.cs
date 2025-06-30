@@ -12,8 +12,6 @@ public class GraphicsWindow
     private static Texture2D[] TilesTex;
     private static Texture2D SpritesTex;
     private static Texture2D NametableTex;
-
-    private static int MapSelection;
     private static uint[][] TileBuffer;
     private static uint[] SpriteBuffer;
     private static uint[] MapBuffer;
@@ -42,12 +40,6 @@ public class GraphicsWindow
             Texture.Update(NametableTex, MapBuffer);
             rlImGui.Image(NametableTex);
         }
-    }
-
-    private static void RenderTiles(ushort tileaddr, int i, bool cgb)
-    {
-        int tilenum = 0;
-
     }
 
     public static void DrawSprite(bool CGB)

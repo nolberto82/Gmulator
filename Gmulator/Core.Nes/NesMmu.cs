@@ -1,9 +1,10 @@
 ﻿using GNes.Core.Mappers;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 using System.Xml.Linq;
+using System.Runtime.Intrinsics.Arm;
 
 namespace GNes.Core;
-public class NesMmu(Dictionary<int, Cheat> cheats) : SaveState
+public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
 {
     private NesJoypad Joypad1;
     private NesJoypad Joypad2;
@@ -47,8 +48,8 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : SaveState
 
     public void ApplyCheats(int a, ref byte v)
     {
-        var found = Cheats.ContainsKey(a);
-        if (found)
+        var found = Cheats?.ContainsKey(a);
+        if (found == true)
         {
             var cht = Cheats[a];
             if (cht.Enabled)
@@ -60,6 +61,12 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : SaveState
             }
         }
     }
+
+    public byte[] ReadWram() => Ram;
+    public byte[] ReadVram() => Vram;
+    public byte[] ReadOram() => Oram;
+    public byte[] ReadPrg() => Mapper.Prg;
+    public byte[] ReadChr() => Mapper.Chr;
 
     public byte Read(int a)
     {
@@ -137,10 +144,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : SaveState
             Mapper.Write(a, v);
     }
 
-    public byte ReadDebug(int addr)
-    {
-        return Ram[addr];
-    }
+    public byte ReadDebug(int addr) => Ram[addr];
 
     public int ReadWord(int addr)
     {
@@ -204,7 +208,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : SaveState
         }
 
         var rom = File.ReadAllBytes(filename);
-        new Patch().Run(rom, filename);
+        rom = new Patch().Run(rom, filename);
 
         header.Prom = rom.Take(header.PrgBanks * 0x4000 + 0x10).Skip(0x10).ToArray();
         header.Vrom = rom.Skip(header.Prom.Length + 0x10).Take(header.ChrBanks * 0x2000).ToArray();

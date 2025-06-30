@@ -2,7 +2,7 @@
 using GNes.Core.Mappers;
 
 namespace GNes.Core;
-public partial class NesCpu : SaveState
+public partial class NesCpu : EmuState
 {
     private const int FC = 1 << 0;
     private const int FZ = 1 << 1;
@@ -571,11 +571,6 @@ public partial class NesCpu : SaveState
         Sbc(mode);
     }
 
-    private void Dop(int mode)
-    {
-        PC++;
-    }
-
     private void Anc(int mode)
     {
         And(mode);
@@ -711,8 +706,6 @@ public partial class NesCpu : SaveState
                     h = TickRead(addr);
                     addr = (ushort)((h << 8) | l);
                 }
-
-
                 return addr;
             }
             case RELA:
@@ -795,15 +788,9 @@ public partial class NesCpu : SaveState
         PC = ReadWord(INT_NMI);
     }
 
-    private byte Pop()
-    {
-        return TickRead(++SP | 0x100);
-    }
+    private byte Pop() => TickRead(++SP | 0x100);
 
-    private void Push(int addr, int v)
-    {
-        TickWrite(addr | 0x100, (byte)v);
-    }
+    private void Push(int addr, int v) => TickWrite(addr | 0x100, (byte)v);
 
     private void Brk(int pc)
     {
@@ -844,10 +831,7 @@ public partial class NesCpu : SaveState
             Ps &= ~v;
     }
 
-    public bool GetFlag(int v)
-    {
-        return (Ps & v) > 0;
-    }
+    public bool GetFlag(int v) => (Ps & v) > 0;
 
     private void Set(int mode, int v)
     {

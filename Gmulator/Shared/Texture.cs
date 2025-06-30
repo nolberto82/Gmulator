@@ -14,7 +14,7 @@ public static class Texture
     {
         fixed (uint* pixels = &buffer[0])
         {
-            Image img = new Image
+            Image img = new()
             {
                 Data = pixels,
                 Width = w,

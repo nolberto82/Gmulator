@@ -27,10 +27,7 @@
             Sram = true;
         }
 
-        public override byte ReadPrg(int a)
-        {
-            return base.ReadPrg(0x4000 * Prg[(a & 0x4000) >> 14] + a % 0x4000);
-        }
+        public override byte ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[(a & 0x4000) >> 14] + a % 0x4000);
 
         public override void Reset()
         {
@@ -42,14 +39,8 @@
             base.Reset();
         }
 
-        public override void Scanline()
-        {
-            base.Scanline();
-        }
+        public override void Scanline() => base.Scanline();
 
-        public override void SetLatch(int a, byte v)
-        {
-            base.SetLatch(a, v);
-        }
+        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
     }
 }

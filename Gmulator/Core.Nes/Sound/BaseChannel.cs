@@ -1,5 +1,5 @@
 ﻿namespace GNes.Core.Sound;
-public abstract class BaseChannel : SaveState
+public abstract class BaseChannel : EmuState
 {
     public bool Enabled { get; set; }
     public bool Play { get; set; } = true;
@@ -36,7 +36,7 @@ public abstract class BaseChannel : SaveState
     public int ShadowFrequency { get; set; }
     public bool SweepReload { get; set; }
 
-    public int[][] WaveDuty
+    public static int[][] WaveDuty
     {
         get =>
         [
@@ -47,7 +47,7 @@ public abstract class BaseChannel : SaveState
         ];
     }
 
-    public int[] LengthTable
+    public static int[] LengthTable
     {
         get =>
         [
@@ -58,7 +58,7 @@ public abstract class BaseChannel : SaveState
         ];
     }
 
-    public int[] TriangleIndexes
+    public static int[] TriangleIndexes
     {
         get =>
         [
@@ -69,7 +69,7 @@ public abstract class BaseChannel : SaveState
         ];
     }
 
-    public int[] NoiseTable
+    public static int[] NoiseTable
     {
         get =>
         [

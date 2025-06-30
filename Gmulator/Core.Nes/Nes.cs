@@ -21,40 +21,24 @@ public class Nes : Emulator
     public Timer Timer { get; private set; }
     public NesLogger Logger { get; private set; }
     public Audio Audio { get; }
-    public Dictionary<int, Breakpoint> Breakpoints { get; }
-    public Cheat Cheat { get; }
     public NesJoypad Joypad1 { get; private set; } = new();
     public NesJoypad Joypad2 { get; private set; } = new();
 
-    public Nes() { }
-    public Nes(Cheat cheat, Dictionary<int, Cheat> Cheats, Dictionary<int, Breakpoint> breakpoints, ref LuaApi LuaApi)
+    public Nes()
     {
-        Breakpoints = breakpoints;
-        Cheat = cheat;
-        Cheat.Init(Cheats, NesSystem);
+        CheatConverter = new(this);
         Mmu = new(Cheats);
         Cpu = new();
         Ppu = new(Mmu);
         Apu = new();
         Logger = new(Cpu);
-        Ppu.Init(Apu);
+        Ppu.Init(this);
         Mmu.Init(Joypad1, Joypad2);
         Input.Init(NesJoypad.GetButtons());
-        DebugWindow = new(this, Breakpoints, NesSystem);
 
-        DebugWindow.Read = Mmu.Read;
-        DebugWindow.Write = Mmu.Write;
-        DebugWindow.CpuStep = Cpu.Step;
-        DebugWindow.OnBreakpointHit += Program.BreakpointTriggered;
-        DebugWindow.OnReset += Program.Reset;
-        DebugWindow.SetState += Program.SetState;
-        DebugWindow.OnDisassemble += Logger.Disassemble;
-        DebugWindow.OnToggle += Logger.Toggle;
         Logger.OnGetFlags += Cpu.GetFlags;
         Logger.OnGetRegs += Cpu.GetRegs;
         Logger.ReadByte += Mmu.Read;
-        LuaApi.Read = Mmu.Read;
-        Cpu.SetState = Program.SetState;
 
         Mmu.StatusR = Ppu.StatusR;
         Mmu.DataR = Ppu.DataR;
@@ -75,147 +59,134 @@ public class Nes : Emulator
         Apu.Dmc.Read = Cpu.ReadDmc;
     }
 
-    public override void Execute(int State, bool debug)
+    public override void Execute(bool opened, int times)
     {
-        if (Mapper != null && !Menu.Opened && State == Running)
+        if (Mapper != null && State == Running && !opened)
         {
             var cyclesframe = Header.Region == 0 ? NesNtscCycles : NesPalCycles;
-            while (Ppu.Cycles < cyclesframe)
+            while (times-- > 0)
             {
-                ushort pc = (ushort)Cpu.PC;
-                Cpu.Step();
-
-                if (debug)
+                while (Ppu.Cycles < cyclesframe)
                 {
-                    if (Cpu.StepOverAddr == Cpu.PC)
+                    ushort pc = (ushort)Cpu.PC;
+                    Cpu.Step();
+
+                    if (Debug)
                     {
-                        State = Debugging;
-                        Cpu.StepOverAddr = -1;
-                        return;
+                        if (Cpu.StepOverAddr == Cpu.PC)
+                        {
+                            State = Break;
+                            Cpu.StepOverAddr = -1;
+                            return;
+                        }
+
+                        if (Breakpoints.Count > 0)
+                        {
+                            if (DebugWindow.ExecuteCheck(pc))
+                            {
+                                State = Break;
+                                return;
+                            }
+                        }
+
+                        if (Logger.Logging)
+                            Logger.Log(pc);
                     }
 
-                    DebugWindow.Check(pc);
-
-                    if (NesLogger.Logging)
-                        Logger.Toggle();
+                    if (State == Break)
+                        return;
                 }
-
-                if (State == Debugging)
-                    return;
+                Ppu.Cycles -= cyclesframe;
             }
-            Ppu.Cycles -= cyclesframe;
         }
     }
 
-    public override void Update()
-    {
-        Input.Update(NesSystem, Ppu.FrameCounter);
-    }
+    public override void Update() => Input.Update(this, NesConsole, Ppu.FrameCounter);
 
-    public override void Render(float MenuHeight, bool debug)
-    {
-        base.Render(MenuHeight, debug);
-    }
+    public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
-    public override void Reset(string name, bool reset, bool debug)
+    public override void Reset(string name, string lastname, bool reset)
     {
         if (name != "")
             Mapper = Mmu.LoadRom(name);
 
         if (Mapper != null)
         {
-            var sram = Mmu.Ram.AsSpan(0x6000, 0x2000).ToArray();
+            GameName = name;
+            DebugWindow ??= new NesDebugWindow(this);
+            Mmu.Ram.AsSpan(0x6000, 0x2000).ToArray();
             Cpu.Reset();
             Ppu.Reset();
             Apu.Reset(Header.Region, Header.Region == 0 ? NesNtscCpuClock : NesPalCpuClock);
             Mmu.Reset();
             Logger.Reset();
-            Cheat.Load(Mapper.Name, false);
+            Cheat.Load(this, false);
+            base.Reset(name, lastname, true);
         }
     }
 
-    public override void SaveRam() => Mmu.SaveRam();
-
-    public override void SaveState()
+    public override void SaveState(int slot, StateResult res)
     {
         if (Mapper == null) return;
-        Program.State = Paused;
-        var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
-        using (BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write)))
-        {
-            bw.Write(Encoding.ASCII.GetBytes(SaveStateVersion));
-            Mmu.Save(bw);
-            Cpu.Save(bw);
-            Ppu.Save(bw);
-            Apu.Save(bw);
-            Mapper.Save(bw);
-        }
-        Notifications.Init("State Saved Successfully");
-        Program.State = Running;
-    }
 
-    public override void LoadState()
-    {
-        if (Mapper == null) return;
-        Program.State = Paused;
-        var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
-        if (!File.Exists(name)) return;
-        using (BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read)))
+        lock (StateLock)
         {
-            var version = Encoding.ASCII.GetString(br.ReadBytes(4));
-            if (version == SaveStateVersion)
+            var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
+            if (name != "")
             {
-                Mmu.Load(br);
-                Cpu.Load(br);
-                Ppu.Load(br);
-                Apu.Load(br);
-                Mapper.Load(br);
-                Notifications.Init("State Loaded Successfully");
+                using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
+
+                bw.Write(Encoding.ASCII.GetBytes(SaveStateVersion));
+                Mmu.Save(bw);
+                Cpu.Save(bw);
+                Ppu.Save(bw);
+                Apu.Save(bw);
+                Mapper.Save(bw);
+                base.SaveState(slot, StateResult.Success);
             }
             else
-                Notifications.Init("Error Loading Save State");
+                base.SaveState(slot, StateResult.Failed);
         }
-        Program.State = Running;
     }
 
-    public override void SaveBreakpoints(Dictionary<int, Breakpoint> Breakpoints, string name)
+    public override void LoadState(int slot, StateResult res)
     {
-        base.SaveBreakpoints(Breakpoints, name);
+        if (Mapper == null) return;
+
+        lock (StateLock)
+        {
+            var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
+            if (File.Exists(name))
+            {
+                using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
+
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == SaveStateVersion)
+                {
+                    Mmu.Load(br);
+                    Cpu.Load(br);
+                    Ppu.Load(br);
+                    Apu.Load(br);
+                    Mapper.Load(br);
+                    base.LoadState(slot, StateResult.Success);
+                }
+                else
+                    base.LoadState(slot, StateResult.Mismatch);
+            }
+            else
+                base.LoadState(slot, StateResult.Failed);
+        }
     }
 
-    public override void LoadBreakpoints(Dictionary<int, Breakpoint> Breakpoints, string name)
+    public override void SaveBreakpoints(string name) => base.SaveBreakpoints(name);
+
+    public override void LoadBreakpoints(string name) => base.LoadBreakpoints(name);
+
+    public override void Close()
     {
-        base.LoadBreakpoints(Breakpoints, name);
+        Mmu?.SaveRam();
+        Cheat.Save(Mapper.Name, Cheats);
+        SaveBreakpoints(Mapper.Name);
     }
 
-    public override void Close(Dictionary<int, Breakpoint> Breakpoints)
-    {
-        Cheat.Save(Mapper.Name);
-        SaveBreakpoints(Breakpoints, Mapper.Name);
-    }
-
-    public override Nes GetConsole()
-    {
-        return this;
-    }
-
-    public override T GetRam<T>()
-    {
-        return (T)Convert.ChangeType(Mmu.Ram, typeof(T));
-    }
-
-    public override T GetPc<T>()
-    {
-        return (T)Convert.ChangeType(Cpu.PC, typeof(T));
-    }
-
-    public override T GetCpuInfo<T>(int i)
-    {
-        return (T)Convert.ChangeType(Cpu.GetRegs(), typeof(Dictionary<dynamic, string>));
-    }
-
-    //public override T GetPpuInfo<T>()
-    //{
-    //    return (T)Convert.ChangeType(IO.GetLCDC(), typeof(T));
-    //}
+    public override void SetState(int v) => base.SetState(v);
 }

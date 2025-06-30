@@ -1,7 +1,7 @@
 ﻿using Gmulator.Shared;
 
-namespace GBoy.Core.Sound;
-public abstract class BaseChannel : SaveState
+namespace Gmulator.Core.Gbc.Sound;
+public abstract class BaseChannel : EmuState
 {
     public bool Enabled { get; set; }
 
@@ -56,7 +56,7 @@ public abstract class BaseChannel : SaveState
         [1, 0, 0, 0, 0, 1, 1, 1], //50%
         [0, 1, 1, 1, 1, 1, 1, 0]  //75%
     ];
-    private byte[] shifts = [4, 0, 1, 2];
+    private readonly byte[] shifts = [4, 0, 1, 2];
 
     public virtual short GetSample(int channel)
     {

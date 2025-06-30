@@ -1,5 +1,5 @@
 ﻿
-namespace GBoy.Core.Sound;
+namespace Gmulator.Core.Gbc.Sound;
 public class Square2 : BaseChannel
 {
     public byte NR21 { get; private set; }

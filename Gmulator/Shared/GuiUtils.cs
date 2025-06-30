@@ -45,8 +45,17 @@ public static class GuiUtils
         }
     }
 
-    public static void OpenCopyContext(string name, ref string text)
+    public static void HexInput(ref string v)
     {
+        ImGui.PushItemWidth(-1);
+        ImGui.InputText($"##bpinput", ref v, 4, HexInputFlags);
+        ImGui.PopItemWidth();
+        ImGui.EndChild();
+    }
+
+    public static bool OpenCopyContext(string name, ref string text)
+    {
+        var v = false;
         if (ImGui.BeginPopupContextItem($"##{name}", ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverExistingPopup))
         {
             if (ImGui.MenuItem("Copy", true))
@@ -56,9 +65,13 @@ public static class GuiUtils
         if (ImGui.BeginPopupContextItem($"##{name}", ImGuiPopupFlags.MouseButtonRight | ImGuiPopupFlags.NoOpenOverExistingPopup))
         {
             if (ImGui.MenuItem("Paste", true))
+            {
                 text = Raylib.GetClipboardText_();
+                v = true;
+            }
             ImGui.EndPopup();
         }
+        return v;
     }
 
     public static void Checkbox(string name, bool chk) => ImGui.Checkbox(name, ref chk);
@@ -77,12 +90,33 @@ public static class GuiUtils
     public static void TableRow(string name, string v)
     {
         ImGui.TableNextColumn(); ImGui.Text(name);
-        ImGui.TableNextColumn(); 
-        if (v != null) 
-            ImGui.Text(v); 
-        else 
+        ImGui.TableNextColumn();
+        if (v != null)
+            ImGui.Text(v);
+        else
             ImGui.Text("");
-        ImGui.TableNextRow();
+    }
+
+    public static bool TableRowSelect(string name, string v, bool selected)
+    {
+        var b = false;
+        ImGui.TableNextColumn(); 
+        ImGui.Selectable(name, selected,ImGuiSelectableFlags.SpanAllColumns);
+        if (ImGui.IsItemHovered())
+            b = true;
+        ImGui.TableNextColumn();
+        if (v != null)
+            ImGui.Text(v);
+        else
+            ImGui.Text("");
+        return b;
+    }
+
+    public static void TableRowCol3(string addr, string name, string v)
+    {
+        ImGui.TableNextColumn(); ImGui.Text(addr);
+        ImGui.TableNextColumn(); ImGui.Text(name);
+        ImGui.TableNextColumn(); ImGui.Text(v != null ? v : "");
     }
 
     public static void TableRow(string name, string chkname, ref bool v)
@@ -100,96 +134,4 @@ public static class GuiUtils
         ImGui.GetWindowDrawList().AddRectFilled(min, max, filled);
         ImGui.GetWindowDrawList().AddRect(min, max, unfilled);
     }
-
-    public static bool Button(string name, Vector4 color)
-    {
-        ImGui.PushStyleColor(ImGuiCol.Text, color);
-        return ImGui.Button(name);
-    }
-
-    public static string IniSettings { get; } =
-@"
-[Window][Debug##Default]
-Pos=60,60
-Size=400,400
-Collapsed=0
-
-[Window][Display]
-Pos=0,21
-Size=571,779
-Collapsed=0
-DockId=0x00000001,0
-
-[Window][Debugger]
-Pos=573,21
-Size=244,261
-Collapsed=0
-DockId=0x00000007,0
-
-[Window][Cpu Info]
-Pos=819,21
-Size=209,487
-Collapsed=0
-DockId=0x00000006,0
-
-[Window][Breakpoints]
-Pos=573,284
-Size=244,224
-Collapsed=0
-DockId=0x00000008,0
-
-[Window][Memory Viewer]
-Pos=573,510
-Size=455,290
-Collapsed=0
-DockId=0x00000003,0
-
-[Window][Registers]
-Pos=1030,21
-Size=250,779
-Collapsed=0
-DockId=0x0000000A,0
-
-[Window][Menu]
-Pos=0,21
-Size=1280,800
-Collapsed=0
-
-[Window][Menu/##buttons_D61958BF]
-IsChild=1
-Size=1263,41
-
-[Window][bpcontext]
-Pos=294,419
-Size=198,68
-Collapsed=0
-
-[Window][Ppu Debug]
-Pos=474,220
-Size=656,517
-Collapsed=0
-
-[Window][DockSpaceViewport_11111111]
-Pos=0,21
-Size=1280,779
-Collapsed=0
-
-[Window][Cheat Codes]
-Pos=435,74
-Size=400,400
-Collapsed=0
-
-[Docking][Data]
-DockSpace           ID=0x8B93E3BD Window=0xA787BDB4 Pos=0,21 Size=1280,779 Split=X Selected=0x96643A2F
-  DockNode          ID=0x00000009 Parent=0x8B93E3BD SizeRef=1028,779 Split=X
-    DockNode        ID=0x00000001 Parent=0x00000009 SizeRef=571,487 CentralNode=1 HiddenTabBar=1 Selected=0x96643A2F
-    DockNode        ID=0x00000005 Parent=0x00000009 SizeRef=455,487 Split=Y Selected=0xE1830C86
-      DockNode      ID=0x00000002 Parent=0x00000005 SizeRef=244,487 Split=X Selected=0xE1830C86
-        DockNode    ID=0x00000004 Parent=0x00000002 SizeRef=244,487 Split=Y Selected=0xE1830C86
-          DockNode  ID=0x00000007 Parent=0x00000004 SizeRef=244,261 Selected=0xE1830C86
-          DockNode  ID=0x00000008 Parent=0x00000004 SizeRef=244,224 HiddenTabBar=1 Selected=0x8A8CACFC
-        DockNode    ID=0x00000006 Parent=0x00000002 SizeRef=209,487 Selected=0xD08D0702
-      DockNode      ID=0x00000003 Parent=0x00000005 SizeRef=244,290 Selected=0xC206E20F
-  DockNode          ID=0x0000000A Parent=0x8B93E3BD SizeRef=250,779 Selected=0xEAEE9E08
-";
 }

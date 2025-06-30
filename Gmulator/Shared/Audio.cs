@@ -1,5 +1,6 @@
 ﻿
 using Raylib_cs;
+using System.IO;
 
 namespace Gmulator;
 public class Audio
@@ -7,63 +8,59 @@ public class Audio
     public static AudioStream Stream { get; private set; }
     private static int MaxSamples;
 
-    public Audio(int maxsamples)
+    public Audio()
+    {
+        Raylib.InitAudioDevice();
+    }
+
+    public static void Init(uint freq, int maxsamples, int buffersize, uint samplesize)
     {
         MaxSamples = maxsamples;
-        Raylib.InitAudioDevice();
-
         Raylib.SetAudioStreamBufferSizeDefault(MaxSamples);
-        Stream = Raylib.LoadAudioStream(44100, 32, 2);
-        SetVolume(0.01f);
+        Stream = Raylib.LoadAudioStream(freq, samplesize, 2);
         Raylib.PlayAudioStream(Stream);
     }
 
-    public static void SetVolume(float v) => Raylib.SetMasterVolume(v);
-    public static void Update(float[] AudioBuffer)
+    public static void SetVolume(float v)
     {
-        unsafe
+        Raylib.SetMasterVolume(v);
+        Raylib.SetAudioStreamVolume(Stream, v);
+    }
+
+    public unsafe static void Update(float[] AudioBuffer)
+    {
+        if (Raylib.IsAudioStreamProcessed(Stream))
         {
-            if (Raylib.IsAudioStreamProcessed(Stream))
-            {
-                fixed (float* ptr = AudioBuffer)
-                    Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
-            }
+            fixed (void* ptr = AudioBuffer)
+                Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
         }
     }
 
-    public static void Update(short[] AudioBuffer)
+    public unsafe static void Update(short[] AudioBuffer)
     {
-        unsafe
+        if (Raylib.IsAudioStreamProcessed(Stream))
         {
-            if (Raylib.IsAudioStreamProcessed(Stream))
-            {
-                fixed (void* ptr = AudioBuffer)
-                    Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
-            }
+            fixed (void* ptr = AudioBuffer)
+                Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
         }
     }
 
-    public static void Update(ushort[] AudioBuffer)
+    public unsafe static void Update(ushort[] AudioBuffer)
     {
-        unsafe
+        if (Raylib.IsAudioStreamProcessed(Stream))
         {
-            if (Raylib.IsAudioStreamProcessed(Stream))
-            {
-                fixed (void* ptr = AudioBuffer)
-                    Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
-            }
+            fixed (void* ptr = AudioBuffer)
+                Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
         }
+
     }
 
-    public static void Update(byte[] AudioBuffer)
+    public unsafe static void Update(byte[] AudioBuffer)
     {
-        unsafe
+        if (Raylib.IsAudioStreamProcessed(Stream))
         {
-            if (Raylib.IsAudioStreamProcessed(Stream))
-            {
-                fixed (void* ptr = AudioBuffer)
-                    Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
-            }
+            fixed (void* ptr = AudioBuffer)
+                Raylib.UpdateAudioStream(Stream, ptr, MaxSamples);
         }
     }
 

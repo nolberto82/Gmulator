@@ -1,5 +1,5 @@
 ﻿
-namespace GBoy.Core.Sound;
+namespace Gmulator.Core.Gbc.Sound;
 public class Noise : BaseChannel
 {
     public byte NR41 { get; private set; }

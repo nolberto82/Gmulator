@@ -1,4 +1,4 @@
-﻿namespace GBoy.Core;
+﻿namespace Gmulator.Core.Gbc;
 public partial class GbcCpu
 {
     private void Step00(byte op)
@@ -216,7 +216,7 @@ public partial class GbcCpu
             case 0xd0: OpRet((F & FC) == 0); break;
             case 0xd1: DE = OpPop(); break;
             case 0xd2: OpJp((F & FC) == 0); break;
-            case 0xd3: SetState(Debugging); break;
+            case 0xd3: SetState(Break); break;
             case 0xd4: OpCall((F & FC) == 0); break;
             case 0xd5: Tick(); OpPush(DE); break;
             case 0xd6: OpSub8(OpLdImm8()); break;
@@ -224,16 +224,16 @@ public partial class GbcCpu
             case 0xd8: OpRet((F & FC) > 0); break;
             case 0xd9: OpReti(); break;
             case 0xda: OpJp((F & FC) > 0); break;
-            case 0xdb: SetState(Debugging); break;
+            case 0xdb: SetState(Break); break;
             case 0xdc: OpCall((F & FC) > 0); break;
-            case 0xdd: SetState(Debugging); break;
+            case 0xdd: SetState(Break); break;
             case 0xde: OpSbc8(OpLdImm8()); break;
             case 0xdf: OpRst(0x18); break;
             case 0xe0: OpLdWr((ushort)(0xff00 + OpLdImm8()), A); break;
             case 0xe1: HL = OpPop(); break;
             case 0xe2: OpLdWr((ushort)(0xff00 + C), A); break;
-            case 0xe3: SetState(Debugging); break;
-            case 0xe4: SetState(Debugging); break;
+            case 0xe3: SetState(Break); break;
+            case 0xe4: SetState(Break); break;
             case 0xe5: Tick(); OpPush(HL); break;
             case 0xe6: OpAnd(OpLdImm8()); break;
             case 0xe7: OpRst(0x20); break;
@@ -242,14 +242,14 @@ public partial class GbcCpu
             case 0xea: OpLdWr(OpLdImm16(), A); break;
             case 0xeb:
             case 0xec:
-            case 0xed: SetState(Debugging); break;
+            case 0xed: SetState(Break); break;
             case 0xee: OpXor(OpLdImm8()); break;
             case 0xef: OpRst(0x28); break;
             case 0xf0: A = OpLdReg((ushort)(0xff00 + OpLdImm8())); break;
             case 0xf1: AF = OpPop(true); break;
             case 0xf2: A = OpLdReg((ushort)(0xff00 + C)); break;
             case 0xf3: OpDI(); break;
-            case 0xf4: SetState(Debugging); break;
+            case 0xf4: SetState(Break); break;
             case 0xf5: Tick(); OpPush(AF); break;
             case 0xf6: OpOr(OpLdImm8()); break;
             case 0xf7: OpRst(0x30); break;
@@ -258,7 +258,7 @@ public partial class GbcCpu
             case 0xfa: A = OpLdReg(OpLdImm16()); break;
             case 0xfb: OpEI(); break;
             case 0xfc:
-            case 0xfd: SetState(Debugging); break;
+            case 0xfd: SetState(Break); break;
             case 0xfe: OpCp(OpLdImm8()); break;
             case 0xff: OpRst(0x38); break;
         }
@@ -338,7 +338,7 @@ public partial class GbcCpu
             case 0x43: OpBit(0, E); break;
             case 0x44: OpBit(0, H); break;
             case 0x45: OpBit(0, L); break;
-            case 0x46: OpBit(0, OpLdReg(HL), HL); break;
+            case 0x46: OpBit(0, OpLdReg(HL)); break;
             case 0x47: OpBit(0, A); break;
             case 0x48: OpBit(1, B); break;
             case 0x49: OpBit(1, C); break;
@@ -346,7 +346,7 @@ public partial class GbcCpu
             case 0x4b: OpBit(1, E); break;
             case 0x4c: OpBit(1, H); break;
             case 0x4d: OpBit(1, L); break;
-            case 0x4e: OpBit(1, OpLdReg(HL), HL); break;
+            case 0x4e: OpBit(1, OpLdReg(HL)); break;
             case 0x4f: OpBit(1, A); break;
             case 0x50: OpBit(2, B); break;
             case 0x51: OpBit(2, C); break;
@@ -354,7 +354,7 @@ public partial class GbcCpu
             case 0x53: OpBit(2, E); break;
             case 0x54: OpBit(2, H); break;
             case 0x55: OpBit(2, L); break;
-            case 0x56: OpBit(2, OpLdReg(HL), HL); break;
+            case 0x56: OpBit(2, OpLdReg(HL)); break;
             case 0x57: OpBit(2, A); break;
             case 0x58: OpBit(3, B); break;
             case 0x59: OpBit(3, C); break;
@@ -362,7 +362,7 @@ public partial class GbcCpu
             case 0x5b: OpBit(3, E); break;
             case 0x5c: OpBit(3, H); break;
             case 0x5d: OpBit(3, L); break;
-            case 0x5e: OpBit(3, OpLdReg(HL), HL); break;
+            case 0x5e: OpBit(3, OpLdReg(HL)); break;
             case 0x5f: OpBit(3, A); break;
             case 0x60: OpBit(4, B); break;
             case 0x61: OpBit(4, C); break;
@@ -370,7 +370,7 @@ public partial class GbcCpu
             case 0x63: OpBit(4, E); break;
             case 0x64: OpBit(4, H); break;
             case 0x65: OpBit(4, L); break;
-            case 0x66: OpBit(4, OpLdReg(HL), HL); break;
+            case 0x66: OpBit(4, OpLdReg(HL)); break;
             case 0x67: OpBit(4, A); break;
             case 0x68: OpBit(5, B); break;
             case 0x69: OpBit(5, C); break;
@@ -378,7 +378,7 @@ public partial class GbcCpu
             case 0x6b: OpBit(5, E); break;
             case 0x6c: OpBit(5, H); break;
             case 0x6d: OpBit(5, L); break;
-            case 0x6e: OpBit(5, OpLdReg(HL), HL); break;
+            case 0x6e: OpBit(5, OpLdReg(HL)); break;
             case 0x6f: OpBit(5, A); break;
             case 0x70: OpBit(6, B); break;
             case 0x71: OpBit(6, C); break;
@@ -386,7 +386,7 @@ public partial class GbcCpu
             case 0x73: OpBit(6, E); break;
             case 0x74: OpBit(6, H); break;
             case 0x75: OpBit(6, L); break;
-            case 0x76: OpBit(6, OpLdReg(HL), HL); break;
+            case 0x76: OpBit(6, OpLdReg(HL)); break;
             case 0x77: OpBit(6, A); break;
             case 0x78: OpBit(7, B); break;
             case 0x79: OpBit(7, C); break;
@@ -394,7 +394,7 @@ public partial class GbcCpu
             case 0x7b: OpBit(7, E); break;
             case 0x7c: OpBit(7, H); break;
             case 0x7d: OpBit(7, L); break;
-            case 0x7e: OpBit(7, OpLdReg(HL), HL); break;
+            case 0x7e: OpBit(7, OpLdReg(HL)); break;
             case 0x7f: OpBit(7, A); break;
             case 0x80: B = OpRes(0, B); break;
             case 0x81: C = OpRes(0, C); break;

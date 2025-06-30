@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Gmulator": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false,
+      "remoteDebugMachine": "NOLDECK:4026",
+      "authenticationMode": "Windows"
+    }
+  }
+}

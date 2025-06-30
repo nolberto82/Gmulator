@@ -1,7 +1,7 @@
 ﻿using Raylib_cs;
 using System.Data;
 
-namespace GBoy.Core;
+namespace Gmulator.Core.Gbc;
 public class GbcJoypad
 {
     private static byte status;
@@ -36,7 +36,7 @@ public class GbcJoypad
         }
     }
 
-    private static bool[] buttons;
+    private static readonly bool[] buttons;
     public bool this[int i]
     {
         get => buttons[i];
@@ -44,7 +44,7 @@ public class GbcJoypad
     }
 
     static GbcJoypad() => buttons = new bool[8];
-    public byte Read()
+    public static byte Read()
     {
         byte v = 0;
         if (Status == 0x10)

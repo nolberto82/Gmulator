@@ -1,4 +1,4 @@
-﻿namespace GBoy.Core.Mappers;
+﻿namespace Gmulator.Core.Gbc.Mappers;
 public class Mapper2 : BaseMapper
 {
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);

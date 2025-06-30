@@ -116,7 +116,7 @@ public partial class NesCpu
         }
     };
 
-	public List<Opcode> Disasm = new();
+	public List<Opcode> Disasm = [];
 
 	public void CreateOpcodes() 
 	{

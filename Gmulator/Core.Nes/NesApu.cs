@@ -3,7 +3,7 @@ using GNes.Core.Sound;
 using Raylib_cs;
 
 namespace GNes.Core;
-public class NesApu : SaveState
+public class NesApu : EmuState
 {
     public int Status { get; private set; }
     public int FrameCounter { get; private set; }
@@ -166,21 +166,8 @@ public class NesApu : SaveState
                     var tnd = TndTable[(3 * (int)outtriangle) + (2 * outnoise + outdmc)];
                     var output = (float)HighPass(pulse + tnd);
 
-                    AudioBuffer[BufPos++] = output*8;
-                    AudioBuffer[BufPos++] = output*8;
-
-                    if (Recording)
-                    {
-                        AudioRecord.Add(output);
-                    }
-                    //else if (!Recording && AudioRecord.Count > 0)
-                    //{
-                    //    using (var stream = new FileStream("apu.wav", FileMode.OpenOrCreate, FileAccess.ReadWrite))
-                    //    {
-                    //        stream.AppendWaveData([.. AudioRecord]);
-                    //    }
-                    //    AudioRecord.Clear();
-                    //}
+                    AudioBuffer[BufPos++] = output;
+                    AudioBuffer[BufPos++] = output;
                 }
 
                 if (BufPos >= AudioBuffer.Length)

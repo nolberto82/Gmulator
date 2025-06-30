@@ -1,7 +1,7 @@
-﻿using GBoy.Core.Mappers;
+﻿using Gmulator.Core.Gbc.Mappers;
 
-namespace GBoy.Core;
-public class GbcMmu : SaveState
+namespace Gmulator.Core.Gbc;
+public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
 {
     public string Title { get; private set; } = "";
 
@@ -11,40 +11,35 @@ public class GbcMmu : SaveState
     public string RomName { get; private set; } = "";
     public bool IsBios { get; private set; }
 
-    public byte[] Ram { get; private set; }
+    public byte[] Ram { get; private set; } = new byte[0x10000];
     public byte[] Rom { get; private set; }
-    public byte[] Vram { get; private set; }
-    public byte[] Sram { get; private set; }
-    public byte[] Wram { get; private set; }
+    public byte[] Vram { get; private set; } = new byte[0x4000];
+    public byte[] Sram { get; private set; } = new byte[0x8000];
+    public byte[] Wram { get; private set; } = new byte[0x8000];
 
     public GbcCpu Cpu { get; private set; }
     public BaseMapper Mapper { get; private set; }
-    public GbcIO IO { get; private set; }
-    public Dictionary<int, Cheat> Cheats { get; }
+    public GbcIO IO { get; private set; } = io;
+    public Dictionary<int, Cheat> Cheats { get; } = cheats;
 
     public delegate void ReadBreakpoint(int a);
     public delegate void WriteBreakpoint(int a);
 
-    public GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats)
+    public void Init(Gbc gbc)
     {
-        Ram = new byte[0x10000];
-        Vram = new byte[0x4000];
-        Sram = new byte[0x8000];
-        Wram = new byte[0x8000];
-
-        IO = io;
-        Cheats = cheats;
+        Cpu = gbc.Cpu;
     }
 
-    public void Init(GbcCpu cpu)
-    {
-        Cpu = cpu;
-    }
+    public byte[] ReadWram() => Ram;
+    public byte[] ReadVram() => Ram;
+    public byte[] ReadOram() => Ram.AsSpan(0xfe00, 0x100).ToArray();
+    public byte[] ReadRom() => Rom;
 
     public byte Read(int a)
     {
         a &= 0xffff;
         byte v = 0xff;
+        
         if (a <= 0x7fff)
         {
             if (a <= 0x7fff)
@@ -92,8 +87,6 @@ public class GbcMmu : SaveState
             Mapper.WriteRom0(a, v);
         else if (a <= 0x7fff)
             Mapper.WriteRom1(a, v);
-        else if (a <= 0x7fff)
-        { }
         else if (a <= 0x9fff)
         {
             Vram[a - 0x8000 + 0x2000 * IO.VBK] = v;
@@ -133,7 +126,7 @@ public class GbcMmu : SaveState
 
     public void WriteBlock(int src, int dst, int size)
     {
-        Span<byte> srcbytes = null;
+        Span<byte> srcbytes;
         Span<byte> dstbytes;
         if (src <= 0x7fff)
             srcbytes = Mapper.ReadRomBlock(src, size);
@@ -151,7 +144,7 @@ public class GbcMmu : SaveState
 
     public void WriteVramBanks(int a, byte v) => Vram[(ushort)a] = v;
 
-    public byte ReadDMA(int a, bool savestate = false)
+    public byte ReadDMA(int a)
     {
         a &= 0xffff;
         if (a <= 0x7fff)
@@ -164,7 +157,7 @@ public class GbcMmu : SaveState
             return Ram[a];
     }
 
-    public void WriteDMA(int a, byte v, bool savestate = false)
+    public void WriteDMA(int a, byte v)
     {
         a &= 0xffff;
         if (a >= 0x8000 && a <= 0x9fff)
@@ -227,10 +220,7 @@ public class GbcMmu : SaveState
         }
     }
 
-    public void Reset(bool cgb, string filename)
-    {
-        Mapper.Init(Rom, filename);
-    }
+    public void Reset(string filename) => Mapper.Init(Rom, filename);
 
     public byte[] LoadFile(string filename)
     {
@@ -243,7 +233,7 @@ public class GbcMmu : SaveState
             Type = rom[0x147];
             if (MapperTypes.TryGetValue(Type, out string value))
                 Console.WriteLine($"Mapper: {value}");
-            new Patch().Run(rom, filename);
+            rom = new Patch().Run(rom, filename);
         }
         else
             IsBios = true;

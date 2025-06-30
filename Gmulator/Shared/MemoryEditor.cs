@@ -1,11 +1,9 @@
-﻿
-using ImGuiNET;
+﻿using ImGuiNET;
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using static Gmulator.DebugWindow;
 
-namespace ImGuiExtra;
+namespace Gmulator.Shared;
 public unsafe class MemoryEditor
 {
     enum DataFormat
@@ -18,18 +16,18 @@ public unsafe class MemoryEditor
 
     // Settings
     bool Open;                                       // = true   // set to false when DrawWindow() was closed. ignore if not using DrawWindow().
-    bool ReadOnly;                                   // = false  // disable any editing.
+    readonly bool ReadOnly;                                   // = false  // disable any editing.
     int Cols;                                       // = 16     // number of columns to display.
-    bool OptShowOptions;                             // = true   // display options button/context menu. when disabled, options will be locked unless you provide your own UI for them.
+    readonly bool OptShowOptions;                             // = true   // display options button/context menu. when disabled, options will be locked unless you provide your own UI for them.
     bool OptShowDataPreview;                         // = false  // display a footer previewing the decimal/binary/hex/float representation of the currently selected bytes.
     bool OptShowHexII;                               // = false  // display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
     bool OptShowAscii;                               // = true   // display ASCII representation on the right side.
     bool OptGreyOutZeroes;                           // = true   // display null/zero bytes using the TextDisabled color.
     bool OptUpperCaseHex;                            // = true   // display hexadecimal values as "FF" instead of "ff".
-    int OptMidColsCount;                            // = 8      // set to 0 to disable extra spacing between every mid-cols.
+    readonly int OptMidColsCount;                            // = 8      // set to 0 to disable extra spacing between every mid-cols.
     public int OptAddrDigitsCount;                         // = 0      // number of addr digits to display (default calculated based on maximum displayed addr).
-    float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
-    uint HighlightColor;                             //          // background color of highlighted bytes.
+    readonly float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
+    readonly uint HighlightColor;                             //          // background color of highlighted bytes.
     public delegate byte ReadDel(int off);    // = 0      // optional handler to read bytes.
     public ReadDel ReadFn;
     public delegate void WriteDel(int off, byte d); // = 0      // optional handler to write bytes.
@@ -42,16 +40,14 @@ public unsafe class MemoryEditor
     int DataPreviewAddr;
     int DataEditingAddr;
     bool DataEditingTakeFocus;
-    byte[] DataInputBuf = new byte[32];
-    byte[] AddrInputBuf = new byte[32];
+    readonly byte[] DataInputBuf = new byte[32];
+    readonly byte[] AddrInputBuf = new byte[32];
     int GotoAddr;
     int HighlightMin, HighlightMax;
-    int PreviewEndianness;
-    ImGuiDataType PreviewDataType;
+    readonly ImGuiDataType PreviewDataType;
 
     public int SelectedRam { get; set; }
-    private int bpaddr;
-    private bool onaddr;
+    private readonly int bpaddr;
 
     record Sizes
     {
@@ -67,7 +63,7 @@ public unsafe class MemoryEditor
         public float WindowWidth;
     };
 
-    public MemoryEditor()
+    public MemoryEditor(Action<int, int, int, bool, int> addbp, Action<int, byte> addcheat)
     {
         // Settings
         Open = true;
@@ -90,8 +86,9 @@ public unsafe class MemoryEditor
         DataEditingTakeFocus = false;
         GotoAddr = -1;
         HighlightMin = HighlightMax = -1;
-        PreviewEndianness = 0;
         PreviewDataType = ImGuiDataType.S32;
+        AddBreakpoint = addbp;
+        AddCheat = addcheat;
     }
 
     // Standalone Memory Editor window
@@ -108,22 +105,14 @@ public unsafe class MemoryEditor
                 ImGui.OpenPopup("bpcontext");
             //DrawContents(ram.ToArray(), ram.Length, base_display_addr);
             if (ContentsWidthChanged)
-            {
                 //CalcSizes(out s, ram.Length, base_display_addr);
                 ImGui.SetWindowSize(new(s.WindowWidth, ImGui.GetWindowSize().Y));
-            }
         }
         ImGui.End();
     }
 
-    public void DrawContents(byte[] mem_data_void, int mem_size, int ram_type, int base_display_addr = 0x0000)
+    public void DrawContents(byte[] mem_data_void, int mem_size, int base_display_addr = 0x0000)
     {
-        if (ImGui.IsWindowHovered(ImGuiHoveredFlags.RootAndChildWindows) && ImGui.IsMouseReleased(ImGuiMouseButton.Right))
-        {
-            // ImGui.OpenPopup("bpcontext");
-            //DataEditingTakeFocus = false;
-        }
-
         if (Cols < 1)
             Cols = 1;
 
@@ -153,8 +142,8 @@ public unsafe class MemoryEditor
         // We are not really using the clipper API correctly here, because we rely on visible_start_addr/visible_end_addr for our scrolling function.
         int line_total_count = (mem_size + Cols - 1) / Cols;
 
-        ImGuiListClipper _clipper = new ImGuiListClipper();
-        ImGuiListClipperPtr clipper = new ImGuiListClipperPtr(&_clipper);
+        ImGuiListClipper _clipper = new();
+        ImGuiListClipperPtr clipper = new(&_clipper);
         clipper.Begin(line_total_count, s.LineHeight);
 
         int visible_start_addr = clipper.DisplayStart * Cols;
@@ -175,8 +164,7 @@ public unsafe class MemoryEditor
         {
             // Move cursor but only apply on next frame so scrolling with be synchronized (because currently we can't change the scrolling while the window is being rendered)
             if (ImGui.IsKeyPressed(ImGuiKey.UpArrow) && DataEditingAddr >= Cols)
-            { data_editing_addr_next = DataEditingAddr - Cols; }
-            else if (ImGui.IsKeyPressed(ImGuiKey.DownArrow) && DataEditingAddr < mem_size - Cols)
+data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKeyPressed(ImGuiKey.DownArrow) && DataEditingAddr < mem_size - Cols)
             { data_editing_addr_next = DataEditingAddr + Cols; }
             else if (ImGui.IsKeyPressed(ImGuiKey.LeftArrow) && DataEditingAddr > 0)
             { data_editing_addr_next = DataEditingAddr - 1; }
@@ -184,11 +172,11 @@ public unsafe class MemoryEditor
             { data_editing_addr_next = DataEditingAddr + 1; }
         }
 
-        if (data_editing_addr_next != -1 && (data_editing_addr_next / Cols) != (data_editing_addr_backup / Cols))
+        if (data_editing_addr_next != -1 && data_editing_addr_next / Cols != data_editing_addr_backup / Cols)
         {
             // Track cursor movements
-            int scroll_offset = (data_editing_addr_next / Cols - data_editing_addr_backup / Cols);
-            bool scroll_desired = (scroll_offset < 0 && data_editing_addr_next < visible_start_addr + Cols * 2) || (scroll_offset > 0 && data_editing_addr_next > visible_end_addr - Cols * 2);
+            int scroll_offset = data_editing_addr_next / Cols - data_editing_addr_backup / Cols;
+            bool scroll_desired = scroll_offset < 0 && data_editing_addr_next < visible_start_addr + Cols * 2 || scroll_offset > 0 && data_editing_addr_next > visible_end_addr - Cols * 2;
             if (scroll_desired)
                 ImGui.SetScrollY(ImGui.GetScrollY() + scroll_offset * s.LineHeight);
         }
@@ -217,18 +205,18 @@ public unsafe class MemoryEditor
                     ImGui.SameLine(byte_pos_x);
 
                     // Draw highlight
-                    bool is_highlight_from_user_range = (addr >= HighlightMin && addr < HighlightMax);
+                    bool is_highlight_from_user_range = addr >= HighlightMin && addr < HighlightMax;
                     bool is_highlight_from_user_func = HighlightFn != null && HighlightFn(mem_data, addr);
-                    bool is_highlight_from_preview = (addr >= DataPreviewAddr && addr < DataPreviewAddr + preview_data_type_size);
+                    bool is_highlight_from_preview = addr >= DataPreviewAddr && addr < DataPreviewAddr + preview_data_type_size;
                     if (is_highlight_from_user_range || is_highlight_from_user_func || is_highlight_from_preview)
                     {
                         Vector2 pos = ImGui.GetCursorScreenPos();
                         float highlight_width = s.GlyphWidth * 2;
-                        bool is_next_byte_highlighted = (addr + 1 < mem_size) && ((HighlightMax != -1 && addr + 1 < HighlightMax) || (HighlightFn != null && HighlightFn(mem_data, addr + 1)));
-                        if (is_next_byte_highlighted || (n + 1 == Cols))
+                        bool is_next_byte_highlighted = addr + 1 < mem_size && (HighlightMax != -1 && addr + 1 < HighlightMax || HighlightFn != null && HighlightFn(mem_data, addr + 1));
+                        if (is_next_byte_highlighted || n + 1 == Cols)
                         {
                             highlight_width = s.HexCellWidth;
-                            if (OptMidColsCount > 0 && n > 0 && (n + 1) < Cols && ((n + 1) % OptMidColsCount) == 0)
+                            if (OptMidColsCount > 0 && n > 0 && n + 1 < Cols && (n + 1) % OptMidColsCount == 0)
                                 highlight_width += s.SpacingBetweenMidCols;
                         }
                         draw_list.AddRectFilled(pos, new(pos.X + highlight_width, pos.Y + s.LineHeight), HighlightColor);
@@ -248,7 +236,7 @@ public unsafe class MemoryEditor
                         }
                         ImGui.PushItemWidth(s.GlyphWidth * 2);
 
-                        UserData user_data = new UserData();
+                        UserData user_data = new();
                         user_data.CursorPos = -1;
 
                         // TODO: check it (YTom)
@@ -272,8 +260,7 @@ public unsafe class MemoryEditor
                         if (data_editing_addr_next != -1)
                             data_write = data_next = false;
 
-                        int data_input_value = 0;
-                        if (data_write && TryHexParse(DataInputBuf, out data_input_value))
+                        if (data_write && TryHexParse(DataInputBuf, out int data_input_value))
                         {
                             if (WriteFn != null)
                                 WriteFn(addr, (byte)data_input_value);
@@ -284,11 +271,11 @@ public unsafe class MemoryEditor
                     }
                     else
                     {
-                        byte b = ReadFn != null ? ReadFn( addr) : mem_data[addr & 0xffff];
+                        byte b = ReadFn != null ? ReadFn(addr) : mem_data[addr];
 
                         if (OptShowHexII)
                         {
-                            if ((b >= 32 && b < 128))
+                            if (b >= 32 && b < 128)
                                 ImGui.Text($"{b}");
                             else if (b == 0xFF && OptGreyOutZeroes)
                                 ImGui.TextDisabled("## ");
@@ -310,16 +297,16 @@ public unsafe class MemoryEditor
                             data_editing_addr_next = addr;
                         }
 
-                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-                        {
-                            DataEditingAddr = -1;
-                            DataEditingTakeFocus = false;
-                            if (ImGui.IsItemHovered())
-                            {
-                                bpaddr = addr;
-                                ImGui.OpenPopup("bpcontext");
-                            }
-                        }
+                        //if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                        //{
+                        //    DataEditingAddr = -1;
+                        //    DataEditingTakeFocus = false;
+                        //    if (ImGui.IsItemHovered())
+                        //    {
+                        //        bpaddr = addr;
+                        //        ImGui.OpenPopup("bpcontext");
+                        //    }
+                        //}
 
                         ImGui.SetNextWindowSize(new(0, 68));
                         if (ImGui.BeginPopupModal("bpcontext"))
@@ -329,20 +316,16 @@ public unsafe class MemoryEditor
                             {
                                 ImGui.SetNextItemWidth(s.GlyphWidth * 7 + style.FramePadding.X * 2.0f);
                                 if (ImGui.Button($"Breakpoint on Write - {a:X4}"))
-                                {
                                     //InsertRemove(a, BPType.Write, true);
                                     ImGui.CloseCurrentPopup();
-                                }
 
                                 if (ImGui.Button($"Breakpoint on Read  - {a:X4}"))
                                 {
                                     if (DataPreviewAddr > -1)
-                                    {
                                         //if (MemRegions[SelectedRam].Name == "Wram")
                                         //    addr += 0x8000;
                                         //InsertRemove(a, BPType.Read, true);
                                         ImGui.CloseCurrentPopup();
-                                    }
                                 }
 
                                 if (ImGui.Button("Close"))
@@ -374,8 +357,8 @@ public unsafe class MemoryEditor
                             draw_list.AddRectFilled(pos, new(pos.X + s.GlyphWidth, pos.Y + s.LineHeight), ImGui.GetColorU32(ImGuiCol.TextSelectedBg));
                         }
                         byte c = ReadFn != null ? ReadFn(addr) : mem_data[addr];
-                        char display_c = (c < 32 || c >= 128) ? '.' : (char)c;
-                        draw_list.AddText(pos, (display_c == c) ? color_text : color_disabled, $"{display_c}");
+                        char display_c = c < 32 || c >= 128 ? '.' : (char)c;
+                        draw_list.AddText(pos, display_c == c ? color_text : color_disabled, $"{display_c}");
                         pos.X += s.GlyphWidth;
                     }
                 }
@@ -405,17 +388,14 @@ public unsafe class MemoryEditor
         if (OptShowOptions)
         {
             ImGui.Separator();
-            DrawOptionsLine(s, mem_data, mem_size, base_display_addr);
+            DrawOptionsLine(s, mem_size, base_display_addr);
         }
 
         if (lock_show_data_preview)
-        {
             ImGui.Separator();
-            //DrawPreviewLine(s, mem_data, mem_size, base_display_addr);
-        }
     }
 
-    private void DrawOptionsLine(Sizes s, byte[] mem_data, int mem_size, int base_display_addr)
+    private void DrawOptionsLine(Sizes s, int mem_size, int base_display_addr)
     {
         ImGuiStylePtr style = ImGui.GetStyle();
         //const char* format_range = OptUpperCaseHex ? "Range %0*" _PRISizeT "X..%0*" _PRISizeT "X" : "Range %0*" _PRISizeT "x..%0*" _PRISizeT "x";
@@ -429,8 +409,7 @@ public unsafe class MemoryEditor
             if (ImGui.DragInt("##cols", ref Cols, 0.2f, 4, 32, "%d cols")) { ContentsWidthChanged = true; if (Cols < 1) Cols = 1; }
             ImGui.Checkbox("Show Data Preview", ref OptShowDataPreview);
             ImGui.Checkbox("Show HexII", ref OptShowHexII);
-            if (ImGui.Checkbox("Show Ascii", ref OptShowAscii)) { ContentsWidthChanged = true; }
-            ImGui.Checkbox("Grey out zeroes", ref OptGreyOutZeroes);
+            if (ImGui.Checkbox("Show Ascii", ref OptShowAscii)) ContentsWidthChanged = true;             ImGui.Checkbox("Grey out zeroes", ref OptGreyOutZeroes);
             ImGui.Checkbox("Uppercase Hex", ref OptUpperCaseHex);
 
             ImGui.EndPopup();
@@ -439,11 +418,10 @@ public unsafe class MemoryEditor
         ImGui.SameLine();
         ImGui.Text($"{base_display_addr + mem_size - 1:X4}");
         ImGui.SameLine();
-        ImGui.SetNextItemWidth((s.AddrDigitsCount) * s.GlyphWidth + style.FramePadding.X * 2.0f);
+        ImGui.SetNextItemWidth(s.AddrDigitsCount * s.GlyphWidth + style.FramePadding.X * 2.0f);
         if (ImGui.InputText("##addr", AddrInputBuf, (uint)s.AddrDigitsCount + 1, ImGuiInputTextFlags.CharsHexadecimal | ImGuiInputTextFlags.EnterReturnsTrue))
         {
-            int goto_addr;
-            if (TryHexParse(AddrInputBuf, out goto_addr))
+            if (TryHexParse(AddrInputBuf, out int goto_addr))
             {
                 GotoAddr = goto_addr - base_display_addr;
                 HighlightMin = HighlightMax = -1;
@@ -455,21 +433,44 @@ public unsafe class MemoryEditor
             if (GotoAddr < mem_size)
             {
                 ImGui.BeginChild("##scrolling");
-                ImGui.SetScrollFromPosY(ImGui.GetCursorStartPos().Y + (GotoAddr / Cols) * ImGui.GetTextLineHeight());
+                ImGui.SetScrollFromPosY(ImGui.GetCursorStartPos().Y + GotoAddr / Cols * ImGui.GetTextLineHeight());
                 ImGui.EndChild();
                 DataEditingAddr = DataPreviewAddr = GotoAddr;
                 DataEditingTakeFocus = true;
             }
             GotoAddr = -1;
         }
-    }
 
+        ImGui.SameLine();
+
+        if (ImGui.Button("Write Bp"))
+        {
+            if (TryHexParse(AddrInputBuf, out var addr))
+                AddBreakpoint(addr & 0xffff, BPType.Write, -1, true, 0);
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Read Bp"))
+        {
+            if (TryHexParse(AddrInputBuf, out var addr))
+                AddBreakpoint(addr & 0xffff, BPType.Read, -1, false, 0);
+        }
+
+        ImGui.SameLine();
+
+        if (ImGui.Button("Freeze Value"))
+        {
+            if (TryHexParse(AddrInputBuf, out var addr))
+                AddCheat(addr, 0);
+        }
+    }
 
     // FIXME: We should have a way to retrieve the text edit cursor position more easily in the API, this is rather tedious. This is such a ugly mess we may be better off not using InputText() at all here.
     public unsafe static int Callback(ImGuiInputTextCallbackData* userdata)
     {
         var data = new ImGuiInputTextCallbackDataPtr(userdata);
-        UserData* user_data = (UserData*)(data.UserData);
+        UserData* user_data = (UserData*)data.UserData;
         if (!data.HasSelection())
             user_data->CursorPos = data.CursorPos;
         if (data.SelectionStart == 0 && data.SelectionEnd == data.BufTextLen)
@@ -500,7 +501,7 @@ public unsafe class MemoryEditor
         s.HexCellWidth = (int)(s.GlyphWidth * 2.5f);             // "FF " we include trailing space in the width to easily catch clicks everywhere
         s.SpacingBetweenMidCols = (int)(s.HexCellWidth * 0.25f); // Every OptMidColsCount columns we add a bit of extra spacing
         s.PosHexStart = (s.AddrDigitsCount + 2) * s.GlyphWidth;
-        s.PosHexEnd = s.PosHexStart + (s.HexCellWidth * Cols);
+        s.PosHexEnd = s.PosHexStart + s.HexCellWidth * Cols;
         s.PosAsciiStart = s.PosAsciiEnd = s.PosHexEnd;
         if (OptShowAscii)
         {
@@ -515,6 +516,8 @@ public unsafe class MemoryEditor
     }
 
     static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
+    private readonly Action<int, int, int, bool, int> AddBreakpoint;
+    private readonly Action<int, byte> AddCheat;
 
     static int DataTypeGetSize(ImGuiDataType data_type)
     {
@@ -522,10 +525,7 @@ public unsafe class MemoryEditor
         return sizes[(int)data_type];
     }
 
-    private string FixedHex(int v, int count)
-    {
-        return OptUpperCaseHex ? v.ToString("X").PadLeft(count, '0') : v.ToString("x").PadLeft(count, '0');
-    }
+    private string FixedHex(int v, int count) => OptUpperCaseHex ? v.ToString("X").PadLeft(count, '0') : v.ToString("x").PadLeft(count, '0');
 
     private static bool TryHexParse(byte[] bytes, out int result)
     {
@@ -538,7 +538,7 @@ public unsafe class MemoryEditor
         var address = System.Text.Encoding.ASCII.GetBytes(input);
         for (int i = 0; i < bytes.Length; i++)
         {
-            bytes[i] = (i < address.Length) ? address[i] : (byte)0;
+            bytes[i] = i < address.Length ? address[i] : (byte)0;
         }
     }
 

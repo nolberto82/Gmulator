@@ -1,10 +1,10 @@
-﻿using GBoy.Core.Sound;
+﻿using Gmulator.Core.Gbc.Sound;
 using Gmulator.Shared;
 using Raylib_cs;
-using Wave = GBoy.Core.Sound.Wave;
+using Wave = Gmulator.Core.Gbc.Sound.Wave;
 
-namespace GBoy.Core;
-public class GbcApu : SaveState
+namespace Gmulator.Core.Gbc;
+public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
 {
     public byte NR50 { get; private set; }
     public byte NR51 { get; private set; }
@@ -14,31 +14,22 @@ public class GbcApu : SaveState
     public int FrameSequencer { get; private set; }
     public int FrameSequencerCycles { get; private set; }
 
-    public static int NextSampleTimer { get; private set; }
-    public static int BufPos { get; set; }
+    private int NextSampleTimer;
+    private int BufPos;
 
-    public static int VolumeLeft;
-    public static int VolumeRight;
+    private int VolumeLeft;
+    private int VolumeRight;
 
-    public Square1 Square1 { get; private set; }
-    public Square2 Square2 { get; private set; }
-    public Wave Wave { get; private set; }
-    public Noise Noise { get; private set; }
+    public Square1 Square1 { get; private set; } = new();
+    public Square2 Square2 { get; private set; } = new();
+    public Wave Wave { get; private set; } = new(mmu);
+    public Noise Noise { get; private set; } = new();
 
     public float[] AudioBuffer { get; private set; } = new float[MaxSamples * 2];
 
     public const int MaxSamples = 4096;
     public const int SampleRate = 44100;
-    public readonly int SamplesCpu;
-
-    public GbcApu(GbcMmu mmu, int cpuclock)
-    {
-        SamplesCpu = cpuclock / SampleRate;
-        Square1 = new();
-        Square2 = new();
-        Wave = new(mmu);
-        Noise = new();
-    }
+    public readonly int SamplesCpu = cpuclock / SampleRate;
 
     public void Step(int cycles)
     {
@@ -110,8 +101,8 @@ public class GbcApu : SaveState
             }
             else
             {
-                AudioBuffer[BufPos++] = l / 8;
-                AudioBuffer[BufPos++] = r / 8;
+                AudioBuffer[BufPos++] = l / 64;
+                AudioBuffer[BufPos++] = r / 64;
             }
 
             if (BufPos >= AudioBuffer.Length)

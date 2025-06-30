@@ -16,11 +16,14 @@ public static class Constants
     public const int IntSerial = 0x08;
     public const int IntJoypad = 0x10;
 
-    public const int Debugging = 0;
-    public const int Stepping = 1;
-    public const int Running = 2;
-    public const int Paused = 3;
-    public const int Stopped = 4;
+    public const int Break = 0;
+    public const int StepMain = 1;
+    public const int StepSpc = 2;
+    public const int StepOverMain = 3;
+    public const int StepOverSpc = 4;
+    public const int Running = 5;
+    public const int Paused = 6;
+    public const int Stopped = 7;
 
     public const int Horizontal = 3;
     public const int Vertical = 2;
@@ -28,7 +31,9 @@ public static class Constants
     public const int SingleNt1 = 1;
 
     public const int ScreenWidth = 1280;
-    public const int ScreenHeight = 800;
+    public const int ScreenHeight = 900;
+    public const int DeckWidth = 1280;
+    public const int DeckHeight = 800;
 
     public const int NesCpuClock = 1789773;
     public const int NesCyclesPerFrame = 29780;
@@ -42,25 +47,41 @@ public static class Constants
 
     public const int Fps = 60;
 
-    public const int NesWidth = 256;
-    public const int NesHeight = 240;
     public const int GbWidth = 160;
     public const int GbHeight = 144;
+    public const int NesWidth = 256;
+    public const int NesHeight = 240;
+    public const int SnesWidth = 256;
+    public const int SnesHeight = 240;
+
+    public const int GbcAudioFreq = 44100;
+    public const int NesAudioFreq = 44100;
+    public const int SnesAudioFreq = 44100;
+
+    public const int SnesMaxSamples = 4096;
+
+    public const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
 
     public const int GameGenie = 0;
     public const int GameShark = 1;
+    public const int Raw = 2;
 
-    public const int GbcSystem = 0;
-    public const int NesSystem = 1;
+    public const int NoConsole = -1;
+    public const int GbcConsole = 0;
+    public const int NesConsole = 1;
+    public const int SnesConsole = 2;
 
-    public static readonly Vector2 ButtonSize = new(70, 0);
+    public const int DisasmMaxLines = 15;
+
+    public static readonly Vector2 ButtonSize = new(60, 0);
     public static readonly Vector4 RED = new(1, 0, 0, 1);
     public static readonly Vector4 GREEN = new(0, 1, 0, 1);
     public static readonly Vector4 BLUE = new(0, 0, 1, 1);
     public static readonly Vector4 WHITE = new(1, 1, 1, 1);
+    public static readonly Vector4 YELLOW = new(1, 1, 0, 1);
     public static readonly Vector4 GRAY = new(128 / 255f, 128 / 255f, 128 / 255f, 1);
     public static readonly Vector4 DEFCOLOR = new(0.260f, 0.590f, 0.980f, 0.400f);
-    public const ImGuiInputTextFlags HexInputFlags = ImGuiInputTextFlags.CharsHexadecimal | ImGuiInputTextFlags.CharsUppercase | ImGuiInputTextFlags.CallbackCompletion;
+    public const ImGuiInputTextFlags HexInputFlags = ImGuiInputTextFlags.CharsHexadecimal | ImGuiInputTextFlags.CharsUppercase;
     public const ImGuiWindowFlags NoScrollFlags = ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
     public const ImGuiWindowFlags DockFlags = ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoTitleBar |
         ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.MenuBar | ImGuiWindowFlags.NoCollapse |
@@ -90,7 +111,14 @@ public static class Constants
     public const GamepadButton BtnX = GamepadButton.RightFaceUp;
     public const GamepadButton BtnY = GamepadButton.RightFaceLeft;
 
-    public const string SaveStateVersion = "1.05";
+    public readonly static Dictionary<KeyboardKey, int> SaveStateKeys = new()
+    {
+        [KeyboardKey.F1] = 0, [KeyboardKey.F2] = 1, [KeyboardKey.F3] = 2,
+        [KeyboardKey.F4] = 3, [KeyboardKey.F5] = 4, [KeyboardKey.F6] = 5,
+        [KeyboardKey.F7] = 6, [KeyboardKey.F8] = 7, [KeyboardKey.F9] = 8,
+    };
+
+    public const string SaveStateVersion = "1.07";
     public static readonly string RomDirectory = "Roms";
     public static readonly string SaveDirectory = "Saves";
     public static readonly string StateDirectory = "States";
@@ -98,6 +126,13 @@ public static class Constants
     public static readonly string LuaDirectory = "Lua";
     public static readonly string ConfigDirectory = "Config";
     public static readonly string DebugDirectory = "Debugger";
+
+    public class RegistersInfo(string address, string name, string value)
+    {
+        public string Address { get; private set; } = address;
+        public string Name { get; private set; } = name;
+        public string Value { get; private set; } = value;
+    }
 
     public class DisasmEntry(int pc, string disasm, string name, string oper, string regtext, int size, string bytetext = "")
     {

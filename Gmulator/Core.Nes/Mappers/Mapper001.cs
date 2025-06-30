@@ -97,10 +97,7 @@
             base.Write(a, v);
         }
 
-        public override void SetLatch(int a, byte v)
-        {
-            base.SetLatch(a, v);
-        }
+        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
 
         public override void Reset()
         {
@@ -110,10 +107,7 @@
             base.Reset();
         }
 
-        public override void Scanline()
-        {
-            base.Scanline();
-        }
+        public override void Scanline() => base.Scanline();
 
         private void UpdatePrg(byte v)
         {

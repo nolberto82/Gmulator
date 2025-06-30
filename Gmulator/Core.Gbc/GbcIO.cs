@@ -1,7 +1,7 @@
 ﻿using Gmulator.Shared;
 
-namespace GBoy.Core;
-public partial class GbcIO : SaveState
+namespace Gmulator.Core.Gbc;
+public partial class GbcIO : EmuState
 {
     public bool UpdateTIMA { get; set; }
 
@@ -282,57 +282,45 @@ public partial class GbcIO : SaveState
         BGPD = 0xff;
     }
 
-    public Dictionary<string, dynamic> GetLCDC()
+    public Dictionary<string, dynamic> GetLCDC() => new()
     {
-        return new Dictionary<string, dynamic>()
-        {
-            ["Background"] = LCDC.GetBit(0),
-            ["Sprites"] = LCDC.GetBit(1),
-            ["Sprite Size"] = LCDC.GetBit(2) ? "8x16" : "8x8",
-            ["BG Map"] = LCDC.GetBit(3) ? "9C00:9FFF" : "9800:9BFF",
-            ["BG Tile"] = LCDC.GetBit(4) ? "8000:8FFF" : "8800:97FF",
-            ["Window"] = LCDC.GetBit(5),
-            ["Window Map"] = LCDC.GetBit(6) ? "9C00:9FFF" : "9800:9BFF",
-            ["LCD"] = LCDC.GetBit(7),
-        };
-    }
+        ["Background"] = LCDC.GetBit(0),
+        ["Sprites"] = LCDC.GetBit(1),
+        ["Sprite Size"] = LCDC.GetBit(2) ? "8x16" : "8x8",
+        ["BG Map"] = LCDC.GetBit(3) ? "9C00:9FFF" : "9800:9BFF",
+        ["BG Tile"] = LCDC.GetBit(4) ? "8000:8FFF" : "8800:97FF",
+        ["Window"] = LCDC.GetBit(5),
+        ["Window Map"] = LCDC.GetBit(6) ? "9C00:9FFF" : "9800:9BFF",
+        ["LCD"] = LCDC.GetBit(7),
+    };
 
-    public Dictionary<string, dynamic> GetSTAT()
+    public Dictionary<string, dynamic> GetSTAT() => new()
     {
-        return new Dictionary<string, dynamic>()
-        {
-            ["PPU mode"] = STAT & 3,
-            ["LYC == LY"] = STAT.GetBit(2),
-            ["Mode 0 select"] = STAT.GetBit(3),
-            ["Mode 1 select"] = STAT.GetBit(4),
-            ["Mode 2 select"] = STAT.GetBit(5),
-            ["LYC select"] = STAT.GetBit(6),
-        };
-    }
+        ["PPU mode"] = STAT & 3,
+        ["LYC == LY"] = STAT.GetBit(2),
+        ["Mode 0 select"] = STAT.GetBit(3),
+        ["Mode 1 select"] = STAT.GetBit(4),
+        ["Mode 2 select"] = STAT.GetBit(5),
+        ["LYC select"] = STAT.GetBit(6),
+    };
 
-    public Dictionary<string, dynamic> GetIF()
+    public Dictionary<string, dynamic> GetIF() => new()
     {
-        return new Dictionary<string, dynamic>()
-        {
-            ["Vblank"] = IF.GetBit(0),
-            ["LCD"] = IF.GetBit(1),
-            ["Timer"] = IF.GetBit(2),
-            ["Serial"] = IF.GetBit(3),
-            ["Joypad"] = IF.GetBit(4),
-        };
-    }
+        ["Vblank"] = IF.GetBit(0),
+        ["LCD"] = IF.GetBit(1),
+        ["Timer"] = IF.GetBit(2),
+        ["Serial"] = IF.GetBit(3),
+        ["Joypad"] = IF.GetBit(4),
+    };
 
-    public Dictionary<string, dynamic> GetIE()
+    public Dictionary<string, dynamic> GetIE() => new()
     {
-        return new Dictionary<string, dynamic>()
-        {
-            ["Vblank"] = IF.GetBit(0),
-            ["LCD"] = IF.GetBit(1),
-            ["Timer"] = IF.GetBit(2),
-            ["Serial"] = IF.GetBit(3),
-            ["Joypad"] = IF.GetBit(4),
-        };
-    }
+        ["Vblank"] = IF.GetBit(0),
+        ["LCD"] = IF.GetBit(1),
+        ["Timer"] = IF.GetBit(2),
+        ["Serial"] = IF.GetBit(3),
+        ["Joypad"] = IF.GetBit(4),
+    };
 
     public Dictionary<string, dynamic> GetChannel1() => new()
     {
@@ -382,7 +370,7 @@ public partial class GbcIO : SaveState
         ["Position"] = Apu.Wave.Position,
     };
 
-    public Dictionary<string, dynamic> GetChannel4() => new Dictionary<string, dynamic>()
+    public Dictionary<string, dynamic> GetChannel4() => new()
     {
         ["Length"] = Apu.Noise.LengthCounter,
         ["Env Period"] = Apu.Noise.EnvPeriod,

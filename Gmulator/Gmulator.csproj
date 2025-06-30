@@ -1,49 +1,73 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>disable</Nullable>
-    <PublishAot>true</PublishAot>
-    <InvariantGlobalization>true</InvariantGlobalization>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
-    <ApplicationIcon>Assets\GBC_1.ico</ApplicationIcon>
-    <Configurations>Debug;Release;DeckDebug;DeckRelease</Configurations>
-  </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>disable</Nullable>
+		<PublishAot>False</PublishAot>
+		<InvariantGlobalization>true</InvariantGlobalization>
+		<AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+		<ApplicationIcon>Assets\GBC_1.ico</ApplicationIcon>
+		<Configurations>Debug;Release;DeckDebug;DeckRelease</Configurations>
+		<LangVersion>preview</LangVersion>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'" />
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DeckDebug|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DECKDEBUG</DefineConstants>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DeckDebug|AnyCPU'">
+		<DefineConstants>$(DefineConstants);DECKDEBUG</DefineConstants>
+	</PropertyGroup>
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'" />
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'" />
 
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DeckRelease|AnyCPU'">
-    <DefineConstants>$(DefineConstants);DECKRELEASE</DefineConstants>
-    <Optimize>True</Optimize>
-  </PropertyGroup>
+	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='DeckRelease|AnyCPU'">
+		<DefineConstants>$(DefineConstants);DECKRELEASE</DefineConstants>
+		<Optimize>True</Optimize>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <Content Include="Assets\GBC_1.ico" />
-  </ItemGroup>
+	<ItemGroup>
+	  <Compile Remove="Core.Snes\SnesGui.cs" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <PackageReference Include="NLua" Version="1.7.3" />
-    <PackageReference Include="rlImgui-cs" Version="2.1.0" />
-  </ItemGroup>
+	<ItemGroup>
+		<Content Include="Assets\GBC_1.ico" />
+	</ItemGroup>
 
-  <ItemGroup>
-    <None Update="Assets\consola.ttf">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\GBC_1.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="Assets\GBC_1.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-  </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="ImGui.NET" Version="1.91.6.1" />
+		<PackageReference Include="NLua" Version="1.7.5" />
+		<PackageReference Include="rlImgui-cs" Version="3.2.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <Reference Include="Raylib-cs">
+	    <HintPath>Raylib-cs.dll</HintPath>
+	  </Reference>
+	  <Reference Include="rlImGui">
+	    <HintPath>rlImGui.dll</HintPath>
+	  </Reference>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Assets\consola.ttf">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\GBC_1.ico">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\GBC_1.png">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\naga.ttf">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Assets\naga10.ttf">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+		<None Update="Lua\Super Mario World %28USA%29.lua">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
+	</ItemGroup>
 
 </Project>

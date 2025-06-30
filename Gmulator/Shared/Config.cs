@@ -2,67 +2,69 @@
 using System.IO;
 using System.Text.Json;
 
-namespace Gmulator
+namespace Gmulator.Shared;
+public class Config
 {
-    public class Config
+    public string WorkingDir { get; set; } = "C:";
+    public float Volume { get; set; } = 0.1f;
+    public float FrameSkip { get; set; } = 2;
+    public float RotateAB { get; set; }
+
+    public Config() { }
+    public Config(string directory, float volume, float frameskip, float ab)
     {
-        public string WorkingDir { get; set; }
-        public float Volume { get; set; }
-        public bool RotateAB { get; set; }
+        WorkingDir = directory;
+        Volume = volume;
+        FrameSkip = frameskip;
+        RotateAB = ab;
+    }
 
-        public Config() { }
-        public Config(string directory, float volume, bool ab)
+    public void Load()
+    {
+        var file = @$"{ConfigDirectory}/Settings.json";
+        if (File.Exists(file))
         {
-            WorkingDir = directory;
-            Volume = volume;
-            RotateAB = ab;
-        }
-
-        public static void Load()
-        {
-            var file = @$"{ConfigDirectory}/Settings.json";
-            if (File.Exists(file))
+            var res = JsonSerializer.Deserialize<List<Config>>(File.ReadAllText(file), GEmuJsonContext.Default.Options);
+            if (res != null && res.Count > 0)
             {
-                var res = JsonSerializer.Deserialize<List<Config>>(File.ReadAllText(file), GEmuJsonContext.Default.Options);
-                if (res.Count > 0)
-                {
-                    Menu.WorkingDir = res[0].WorkingDir;
-                    Raylib.SetMasterVolume(res[0].Volume);
-                    Input.RotateAB = res[0].RotateAB;
-                }
+                WorkingDir = res[0].WorkingDir ?? "C:";
+                Audio.SetVolume(res[0].Volume);
+                Volume = res[0].Volume;
+                FrameSkip = res[0].FrameSkip;
+                RotateAB = res[0].RotateAB;
             }
         }
+    }
 
-        public static void Save()
-        {
-            List<Config> config = [new(Menu.WorkingDir, Raylib.GetMasterVolume(), Input.RotateAB)];
-            var file = @$"{ConfigDirectory}/Settings.json";
-            var json = JsonSerializer.Serialize(config, GEmuJsonContext.Default.Options);
-            File.WriteAllText(file, json);
-        }
+    public void Save()
+    {
+        List<Config> config = [new(WorkingDir, Volume, FrameSkip, RotateAB)];
+        var file = @$"{ConfigDirectory}/Settings.json";
+        var json = JsonSerializer.Serialize(config, GEmuJsonContext.Default.Options);
+        File.WriteAllText(file, json);
+    }
 
-        public static void CreateDirectories()
-        {
-            if (!Directory.Exists(RomDirectory))
-                Directory.CreateDirectory(RomDirectory);
+    public static void CreateDirectories(bool isdeck)
+    {
+        if (!Directory.Exists(RomDirectory))
+            Directory.CreateDirectory(RomDirectory);
 
-            if (!Directory.Exists(SaveDirectory))
-                Directory.CreateDirectory(SaveDirectory);
+        if (!Directory.Exists(SaveDirectory))
+            Directory.CreateDirectory(SaveDirectory);
 
-            if (!Directory.Exists(StateDirectory))
-                Directory.CreateDirectory(StateDirectory);
+        if (!Directory.Exists(StateDirectory))
+            Directory.CreateDirectory(StateDirectory);
 
-            if (!Directory.Exists(CheatDirectory))
-                Directory.CreateDirectory(CheatDirectory);
+        if (!Directory.Exists(CheatDirectory))
+            Directory.CreateDirectory(CheatDirectory);
 
-            if (!Directory.Exists(LuaDirectory))
-                Directory.CreateDirectory(LuaDirectory);
+        if (!Directory.Exists(LuaDirectory))
+            Directory.CreateDirectory(LuaDirectory);
 
-            if (!Directory.Exists(ConfigDirectory))
-                Directory.CreateDirectory(ConfigDirectory);
+        if (!Directory.Exists(ConfigDirectory))
+            Directory.CreateDirectory(ConfigDirectory);
 
-            if (!Directory.Exists(DebugDirectory))
-                Directory.CreateDirectory(DebugDirectory);
-        }
+        if (!isdeck && !Directory.Exists(DebugDirectory))
+            Directory.CreateDirectory(DebugDirectory);
     }
 }

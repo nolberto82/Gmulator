@@ -1,5 +1,5 @@
-﻿namespace GBoy.Core.Mappers;
-public abstract class BaseMapper : SaveState
+﻿namespace Gmulator.Core.Gbc.Mappers;
+public abstract class BaseMapper : EmuState
 {
     public byte[] Rom { get; set; }
     public int Rombank { get; set; }

@@ -6,8 +6,8 @@ namespace GNes.Core;
 public class NesLogger
 {
     private static StreamWriter outFile;
-    public static bool Logging;
-    private NesCpu Cpu;
+    public bool Logging;
+    private readonly NesCpu Cpu;
     public NesPpu Ppu;
 
     public Func<int, byte> ReadByte;
@@ -43,7 +43,7 @@ public class NesLogger
             outFile?.Close();
     }
 
-    public DisasmEntry Disassemble(int pc, bool get_registers, bool gamedoctor = false)
+    public DisasmEntry Disassemble(int bank, int pc, bool get_registers, bool getbytes)
     {
         if (pc + 2 >= 0x10000)
             return new DisasmEntry(pc, "", "", "", "", 0);
@@ -169,8 +169,8 @@ public class NesLogger
             string btext = "";
             if (data.Length > 9)
             {
-                btext = $" {data.Substring(0, 9)}";
-                data = data.Substring(9, data.Length - 9);
+                btext = $" {data[..9]}";
+                data = data[9..];
             }
 
             regtext = $"A:{Cpu.A:X2} X:{Cpu.X:X2} Y:{Cpu.Y:X2}" +
@@ -182,7 +182,20 @@ public class NesLogger
             return new(pc, data, name, data, regtext, size);
     }
 
-    private Dictionary<int, string> IORegNames = new()
+    internal void Log(ushort pc)
+    {
+        if (Outfile != null && Outfile.BaseStream.CanWrite)
+        {
+            bool gamedoctor = false;
+            DisasmEntry e = Disassemble(0, pc, true, false);
+            if (gamedoctor)
+                Outfile.WriteLine($"{e.regtext}");
+            else
+                Outfile.WriteLine($"{e.pc:X4}  {e.disasm,-26} {e.regtext.ToUpper()}");
+        }
+    }
+
+    private readonly Dictionary<int, string> IORegNames = new()
     {
         [0x4000] = "SQ1_VOL",
         [0x4001] = "SQ1_SWEEP",

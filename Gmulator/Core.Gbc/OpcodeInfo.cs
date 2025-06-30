@@ -1,30 +1,21 @@
-
-namespace GBoy.Core;
+namespace Gmulator.Core.Gbc;
 public partial class GbcCpu
 {
-    public struct Opcode
+    public class Opcode(string name, string oper, string format, byte size)
     {
-        public string Name;
-        public string Oper;
-        public string Format;
-        public byte Size;
-             
-        public Opcode(string name, string oper, string format, byte size)
-        {
-            Name = name;
-            Oper = oper;
-            Format = format;
-            Size = size;
-        }
+        public string Name = name;
+        public string Oper = oper;
+        public string Format = format;
+        public byte Size = size;
     }
     
 	public static List<Opcode> OpInfo00;
 	public static List<Opcode> OpInfoCB;
 
-    public void GenerateOpInfo()
+	public static void GenerateOpInfo()
 	{
-		OpInfo00 = new();
-		OpInfoCB = new();
+		OpInfo00 = [];
+		OpInfoCB = [];
 
 		OpInfo00.Add(new Opcode("nop", "n/a", "", 1)); //00
 		OpInfo00.Add(new Opcode("ld", "bc,", "x4", 3)); //01
