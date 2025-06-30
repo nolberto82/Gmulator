@@ -11,7 +11,7 @@ NLua | https://github.com/NLua/NLua |
 
 # References
 
-## Gameboy/Gameboy Color
+## GB/GBC
 
 * https://gbdev.io/pandocs/
 * https://github.com/NightShade256/NightShade256.github.io/blob/main/_posts/2021-03-27-gb-sound-emulation.md
