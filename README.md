@@ -26,4 +26,4 @@ NLua | https://github.com/NLua/NLua |
 
 * https://snes.nesdev.org/wiki/SNESdev_Wiki
 * https://wiki.superfamicom.org/
-* https://github.com/dinkc64/LakeSnes/tree/main - for its sound emulation
+* https://github.com/angelo-wf/LakeSnes - for its sound emulation
