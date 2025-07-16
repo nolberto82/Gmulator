@@ -2,7 +2,7 @@
 using Raylib_cs;
 using System.Runtime.CompilerServices;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 internal class Input
 {
     private static bool[] Buttons;
@@ -87,14 +87,14 @@ internal class Input
         }
     }
 
-    public static void UpdateGuiInput(Emulator emu, Menu menu, bool isdeck)
+    public static void UpdateGuiInput(Emulator emu, Menu menu)
     {
         DisableInputs();
         if (emu == null) return;
         if (!Raylib.IsWindowFocused()) return;
 
-        var NewRightStickY = Raylib.GetGamepadAxisMovement(0, GamepadAxis.RightY);
-        if (NewRightStickY > -0.1f && NewRightStickY < 0.1f) NewRightStickY = 0.0f; //Deadzone
+        var newrightstickY = Raylib.GetGamepadAxisMovement(0, GamepadAxis.RightY);
+        if (newrightstickY > -0.1f && newrightstickY < 0.1f) newrightstickY = 0.0f; //Deadzone
 
         if (Raylib.IsGamepadButtonPressed(0, BtnL2))
             menu?.Open(emu);
@@ -118,9 +118,9 @@ internal class Input
             Raylib.SetWindowState(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow);
         }
 
-        if (NewRightStickY < 0 && OldRightThumbY == 0)
+        if (newrightstickY < 0 && OldRightThumbY == 0)
             emu.SaveState(0, 0);
-        else if (NewRightStickY > 0 && OldRightThumbY == 0)
+        else if (newrightstickY > 0 && OldRightThumbY == 0)
             emu.LoadState(0, 0);
 
         var shift = Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift);
@@ -139,7 +139,7 @@ internal class Input
             }
         }
 
-        OldRightThumbY = NewRightStickY;
+        OldRightThumbY = newrightstickY;
     }
 
     private static void DisableInputs()

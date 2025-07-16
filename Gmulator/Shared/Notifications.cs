@@ -2,7 +2,7 @@
 using Raylib_cs;
 using System.Runtime.InteropServices;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 internal static class Notifications
 {
     private static string[] Text;
@@ -22,12 +22,12 @@ internal static class Notifications
         Frames = 125;
     }
 
-    public static void Render(int x, int y, int width, int height, bool debug)
+    public static void Render(int x, int y, int width, bool debug)
     {
         if (Frames-- > 0)
         {
             if (!debug)
-                RenderText(Text, x, y, width, height, Color.Yellow, debug);
+                RenderText(Text, x, y, width, Color.Yellow, debug);
         }
     }
 
@@ -45,7 +45,7 @@ internal static class Notifications
         }
     }
 
-    public static void RenderText(string[] text, int x, int y, int width, int height, Color c, bool debug)
+    public static void RenderText(string[] text, int x, int y, int width, Color c, bool debug)
     {
         var fontsize = debug ? 15 : 30;
         var wheight = Raylib.GetScreenHeight();

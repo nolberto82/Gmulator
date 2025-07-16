@@ -68,6 +68,7 @@ public class Snes : Emulator
                     }
 #endif
 
+                    LuaApi?.OnExec(Cpu.PB << 16 |Cpu.PC);
                     Cpu.Step();
 
                     if (State == StepMain)
@@ -560,7 +561,7 @@ public class Snes : Emulator
             foreach (var c in Cheats)
             {
                 if (c.Value.Enabled && c.Value.Type == GameShark)
-                    Ram[(((bank & 1) << 16) | c.Value.Address & 0xffff)] = c.Value.Value;
+                    Ram[c.Value.Address & 0xffff] = c.Value.Value;
             }
         }
         return v;

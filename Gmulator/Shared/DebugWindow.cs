@@ -339,6 +339,8 @@ namespace Gmulator.Shared
 
         public bool AccessCheck(int a, int v, int memtype, bool write)
         {
+            if (a==0x37f)
+            { }
             Breakpoints.TryGetValue(a, out Breakpoint bp);
             if (bp != null && bp.Enabled && bp.RamType == memtype && bp.Type > 0)
             {

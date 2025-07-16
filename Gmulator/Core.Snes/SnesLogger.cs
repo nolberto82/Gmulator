@@ -2,27 +2,22 @@
 
 namespace Gmulator.Core.Snes
 {
-    public class SnesLogger
+    public class SnesLogger(Snes snes)
     {
         public bool Logging { get; internal set; }
 
         internal Func<Dictionary<string, bool>> GetFlags;
         internal Func<Dictionary<string, string>> GetRegs;
         private StreamWriter Outfile;
-        private readonly Snes Snes;
+        private readonly Snes Snes = snes;
 
         public bool MMode { get; internal set; }
         public bool XMode { get; internal set; }
 
-        public SnesLogger(Snes snes)
-        {
-            Snes = snes;
-        }
-
         public DisasmEntry Disassemble(int bank, int pc, bool getregs, bool getbytes)
         {
             var Cpu = Snes.Cpu;
-            pc = bank | pc;
+            //pc = bank | pc;
             byte op = Snes.ReadOp(pc);
             int a = 0;
             int c, x;
@@ -237,7 +232,7 @@ namespace Gmulator.Core.Snes
                     var k = f.Value ? f.Key : f.Key.ToLower();
                     s += $"{k}";
                 }
-                regtext += new string(s.Reverse().ToArray()) + " ";
+                regtext += new string([.. s.Reverse()]) + " ";
             }
             return new(bank | pc, $"{name} {data}", name, "", regtext, size, getbytes ? bytedata : "");
         }

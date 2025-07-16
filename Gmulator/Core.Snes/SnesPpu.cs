@@ -294,8 +294,6 @@ public class SnesPpu : EmuState
                     RDNMI &= 0x7f;
                     FrameReady = true;
                     FrameCounter++;
-                    if (!Snes.FastForward)
-                        Array.Fill<uint>(ScreenBuffer, 0xff000000);
                 }
             }
         }

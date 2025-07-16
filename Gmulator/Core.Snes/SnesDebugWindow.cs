@@ -74,7 +74,7 @@ internal class SnesDebugWindow : DebugWindow
                 if (ImGui.Selectable($"{pc:X6} ", false, ImGuiSelectableFlags.AllowDoubleClick))
                 {
                     if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                        AddBreakpoint(e.pc, BPType.Exec, -1, false, RamType.Rom);
+                        AddBreakpoint(pc, BPType.Exec, -1, false, RamType.Rom);
                 }
 
                 DrawHighlight(bank | Cpu.PC, e.pc);

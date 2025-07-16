@@ -178,7 +178,7 @@ public class Cheat
                 var txt = File.ReadAllText(libretrocht).Split(["\n\n", "\r\n"], StringSplitOptions.RemoveEmptyEntries);
                 for (int i = 1; i < txt.Length; i++)
                 {
-                    if (!txt[0].ToLowerInvariant().Contains("cheats ="))
+                    if (!txt[0].Contains("cheats =", StringComparison.InvariantCultureIgnoreCase))
                     {
                         Notifications.Init("Cheat File is Not in Libretro Format");
                         return;

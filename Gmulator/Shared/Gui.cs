@@ -16,7 +16,6 @@ namespace Gmulator.Shared;
 
 public abstract class Gui
 {
-    public readonly string WindowTitle = "Gmulator";
     public const string FontName = "Assets/naga10.ttf";
 
     public LuaApi LuaApi { get; private set; }
@@ -51,7 +50,7 @@ public abstract class Gui
             Emu?.Update();
             LuaApi?.Update(Menu.Opened);
 
-            Input.UpdateGuiInput(Emu, Menu, isdeck);
+            Input.UpdateGuiInput(Emu, Menu);
 
             ImGui.PushFont(DebuFont[0]);
             Menu.Update(isdeck);
@@ -78,7 +77,7 @@ public abstract class Gui
     public virtual void Init(bool isdeck)
     {
         Raylib.SetConfigFlags(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow | ConfigFlags.HighDpiWindow);
-        Raylib.InitWindow(DeckWidth, DeckHeight, WindowTitle);
+        Raylib.InitWindow(DeckWidth, DeckHeight, EmulatorName);
         Raylib.SetTargetFPS(60);
         Audio = new();
 
@@ -151,27 +150,26 @@ public abstract class Gui
                     Emu = new Gbc();
                     Emu.Init(GbWidth, GbHeight, GbcConsole, MenuHeight, DebuFont, GuiFont);
                     LuaApi = Emu.LuaApi;
-                    LuaApi.Read = Emu.GetConsole<Gbc>().Mmu.Read;
                     Audio.Init(GbcAudioFreq, 4096, 4096, 32);
                     break;
                 case ".nes":
                     Emu = new Nes();
                     Emu.Init(NesWidth, NesHeight, NesConsole, MenuHeight, DebuFont, GuiFont);
                     LuaApi = Emu.LuaApi;
-                    LuaApi.Read = Emu.GetConsole<Nes>().Mmu.Read;
                     Audio.Init(NesAudioFreq, 4096, 4096, 32);
                     break;
                 case ".sfc" or ".smc":
                     Emu = new Snes();
                     Emu.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebuFont, GuiFont);
                     LuaApi = Emu.LuaApi;
-                    LuaApi.Read = Emu.GetConsole<Snes>().ReadMemory;
                     Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
                     break;
                 default: return;
             }
 
             //Emu?.SetLua();
+            LuaApi.Init();
+            LuaApi.InitMemCallbacks(Emu);
             Emu.Config = new();
             Emu?.Config.Load();
             LuaApi?.Reset();

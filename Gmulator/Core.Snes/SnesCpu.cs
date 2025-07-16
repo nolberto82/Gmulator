@@ -18,7 +18,7 @@ public partial class SnesCpu : EmuState, ICpu
     private const int BRKe = 0xFFFE;
 
     private int pc, sp, ra, rx, ry, ps;
-    private bool Imme;
+    private bool Imme, Wait;
 
     public int PC { get => (ushort)pc; set => pc = (ushort)value; }
     public int SP { get => (ushort)sp; set => sp = (ushort)value; }
@@ -162,13 +162,14 @@ public partial class SnesCpu : EmuState, ICpu
         if (NmiEnabled)
         {
             Nmi(NMIn);
-            NmiEnabled = false;
+            NmiEnabled = Wait = false;
+
             return;
         }
         if (!I && IRQEnabled)
         {
             Nmi(IRQn);
-            IRQEnabled = false;
+            IRQEnabled = Wait = false;
             return;
         }
 
@@ -178,7 +179,6 @@ public partial class SnesCpu : EmuState, ICpu
 
     public void ExecOp(byte op)
     {
-
         int mode = Disasm[op].Mode;
         Imme = Disasm[op].Immediate;
 
@@ -272,7 +272,7 @@ public partial class SnesCpu : EmuState, ICpu
             case TXY: GetMode(mode); Txy(); break;
             case TYA: GetMode(mode); Tya(); break;
             case TYX: GetMode(mode); Tyx(); break;
-            case WAI: GetMode(mode, true); Idle(); Idle(); PC--; break;
+            case WAI: GetMode(mode, true); Idle(); Idle(); Wait = true; break;
             case WDM: PC++; break;
             case XBA: GetMode(mode, true); Xba(); break;
             case XCE: GetMode(mode, true); Xce(); break;
@@ -1698,6 +1698,20 @@ public partial class SnesCpu : EmuState, ICpu
         ["DB"] = $"{DB:X2}",
         ["PB"] = $"{PB:X2}",
     };
+
+    public void SetReg(string reg, int v)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "a": A = v; break;
+            case "x": X = v; break;
+            case "y": Y = v; break;
+            case "p": PS = v; break;
+            case "pc": PC = v; break;
+        }
+    }
+
+
 
     public override void Save(BinaryWriter bw)
     {

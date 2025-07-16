@@ -1,5 +1,4 @@
-﻿using Gmulator.Shared;
-using GNes.Core;
+﻿using GNes.Core;
 using GNes.Core.Mappers;
 using ImGuiNET;
 using Raylib_cs;

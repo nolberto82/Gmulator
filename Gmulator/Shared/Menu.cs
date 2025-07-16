@@ -32,9 +32,12 @@ public class Menu
     private string CheatsOut;
     public Action<Emulator> ReloadCheats { get; set; }
     public Action<string, string> Reset { get; set; }
-    public bool Opened;
-    public bool OpenDialog;
-    public bool CheatDialog;
+    public bool Opened { get => opened; private set => opened = value; }
+    private bool OpenDialog;
+    private bool CheatDialog;
+    private bool DeleteFileMode;
+    private bool opened;
+
     public string WorkingDir { get; set; }
     public string[] Extensions { get; set; }
     private Emulator Emu { get; set; }
@@ -53,11 +56,8 @@ public class Menu
 
         Extensions = exts;
 
-        var style = ImGui.GetStyle();
-        style.Colors[(int)ImGuiCol.HeaderHovered] = new(0.0f, 0.5f, 0.0f, 1f);
-        style.Colors[(int)ImGuiCol.NavCursor] = new(0.0f, 0.5f, 0.0f, 1f);
-        style.Colors[(int)ImGuiCol.Header] = new(0.0f, 0.5f, 0.0f, 1f);
-        style.Colors[(int)ImGuiCol.FrameBg] = new(0.06f, 0.06f, 0.06f, 0.16f);
+        //var style = ImGui.GetStyle();
+        //style.Colors[(int)ImGuiCol.NavCursor] = new(0.0f, 0.5f, 0.0f, 1f);
     }
 
     public void Open(Emulator emu)
@@ -66,6 +66,7 @@ public class Menu
         {
             Opened = false;
             CheatDialog = false;
+            DeleteFileMode = false;
             return;
         }
 
@@ -107,11 +108,9 @@ public class Menu
     {
         var io = ImGui.GetIO();
         ImGui.SetNextWindowFocus();
-        io.ClearInputMouse();
+        ImGui.GetIO().ClearInputMouse();
 
         io.NativePtr->KeysData_121.Down = 0;
-
-        io.ClearInputMouse();
 
         if (!Initial[(int)TabIndex] && io.NativePtr->KeysData_127.Down == 1)
         {
@@ -148,7 +147,10 @@ public class Menu
             switch (TabIndex)
             {
                 case TabGames:
-
+                    if (Raylib.IsGamepadButtonPressed(0, BtnX))
+                    {
+                        DeleteFileMode = !DeleteFileMode;
+                    }
                     break;
                 case TabCheats:
                     if (Raylib.IsGamepadButtonPressed(0, BtnY) && Emu?.GameName != "")
@@ -194,8 +196,10 @@ public class Menu
             OpenDialog = false;
         }
 
-        ImGui.PushStyleColor(ImGuiCol.FrameBg, 0x00000000);
-        if (ImGui.BeginPopupModal("Menu", ref Opened, NoScrollFlags))
+        ImGui.PushStyleColor(ImGuiCol.Header, 0xff008000);
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, 0xff008000);
+        ImGui.PushStyleColor(ImGuiCol.NavCursor, 0x00000000);
+        if (ImGui.BeginPopupModal("Menu", ref opened, NoScrollFlags))
         {
             ImGui.Columns(TabNames.Length, "", false);
             for (int i = 0; i < TabNames.Length; i++)
@@ -206,7 +210,9 @@ public class Menu
                 ImGui.PushStyleColor(ImGuiCol.Text, i == TabIndex ? GREEN : WHITE);
 
                 if (isdeck)
+                {
                     ImGui.Text(TabNames[i]);
+                }
                 else
                 {
                     if (ImGui.Selectable(TabNames[i], false, ImGuiSelectableFlags.NoAutoClosePopups, new(110, 0)))
@@ -261,14 +267,21 @@ public class Menu
                         var start = isdeck ? 0 : GameFiles.Count(d => d.IsDrive) + 1;
                         for (int i = start; i < GameFiles.Count; i++)
                         {
+                            ImGui.PushID(i);
                             var file = GameFiles[i];
                             var name = Path.GetFileName(file.Name);
                             if (name == "")
                                 name = file.Name;
 
-                            ImGui.PushStyleColor(ImGuiCol.Text, !file.IsFile ? YELLOW : WHITE);
+                            ImGui.PushStyleColor(ImGuiCol.Text, !file.IsFile ? YELLOW : DeleteFileMode ? RED : WHITE);
                             if (ImGui.Selectable($"{name}", i == ItemSelected[TabGames], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
+                                if (DeleteFileMode)
+                                {
+                                    File.Delete(file.Name);
+                                }
+                                else
+                                {
                                 if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
                                 {
                                     if (File.Exists(file.Name))
@@ -289,9 +302,13 @@ public class Menu
                                         break;
                                     }
                                 }
+                                }
                             }
+
                             SetActive(TabGames, i);
                             ImGui.PopStyleColor();
+                            ImGui.PopID();
+
                         }
                         ImGui.EndChild();
                     }
@@ -336,7 +353,7 @@ public class Menu
                                 if (cht.Count > 0)
                                 {
                                     ImGui.PushID(i);
-                                    if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == ItemSelected[TabCheats], ImGuiSelectableFlags.SpanAllColumns))
+                                    if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == ItemSelected[TabCheats]))
                                     {
 
                                     }
@@ -363,9 +380,10 @@ public class Menu
                                         ImGui.SameLine();
                                         if (ImGui.Button("x"))
                                         {
-                                            Emu.Cheats.TryGetValue(cht[0].Address, out Cheat c);
-                                            if (c != null)
+                                            foreach (var c in cht)
+                                            {
                                                 Emu.Cheats.Remove(c.Address);
+                                            }
                                             CheatConverter.Save(GameName);
                                         }
                                     }
@@ -467,26 +485,10 @@ public class Menu
                 ImGui.TableSetupColumn("##info0", ImGuiTableColumnFlags.WidthFixed, 200);
                 ImGui.TableSetupColumn("##info1");
                 TableRow("L/R", "Switch Tabs");
-                if (TabIndex < 3)
+                foreach (var t in TabInfo[TabIndex == 1 && CheatDialog ? TabCheatsBrowser : TabIndex][isdeck ? 0 : 1])
                 {
-                    if (!CheatDialog && TabIndex == TabCheats)
-                        TableRow("Cross", "Toggle Cheats");
-                    else
-                        TableRow("Cross", "Select File");
+                    TableRow(t.Button, t.Description);
                 }
-
-                if (TabIndex == TabCheats)
-                    TableRow("Square", !CheatDialog ? "Open Cheats Browser" : "Close Cheats Browser");
-                else if (TabIndex == TabLua)
-                    TableRow("L", "Reload Lua File In Game");
-                else if (TabIndex == TabOptions)
-                {
-                    if (isdeck)
-                        TableRow("Left/Right", "Change Options");
-                    else
-                        TableRow("Mouse Wheel", "Change Options");
-                }
-
                 ImGui.EndTable();
             }
             ImGui.EndChild();
@@ -494,8 +496,7 @@ public class Menu
 
             ImGui.EndPopup();
         }
-
-        ImGui.PopStyleColor();
+        ImGui.PopStyleColor(3);
     }
 
     private void CopyHacks(bool isdeck)
@@ -550,11 +551,38 @@ public class Menu
         }
     }
 
+    private readonly Dictionary<int, Info[][]> TabInfo = new()
+    {
+        [TabGames] = [
+            [new("Cross", "Select File"), new("Triangle", "Delete Mode")],
+            [new("Cross", "Select File"), new("Triangle", "Delete Mode")]
+        ],
+        [TabCheats] = [
+            [new("Cross", "Select File"), new("Square", "Open Cheats Browser")],
+            [new("Cross", "Select File"), new("Square", "Open Cheats Browser")],
+        ],
+        [TabLua] = [
+            [new("Cross", "Select File")],
+            [new("Cross", "Select File")],
+        ],
+        [TabOptions] = [
+            [new("Mouse Wheel", "Change Options")],
+            [new("Left/Right", "Change Options")]
+        ],
+        [TabCheatsBrowser] = [
+            [new("Cross", "Select File"), new("Square", "Close Cheats Browser")],
+            [new("Cross", "Select File"), new("Square", "Close Cheats Browser")]
+        ],
+    };
+
+    public record Info(string Button, string Description);
+
     private struct FileDetails(string name, bool isDrive, bool isFile)
     {
         public string Name = name;
         public bool IsDrive = isDrive;
         public bool IsFile = isFile;
+        public bool IsDelete;
     }
 
     private class Option(string name, float[] values, string[] status, bool press, Func<Option, float> func, Action<bool> action)

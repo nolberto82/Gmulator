@@ -136,7 +136,7 @@ namespace Gmulator.Shared
                     texheight * scale - MenuHeight),
                     Vector2.Zero, 0, Color.White);
 
-                Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), (int)(texheight * scale), Debug);
+                Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), Debug);
                 Raylib.DrawFPS(width - 100, (int)(5 + MenuHeight));
             }
         }
