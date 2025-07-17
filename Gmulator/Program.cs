@@ -1,4 +1,5 @@
-﻿public partial class Program
+﻿namespace Gmulator;
+public partial class Program
 {
     [STAThread]
     private static void Main()

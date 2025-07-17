@@ -1,5 +1,5 @@
 ﻿
-global using static Gmulator.Constants;
+global using static Gmulator.Shared.Constants;
 global using static Gmulator.GuiUtils;
 global using static Gmulator.ByteExtensions;
 global using static Gmulator.JsonUtil;

@@ -2,7 +2,7 @@
 using Raylib_cs;
 using System.Numerics;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 public static class Constants
 {
     public const int FC = 0x10;
@@ -60,7 +60,7 @@ public static class Constants
 
     public const int SnesMaxSamples = 4096;
 
-    public const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
+    public const double apuCyclesPerMaster = 32040 * 32 / (1364 * 262 * 60.0);
 
     public const int GameGenie = 0;
     public const int GameShark = 1;
@@ -118,6 +118,7 @@ public static class Constants
         [KeyboardKey.F7] = 6, [KeyboardKey.F8] = 7, [KeyboardKey.F9] = 8,
     };
 
+    public const string EmulatorName = "Gmulator";
     public const string SaveStateVersion = "1.07";
     public static readonly string RomDirectory = "Roms";
     public static readonly string SaveDirectory = "Saves";

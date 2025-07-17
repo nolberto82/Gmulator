@@ -112,7 +112,7 @@ public class SnesPpu : EmuState
     private int[] BgScrollY = [0, 0, 0, 0];
     private int[] BgSizeX = [255, 255, 255, 255];
     private int[] BgSizeY = [255, 255, 255, 255];
-    public bool[] MathColor { get; private set; } = new bool[8];
+    public bool[] ColorMath { get; private set; } = new bool[8];
     public bool[] Win1Enabled { get; private set; } = new bool[6];
     public bool[] Win1Inverted { get; private set; } = new bool[6];
     public bool[] Win2Enabled { get; private set; } = new bool[6];
@@ -391,7 +391,7 @@ public class SnesPpu : EmuState
                 MBgs[i].Color = 0; MBgs[i].Priority = 0;
                 SBgs[i].Color = 0; SBgs[i].Priority = 0;
 
-                if (!main && !sub)
+                if (!main & !sub)
                     continue;
 
                 int paloff = BgMode == 0 ? i * 32 : 0;
@@ -568,23 +568,27 @@ public class SnesPpu : EmuState
             if (clip)
                 Main.Color = 0;
 
-            var add = !MathColor[7];
+            var add = !ColorMath[7];
+            var half = ColorMath[6] ? 1 : 0;
             var math = GetMathEnabled(Main.Layer, x);
 
             if (math && AddSub)
             {
                 Sub = GetPriority(BgMode, SBgs);
                 if (Sub.Layer == 5 && BgMode != 7)
+                {
                     Sub.Color = Fixed.Color;
+                    half = 0;
+                }
             }
 
-            ScreenBuffer[(VPos - 1) * 256 + x] = GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, add, MathColor[6] ? 1 : 0);
+            ScreenBuffer[(VPos - 1) * 256 + x] = GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, add, half);
         }
     }
 
-    public static uint GetRGB555(ushort p, ushort s, int m, bool math, bool add, int half)
+    public static uint GetRGB555(ushort p, ushort s, int br, bool math, bool add, int half)
     {
-        var brightness = m / 15f;
+        var brightness = br / 15f;
         var mr = (p & 0x1f);
         var mg = (p >> 5) & 0x1f;
         var mb = (p >> 10) & 0x1f;
@@ -649,7 +653,7 @@ public class SnesPpu : EmuState
         };
         if (prev)
             return false;
-        return MathColor[i] && (Main.Layer != 4 || Main.Palette >= 0xc0);
+        return ColorMath[i] && (Main.Layer != 4 || Main.Palette >= 0xc0);
     }
 
     private GfxColor GetPriority(int mode, GfxColor[] Colors)
@@ -1191,7 +1195,7 @@ public class SnesPpu : EmuState
                 Clip = (v >> 6) & 3;
                 break;
             case 0x31:
-                MathColor = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3),
+                ColorMath = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3),
                     v.GetBit(4), v.GetBit(5), v.GetBit(6), v.GetBit(7)];
                 break;
             case 0x32:
@@ -1465,7 +1469,7 @@ public class SnesPpu : EmuState
         EmuState.WriteArray<int>(bw, BgScrollY);
         EmuState.WriteArray<int>(bw, BgSizeX);
         EmuState.WriteArray<int>(bw, BgSizeY);
-        EmuState.WriteArray<bool>(bw, MathColor);
+        EmuState.WriteArray<bool>(bw, ColorMath);
         EmuState.WriteArray<bool>(bw, Win1Enabled);
         EmuState.WriteArray<bool>(bw, Win1Inverted);
         EmuState.WriteArray<bool>(bw, Win2Enabled);
@@ -1515,7 +1519,7 @@ public class SnesPpu : EmuState
         BgScrollY = EmuState.ReadArray<int>(br, BgScrollY.Length);
         BgSizeX = EmuState.ReadArray<int>(br, BgSizeX.Length);
         BgSizeY = EmuState.ReadArray<int>(br, BgSizeY.Length);
-        MathColor = EmuState.ReadArray<bool>(br, MathColor.Length);
+        ColorMath = EmuState.ReadArray<bool>(br, ColorMath.Length);
         Win1Enabled = EmuState.ReadArray<bool>(br, Win1Enabled.Length);
         Win1Inverted = EmuState.ReadArray<bool>(br, Win1Inverted.Length);
         Win2Enabled = EmuState.ReadArray<bool>(br, Win2Enabled.Length);
