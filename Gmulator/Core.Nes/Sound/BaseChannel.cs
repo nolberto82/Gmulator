@@ -1,4 +1,4 @@
-﻿namespace GNes.Core.Sound;
+﻿namespace Gmulator.Core.Nes.Sound;
 public abstract class BaseChannel : EmuState
 {
     public bool Enabled { get; set; }

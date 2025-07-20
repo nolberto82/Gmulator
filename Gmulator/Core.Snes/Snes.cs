@@ -5,6 +5,7 @@ using ImGuiNET;
 using System.Reflection.Metadata.Ecma335;
 using System.ComponentModel.Design;
 using System.Text;
+using System.Diagnostics;
 
 namespace Gmulator.Core.Snes;
 public class Snes : Emulator
@@ -23,8 +24,12 @@ public class Snes : Emulator
     public Breakpoint Breakpoint { get; private set; }
 
     private List<SnesDma> _dma;
-    public byte[] Ram = new byte[0x20000];
+    public byte[] Ram { get; private set; } = new byte[0x20000];
     public Int64 CpuSpc { get; set; }
+
+    private int RamAddr;
+    public bool DmaEnabled { get; private set; }
+    private int DmaState;
 
     private readonly List<float> AudioSamples = [];
 
@@ -45,6 +50,9 @@ public class Snes : Emulator
         Logger = new(this);
         SpcLogger = new();
         SetActions();
+#if DEBUG || DECKDEBUG
+        Debugger.Launch();
+#endif
     }
 
     public override void Execute(bool opened, int times)
@@ -57,7 +65,7 @@ public class Snes : Emulator
                 while (!Ppu.FrameReady)
                 {
                     int pc = Cpu.PB << 16 | Cpu.PC;
-#if DEBUG || RELEASE
+#if DEBUG || DECKDEBUG || RELEASE
                     if (Debug)
                     {
                         switch (DebugStep(pc))
@@ -68,7 +76,7 @@ public class Snes : Emulator
                     }
 #endif
 
-                    LuaApi?.OnExec(Cpu.PB << 16 |Cpu.PC);
+                    LuaApi?.OnExec(Cpu.PB << 16 | Cpu.PC);
                     Cpu.Step();
 
                     if (State == StepMain)
@@ -150,10 +158,6 @@ public class Snes : Emulator
         lock (Cheats)
             return ApplyCheats(bank << 16, a, v);
     }
-
-    int RamAddr;
-    public bool DmaEnabled { get; private set; }
-    private int DmaState;
 
     internal void WriteMemory(int a, int v)
     {
@@ -346,7 +350,7 @@ public class Snes : Emulator
             Spc.Reset();
             Logger.Reset();
             SpcLogger.Reset();
-            Cheat.Load(this, false);
+            Cheat.Load(this);
             LoadBreakpoints(Mapper.Name);
             DmaEnabled = false;
             base.Reset(name, lastname, true);
@@ -424,7 +428,7 @@ public class Snes : Emulator
 
     public override void Close()
     {
-        Cheat.Save(GameName, Cheats);
+        Cheat.Save(GameName);
         SaveBreakpoints(Mapper?.Name);
     }
 
@@ -546,14 +550,11 @@ public class Snes : Emulator
     private byte ApplyCheats(int bank, int a, byte v)
     {
         var ba = bank | a;
-        var cht = Cheats.ContainsKey(ba);
+        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled;
         if (cht)
         {
             if (Cheats[ba].Type == GameGenie)
-            {
-                if (Cheats[ba].Enabled)
-                    return Cheats[ba].Value;
-            }
+                return Cheats[ba].Value;
         }
 
         //if (bank == 0x7e || bank == 0x7f)

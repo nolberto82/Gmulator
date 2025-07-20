@@ -1,11 +1,10 @@
-﻿using GNes.Core;
-using Gmulator;
+﻿using Gmulator;
 using System;
 using Raylib_cs;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
 
-namespace GNes.Core
+namespace Gmulator.Core.Nes
 {
     public class NesPpu(NesMmu mmu) : EmuState
     {

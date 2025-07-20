@@ -90,7 +90,7 @@ public class BaseMapper
         File.WriteAllBytes($"{SaveDirectory}/{name}.srm", Sram);
     }
 
-    readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
+    private readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
 
     public BaseMapper LoadRom(string name)
     {
@@ -111,7 +111,7 @@ public class BaseMapper
 
             Header header = new()
             {
-                Rom = rom.Skip(rom.Length % 1024).ToArray(),
+                Rom = [.. rom.Skip(rom.Length % 1024)],
                 Name = name,
                 Map = rom[o + 0x7fd5] & 0xef,
                 Speed = rom[o + 0x7fd5].GetBit(4),
@@ -195,7 +195,7 @@ public class BaseMapper
         [0x15] = "ExHiRom"
     };
 
-    readonly Dictionary<int, string> Chips = new()
+    private readonly Dictionary<int, string> Chips = new()
     {
         [0x00] = "ROM only",
         [0x01] = "ROM + RAM",

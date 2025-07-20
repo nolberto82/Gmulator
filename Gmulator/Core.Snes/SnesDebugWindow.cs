@@ -77,7 +77,7 @@ internal class SnesDebugWindow : DebugWindow
                         AddBreakpoint(pc, BPType.Exec, -1, false, RamType.Rom);
                 }
 
-                DrawHighlight(bank | Cpu.PC, e.pc);
+                DrawHighlight(bank | Cpu.PC, pc);
 
                 ImGui.PopID();
                 ImGui.SameLine();

@@ -16,9 +16,9 @@ oplist = list(set(oplist))
 adlist = '''impl,accu,imme,zerp,zerx,zery,abso,absx,absy,indx,indy,indi,rela,erro'''.split(
     ",")
 
-with open("../../Core/OpcodeInfo.cs", "w") as f:
-    f.write("namespace GNes.Core;\n")
-    f.write("public partial class Cpu\n{\n\t")
+with open("../../Core.Nes/OpcodeInfo.cs", "w") as f:
+    f.write("namespace Gmulator.Core.Nes;\n")
+    f.write("public partial class NesCpu\n{\n\t")
 
     f.write("//Opcodes\n")
     for i, l in enumerate(oplist):
@@ -30,25 +30,15 @@ with open("../../Core/OpcodeInfo.cs", "w") as f:
 
     f.write("\n")
 
-    f.write('''\tpublic struct Opcode\n\
+    f.write('''	public struct Opcode(string name, int id, int mode, int size, int cycles, int extracycle)
     {
-        public string Name;\n\
-        public int Id;\n\
-        public int Mode;\n\
-        public int Size;\n\
-        public int Cycles;\n\
-        public int ExtraCycle;\n\
-
-        public Opcode(string name, int id, int mode, int size, int cycles, int extracycle)
-        {
-            Name = name;
-            Id = id;
-            Mode = mode;
-            Size = size;
-            Cycles = cycles;
-            ExtraCycle = extracycle;
-        }
-    };\n''')
+        public string Name = name;
+        public int Id = id;
+        public int Mode = mode;
+        public int Size = size;
+        public int Cycles = cycles;
+        public int ExtraCycle = extracycle;
+    }\n''')
 
     f.write("\n")
 
@@ -69,7 +59,7 @@ with open("../../Core/OpcodeInfo.cs", "w") as f:
     # \n};\n\n')
 
     opid = 0
-    f.write("\tpublic List<Opcode> Disasm = new();\n\n")
+    f.write("\tpublic List<Opcode> Disasm = [];\n\n")
     f.write("\tpublic void CreateOpcodes() \n\t{\n")
     for l in lines:
         if l[1] == 'err':

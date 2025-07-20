@@ -1,5 +1,5 @@
 ﻿
-namespace GNes.Core.Sound;
+namespace Gmulator.Core.Nes.Sound;
 public class Noise : BaseChannel
 {
     public ushort ShiftReg { get; private set; }

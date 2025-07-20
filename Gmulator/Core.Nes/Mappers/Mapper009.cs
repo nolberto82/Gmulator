@@ -5,7 +5,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace GNes.Core.Mappers;
+namespace Gmulator.Core.Nes.Mappers;
 
 internal class Mapper009 : BaseMapper
 {

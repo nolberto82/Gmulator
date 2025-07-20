@@ -1,9 +1,8 @@
-﻿using GNes.Core.Mappers;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+﻿using Gmulator.Core.Nes.Mappers;
 using System.Xml.Linq;
 using System.Runtime.Intrinsics.Arm;
 
-namespace GNes.Core;
+namespace Gmulator.Core.Nes;
 public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
 {
     private NesJoypad Joypad1;
@@ -210,8 +209,8 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         var rom = File.ReadAllBytes(filename);
         rom = new Patch().Run(rom, filename);
 
-        header.Prom = rom.Take(header.PrgBanks * 0x4000 + 0x10).Skip(0x10).ToArray();
-        header.Vrom = rom.Skip(header.Prom.Length + 0x10).Take(header.ChrBanks * 0x2000).ToArray();
+        header.Prom = [.. rom.Take(header.PrgBanks * 0x4000 + 0x10).Skip(0x10)];
+        header.Vrom = [.. rom.Skip(header.Prom.Length + 0x10).Take(header.ChrBanks * 0x2000)];
 
         Mapper = Header.MapperId switch
         {
@@ -248,7 +247,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         {
             var name = Path.GetFullPath($"{SaveDirectory}/{Path.GetFileNameWithoutExtension(Mapper.Name)}.sav");
             if (Directory.Exists(SaveDirectory))
-                File.WriteAllBytes($"{name}", Sram.ToArray());
+                File.WriteAllBytes($"{name}", [.. Sram]);
         }
     }
 

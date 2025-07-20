@@ -1,6 +1,6 @@
 ﻿using System.Net.Sockets;
 
-namespace GNes.Core.Mappers;
+namespace Gmulator.Core.Nes.Mappers;
 internal class Mapper004 : BaseMapper
 {
     private int BankReg;
@@ -152,7 +152,6 @@ internal class Mapper004 : BaseMapper
     public override void Reset()
     {
         int prgsize = Header.PrgBanks * 0x4000;
-        int chrsize = Header.ChrBanks * 0x2000;
         Prg = [0, 1, (byte)(prgsize / 0x2000 - 2), (byte)(prgsize / 0x2000 - 1)];
         Chr = [0, 1, 2, 3, 4, 5, 6, 7];
         base.Reset();

@@ -108,7 +108,7 @@ public class Menu
     {
         var io = ImGui.GetIO();
         ImGui.SetNextWindowFocus();
-        ImGui.GetIO().ClearInputMouse();
+        //ImGui.GetIO().ClearInputMouse();
 
         io.NativePtr->KeysData_121.Down = 0;
 
@@ -327,7 +327,7 @@ public class Menu
                                 {
                                     if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                     {
-                                        Cheat.Load(Emu, true, c.Name);
+                                        Cheat.Load(Emu, c.Name);
                                         CheatDialog = false;
                                     }
                                 }
@@ -355,14 +355,13 @@ public class Menu
                                     ImGui.PushID(i);
                                     if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == ItemSelected[TabCheats]))
                                     {
-
                                     }
 
                                     SetActive(TabCheats, i);
 
                                     ImGui.TableNextColumn();
 
-                                    if (i == ItemSelected[TabCheats] && (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown, true)))
+                                    if (i == ItemSelected[TabCheats] && ((ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown, true)) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left)))
                                     {
                                         var r = res.Where(c => c.Description == res[ItemSelected[TabCheats]].Description).ToList();
                                         if (r.Count > 0)
@@ -429,7 +428,7 @@ public class Menu
                     break;
                 case TabLua:
                     LuaFiles.Clear();
-                    Enumerate(LuaDirectory);
+                    Enumerate(CheatDirectory);
                     if (ImGui.BeginChild("##luafiles", new(0, bottom), ImGuiChildFlags.FrameStyle))
                     {
                         for (int i = 0; i < LuaFiles.Count; i++)

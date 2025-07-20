@@ -21,7 +21,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     private Font GuiFont = font;
     public float MenuHeight { get; } = menuheight;
     public bool Debug { get; private set; } = debug;
-    private readonly FileSystemWatcher Watcher = new(LuaDirectory, "*.lua");
+    private readonly FileSystemWatcher Watcher = new(CheatDirectory, "*.lua");
     public List<LuaCallback> Callbacks { get; private set; } = [];
 
     private string LuaCwd;
@@ -234,7 +234,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         if (args.Length != 1 && !File.Exists(($"{args[0]}")))
             return new();
 
-        var path = $"{AppDomain.CurrentDomain.BaseDirectory}{LuaDirectory}";
+        var path = $"{AppDomain.CurrentDomain.BaseDirectory}{CheatDirectory}";
         return Raylib.LoadTexture(($"{path}\\{args[0]}"));
     }
 
@@ -328,7 +328,8 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         {
             Directory.SetCurrentDirectory(@$"{Environment.CurrentDirectory}");
             LuaCwd = Environment.CurrentDirectory;
-            LuaCwd = LuaCwd.Replace('\\', '/');
+            LuaCwd = LuaCwd.Replace("\\", "/");
+            LuaCwd = $"{LuaCwd}/Cheats";
         }
 
         Lua.DoString(@"package.path = package.path ..';" + LuaCwd + "/?.lua'");
@@ -362,7 +363,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     {
         if (File.Exists(LuaFile))
         {
-            name = $"{Environment.CurrentDirectory}\\{LuaDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
+            name = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
             var text = File.ReadAllText(LuaFile);
             File.WriteAllText(name, text);
         }
@@ -370,7 +371,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
 
     public void CheckLuaFile(string name)
     {
-        name = $"{Environment.CurrentDirectory}\\{LuaDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
+        name = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
         if (File.Exists(name))
             Load(name);
     }

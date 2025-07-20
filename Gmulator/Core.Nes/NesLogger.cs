@@ -1,21 +1,15 @@
 ﻿using System.IO;
-using System.Reflection.Metadata.Ecma335;
-using static GNes.Core.NesCpu;
+using static Gmulator.Core.Nes.NesCpu;
 
-namespace GNes.Core;
-public class NesLogger
+namespace Gmulator.Core.Nes;
+public class NesLogger(NesCpu cpu)
 {
     private static StreamWriter outFile;
     public bool Logging;
-    private readonly NesCpu Cpu;
+    private readonly NesCpu Cpu = cpu;
     public NesPpu Ppu;
 
     public Func<int, byte> ReadByte;
-
-    public NesLogger(NesCpu cpu)
-    {
-        Cpu = cpu;
-    }
 
     public void Reset() => Logging = false;
     public void Toggle(bool log = true)
@@ -28,10 +22,7 @@ public class NesLogger
         if (Logging)
             Outfile = new StreamWriter(Environment.CurrentDirectory + "\\trace.log");
         else
-        {
-            if (Outfile != null)
-                Outfile.Close();
-        }
+            Outfile?.Close();
     }
 
     public void OpenCloseLog()
@@ -82,13 +73,11 @@ public class NesLogger
             }
             case ZERX:
             {
-                int a = ReadByte(pc + 1);
                 data = $"{b0:X2} {b1,-5:X2} {name} ${b1:X2},X [${(byte)(b1 + Cpu.X):X4}]";// = ${Mem.ReadDebug((byte)(b1 + Cpu.X)):X2}";
                 break;
             }
             case ZERY:
             {
-                ushort a = (ushort)(ReadByte(pc + 1) | ReadByte(pc + 2) << 8);
                 data = $"{b0:X2} {b1,-5:X2} {name} ${b1:X2},Y [{(byte)(b1 + Cpu.Y):X2}]";// = {Mem.ReadDebug((byte)(b1 + Cpu.Y)):X2}";
                 break;
             }

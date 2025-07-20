@@ -1,5 +1,5 @@
 ﻿
-namespace GNes.Core.Sound;
+namespace Gmulator.Core.Nes.Sound;
 public class Square2 : BaseChannel
 {
     public void Write(int a, byte v)

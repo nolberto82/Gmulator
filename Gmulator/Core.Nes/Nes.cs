@@ -1,5 +1,5 @@
-﻿using GNes.Core;
-using GNes.Core.Mappers;
+﻿using Gmulator.Core.Nes;
+using Gmulator.Core.Nes.Mappers;
 using ImGuiNET;
 using Raylib_cs;
 using System;
@@ -119,7 +119,7 @@ public class Nes : Emulator
             Apu.Reset(Header.Region, Header.Region == 0 ? NesNtscCpuClock : NesPalCpuClock);
             Mmu.Reset();
             Logger.Reset();
-            Cheat.Load(this, false);
+            Cheat.Load(this);
             base.Reset(name, lastname, true);
         }
     }
@@ -183,7 +183,7 @@ public class Nes : Emulator
     public override void Close()
     {
         Mmu?.SaveRam();
-        Cheat.Save(Mapper.Name, Cheats);
+        Cheat.Save(Mapper.Name);
         SaveBreakpoints(Mapper.Name);
     }
 

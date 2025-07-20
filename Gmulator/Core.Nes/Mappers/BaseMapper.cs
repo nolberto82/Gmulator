@@ -1,5 +1,5 @@
 ﻿
-namespace GNes.Core.Mappers;
+namespace Gmulator.Core.Nes.Mappers;
 public class BaseMapper(Header Header) : EmuState
 {
     public byte[] Prg { get; set; }

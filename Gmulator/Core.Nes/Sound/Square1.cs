@@ -1,6 +1,6 @@
 ﻿using System.Threading.Channels;
 
-namespace GNes.Core.Sound;
+namespace Gmulator.Core.Nes.Sound;
 public class Square1 : BaseChannel
 {
     public void Write(int a, byte v)

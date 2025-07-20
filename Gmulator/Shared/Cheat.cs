@@ -5,25 +5,25 @@ namespace Gmulator.Shared;
 public class Cheat
 {
     public string Description { get; set; }
+    public string Codes { get; set; }
     public int Address { get; set; }
     public byte Compare { get; set; }
     public byte Value { get; set; }
     public int Type { get; set; }
     public int Bank { get; set; }
     public bool Enabled { get; set; }
-    public string Codes { get; set; }
     public string Filename { get; private set; }
 
     public Cheat() { }
-    public Cheat(string description, int address, byte compare, byte value, int type, bool enabled, string codes)
+    public Cheat(string description, int address, byte value, byte compare, int type, bool enabled, string codes)
     {
         Description = description == "" ? "Cheat" : description;
         Address = address;
-        Compare = compare;
         Value = value;
-        Type = type;
+        Compare = compare;
         Enabled = enabled;
         Codes = codes;
+        Type = type;
         if (type == GameShark)
             Bank = compare;
     }
@@ -142,22 +142,42 @@ public class Cheat
         return (-1, 0, 0, -1, NoConsole);
     }
 
-    public void ReloadCheats(Emulator Emu) => Load(Emu, true);
-    public void Load(Emulator Emu, bool reloadlibreto, string chtname = "")
+    public void ReloadCheats(Emulator Emu) => Load(Emu);
+    public void Load(Emulator Emu, string chtname = "")
     {
         Emu.Cheats?.Clear();
         var name = Filename = chtname == "" ? Emu.GameName : chtname;
-        var json = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
-        var libretrocht = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}.cht";
-        if (File.Exists(json) && !reloadlibreto)
+        name = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}";
+        var libretrocht = File.Exists($"{name}_cheats.cht") ? $"{name}_cheats.cht" :
+            File.Exists($"{name}.cht") ? $"{name}.cht" : "";
+
+        if (libretrocht != "")
         {
-            var res = JsonSerializer.Deserialize<List<Cheat>>(File.ReadAllText(json), GEmuJsonContext.Default.Options);
-            foreach (var cht in res)
+            var txt = File.ReadAllText(libretrocht).Split(["\n\n", "\r\n"], StringSplitOptions.RemoveEmptyEntries);
+            for (int i = 1; i < txt.Length; i++)
             {
+                if (!txt[0].Contains("cheats =", StringComparison.InvariantCultureIgnoreCase))
+                {
+                    Notifications.Init("Cheat File is Not in Libretro Format");
+                    return;
+                }
+
+                Cheat cht = new();
                 List<RawCode> rawcodes = [];
+                var lines = txt[i].Split("\n", StringSplitOptions.RemoveEmptyEntries);
+                if (lines.Length < 3) continue;
+                for (int j = 0; j < lines.Length; j++)
+                {
+                    var beg = lines[j].IndexOf("= ") + 2;
+                    cht.Description = lines[j][beg..].Replace(@"""", "");
+                    cht.Codes = lines[j + 1][beg..].Replace(@"""", "");
+                    cht.Enabled = true;
+                    j += 2;
+                }
+
                 foreach (var line in cht.Codes.Split("+"))
                 {
-                    var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "");
+                    var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "").Trim();
                     if (c == "")
                         continue;
                     (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, Emu);
@@ -167,64 +187,15 @@ public class Cheat
                 foreach (var r in rawcodes)
                 {
                     if (!Emu.Cheats.ContainsKey(r.Address))
-                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Compare, r.Value, r.Type, cht.Enabled, cht.Codes));
-                }
-            }
-        }
-        else
-        {
-            if (File.Exists(libretrocht))
-            {
-                var txt = File.ReadAllText(libretrocht).Split(["\n\n", "\r\n"], StringSplitOptions.RemoveEmptyEntries);
-                for (int i = 1; i < txt.Length; i++)
-                {
-                    if (!txt[0].Contains("cheats =", StringComparison.InvariantCultureIgnoreCase))
-                    {
-                        Notifications.Init("Cheat File is Not in Libretro Format");
-                        return;
-                    }
-
-                    Cheat cht = new();
-                    List<RawCode> rawcodes = [];
-                    var lines = txt[i].Split("\n", StringSplitOptions.RemoveEmptyEntries);
-                    for (int j = 0; j < lines.Length; j++)
-                    {
-                        var beg = lines[j].IndexOf("= ") + 2;
-                        cht.Description = lines[j][beg..].Replace(@"""", "");
-                        cht.Codes = lines[j + 1][beg..].Replace(@"""", "");
-                        cht.Enabled = true;
-                        j += 2;
-                    }
-
-                    foreach (var line in cht.Codes.Split("+"))
-                    {
-                        var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "").Trim();
-                        if (c == "")
-                            continue;
-                        (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, Emu);
-                        rawcodes.Add(new(addr, cmp, val, type));
-                    }
-
-                    foreach (var r in rawcodes)
-                    {
-                        if (!Emu.Cheats.ContainsKey(r.Address))
-                            Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Compare, r.Value, r.Type, true, cht.Codes));
-                    }
+                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address,r.Value, r.Compare, r.Type, true, cht.Codes));
                 }
             }
         }
 
         if (Emu?.Cheats.Count > 0)
-            Save(Emu.GameName, Emu?.Cheats);
+            CheatConverter.Save(Emu.GameName);
+        //    Save(, Emu?.Cheats);
     }
 
-    public static void Save(string name, Dictionary<int, Cheat> Cheats)
-    {
-        if (Cheats == null || Cheats.Count == 0) return;
-        var cht = Cheats.Values.DistinctBy(c => c.Description).ToList();
-        var chtfile = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
-        JsonSerializerOptions options = new() { WriteIndented = true };
-        var json = JsonSerializer.Serialize(cht, GEmuJsonContext.Default.Options);
-        File.WriteAllText(chtfile, json);
-    }
+    public static void Save(string name) => CheatConverter.Save(name);
 }

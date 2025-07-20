@@ -14,7 +14,7 @@ public static class ByteExtensions
 
     public static byte[] Slice(this byte[] src, int offset, int count)
     {
-        return src.Skip(offset).Take(count - offset).ToArray();
+        return [.. src.Skip(offset).Take(count - offset)];
     }
 
     public static void WriteBytes(this byte[] arr, int b, int addr, int v)

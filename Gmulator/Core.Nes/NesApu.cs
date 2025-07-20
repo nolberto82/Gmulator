@@ -1,8 +1,8 @@
 ﻿using Gmulator;
-using GNes.Core.Sound;
+using Gmulator.Core.Nes.Sound;
 using Raylib_cs;
 
-namespace GNes.Core;
+namespace Gmulator.Core.Nes;
 public class NesApu : EmuState
 {
     public int Status { get; private set; }

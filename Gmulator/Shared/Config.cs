@@ -58,9 +58,6 @@ public class Config
         if (!Directory.Exists(CheatDirectory))
             Directory.CreateDirectory(CheatDirectory);
 
-        if (!Directory.Exists(LuaDirectory))
-            Directory.CreateDirectory(LuaDirectory);
-
         if (!Directory.Exists(ConfigDirectory))
             Directory.CreateDirectory(ConfigDirectory);
 

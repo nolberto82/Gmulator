@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Text.Json;
-using System.Threading.Tasks;
-using static Gmulator.Shared.Cheat;
+﻿using static Gmulator.Shared.Cheat;
 
 namespace Gmulator.Shared;
 public class CheatConverter
@@ -78,7 +72,7 @@ public class CheatConverter
                 foreach (var r in rawcodes)
                 {
                     if (!Cheats.ContainsKey(r.Address))
-                        Cheats.Add(r.Address, new(cheatname, r.Address, r.Compare, r.Value, r.Type, true, string.Join("", codes.ToArray())));
+                        Cheats.Add(r.Address, new(cheatname, r.Address,r.Value, r.Compare, r.Type, true, string.Join("", codes.ToArray())));
                 }
             }
         }
@@ -87,10 +81,18 @@ public class CheatConverter
     public static void Save(string name)
     {
         if (Cheats == null || Cheats.Count == 0) return;
-        var cht = Cheats.Values.DistinctBy(c => c.Description).ToList();
-        var chtfile = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
-        JsonSerializerOptions options = new() { WriteIndented = true };
-        var json = JsonSerializer.Serialize(cht, GEmuJsonContext.Default.Options);
-        File.WriteAllText(chtfile, json);
+        var cheats = Cheats.Values.DistinctBy(c => c.Description).ToList();
+        var chtfile = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}_cheats.cht";
+        using var sw = new StreamWriter(new FileStream(chtfile, FileMode.OpenOrCreate, FileAccess.Write));
+        sw.Write($"cheats = {cheats.Count}\n");
+        sw.Write("\n");
+        for (int i = 0; i < cheats.Count; i++)
+        {
+            Cheat cht = cheats[i];
+            sw.Write($"cheat{i}_desc = \"{cht.Description}\"\n");
+            sw.Write($"cheat{i}_code = \"{cht.Codes}\"\n");
+            sw.Write($"cheat{i}_enable = \"{cht.Enabled.ToString().ToLower()}\"\n");
+            sw.Write("\n");
+        }
     }
 }

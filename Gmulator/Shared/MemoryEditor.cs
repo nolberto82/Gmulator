@@ -6,7 +6,7 @@ using System.Numerics;
 namespace Gmulator.Shared;
 public unsafe class MemoryEditor
 {
-    enum DataFormat
+    private enum DataFormat
     {
         DataFormat_Bin = 0,
         DataFormat_Dec = 1,
@@ -15,19 +15,19 @@ public unsafe class MemoryEditor
     };
 
     // Settings
-    bool Open;                                       // = true   // set to false when DrawWindow() was closed. ignore if not using DrawWindow().
-    readonly bool ReadOnly;                                   // = false  // disable any editing.
-    int Cols;                                       // = 16     // number of columns to display.
-    readonly bool OptShowOptions;                             // = true   // display options button/context menu. when disabled, options will be locked unless you provide your own UI for them.
-    bool OptShowDataPreview;                         // = false  // display a footer previewing the decimal/binary/hex/float representation of the currently selected bytes.
-    bool OptShowHexII;                               // = false  // display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
-    bool OptShowAscii;                               // = true   // display ASCII representation on the right side.
-    bool OptGreyOutZeroes;                           // = true   // display null/zero bytes using the TextDisabled color.
-    bool OptUpperCaseHex;                            // = true   // display hexadecimal values as "FF" instead of "ff".
-    readonly int OptMidColsCount;                            // = 8      // set to 0 to disable extra spacing between every mid-cols.
+    private bool Open;                                       // = true   // set to false when DrawWindow() was closed. ignore if not using DrawWindow().
+    private readonly bool ReadOnly;                                   // = false  // disable any editing.
+    private int Cols;                                       // = 16     // number of columns to display.
+    private readonly bool OptShowOptions;                             // = true   // display options button/context menu. when disabled, options will be locked unless you provide your own UI for them.
+    private bool OptShowDataPreview;                         // = false  // display a footer previewing the decimal/binary/hex/float representation of the currently selected bytes.
+    private bool OptShowHexII;                               // = false  // display values in HexII representation instead of regular hexadecimal: hide null/zero bytes, ascii values as ".X".
+    private bool OptShowAscii;                               // = true   // display ASCII representation on the right side.
+    private bool OptGreyOutZeroes;                           // = true   // display null/zero bytes using the TextDisabled color.
+    private bool OptUpperCaseHex;                            // = true   // display hexadecimal values as "FF" instead of "ff".
+    private readonly int OptMidColsCount;                            // = 8      // set to 0 to disable extra spacing between every mid-cols.
     public int OptAddrDigitsCount;                         // = 0      // number of addr digits to display (default calculated based on maximum displayed addr).
-    readonly float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
-    readonly uint HighlightColor;                             //          // background color of highlighted bytes.
+    private readonly float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
+    private readonly uint HighlightColor;                             //          // background color of highlighted bytes.
     public delegate byte ReadDel(int off);    // = 0      // optional handler to read bytes.
     public ReadDel ReadFn;
     public delegate void WriteDel(int off, byte d); // = 0      // optional handler to write bytes.
@@ -36,20 +36,20 @@ public unsafe class MemoryEditor
     public HighlightDel HighlightFn;
 
     // [public State]
-    bool ContentsWidthChanged;
-    int DataPreviewAddr;
-    int DataEditingAddr;
-    bool DataEditingTakeFocus;
-    readonly byte[] DataInputBuf = new byte[32];
-    readonly byte[] AddrInputBuf = new byte[32];
-    int GotoAddr;
-    int HighlightMin, HighlightMax;
-    readonly ImGuiDataType PreviewDataType;
+    private bool ContentsWidthChanged;
+    private int DataPreviewAddr;
+    private int DataEditingAddr;
+    private bool DataEditingTakeFocus;
+    private readonly byte[] DataInputBuf = new byte[32];
+    private readonly byte[] AddrInputBuf = new byte[32];
+    private int GotoAddr;
+    private int HighlightMin, HighlightMax;
+    private readonly ImGuiDataType PreviewDataType;
 
     public int SelectedRam { get; set; }
     private readonly int bpaddr;
 
-    record Sizes
+    private record Sizes
     {
         public int AddrDigitsCount;
         public float LineHeight;
@@ -488,7 +488,7 @@ data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKe
     }
 
 
-    Sizes CalcSizes(out Sizes s, int mem_size, int base_display_addr)
+    private Sizes CalcSizes(out Sizes s, int mem_size, int base_display_addr)
     {
         s = new();
         ImGuiStylePtr style = ImGui.GetStyle();
@@ -515,11 +515,11 @@ data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKe
         return s;
     }
 
-    static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
+    private static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
     private readonly Action<int, int, int, bool, int> AddBreakpoint;
     private readonly Action<int, byte> AddCheat;
 
-    static int DataTypeGetSize(ImGuiDataType data_type)
+    private static int DataTypeGetSize(ImGuiDataType data_type)
     {
         Debug.Assert(data_type >= 0 && data_type < ImGuiDataType.COUNT);
         return sizes[(int)data_type];
@@ -542,7 +542,7 @@ data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKe
         }
     }
 
-    class UserData
+    private class UserData
     {
         public char[] CurrentBufOverwrite = new char[3];  // Input
         public int CursorPos;               // Output

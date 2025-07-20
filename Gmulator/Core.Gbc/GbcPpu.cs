@@ -43,7 +43,7 @@ public class GbcPpu : EmuState
     private readonly Gbc Gbc;
     public List<Sprite> sprites;
 
-    public uint[] ClearBuffer(uint[] buffer) => Enumerable.Repeat(GbColors[1][3], buffer.Length).ToArray();
+    public uint[] ClearBuffer(uint[] buffer) => [.. Enumerable.Repeat(GbColors[1][3], buffer.Length)];
 
     public GbcPpu(Gbc gbc)
     {

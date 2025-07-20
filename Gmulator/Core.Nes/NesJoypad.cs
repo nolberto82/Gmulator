@@ -1,6 +1,6 @@
 ﻿using Raylib_cs;
 
-namespace GNes.Core;
+namespace Gmulator.Core.Nes;
 public class NesJoypad
 {
     private bool Strobe;

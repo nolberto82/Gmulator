@@ -238,17 +238,7 @@ public class SnesPpu : EmuState
                 }
 
                 if (HPos == 1084)
-                {
-                    if (!ForcedBlank)
-                    {
-                        if (!Snes.FastForward || Snes.FastForward && FrameCounter % Snes.Config.FrameSkip == 0)
-                        {
-                            EvaluateSprites();
-                            if (VPos > 0 && VPos < Overscan)
-                                Render(VPos);
-                        }
-                    }
-                }
+                    Render(VPos);
             }
             else
             {
@@ -294,6 +284,7 @@ public class SnesPpu : EmuState
                     RDNMI &= 0x7f;
                     FrameReady = true;
                     FrameCounter++;
+                    EvaluateSprites(0);
                 }
             }
         }
@@ -375,214 +366,221 @@ public class SnesPpu : EmuState
 
     private void Render(int y)
     {
+
         Sub = new(0, 0, 5);
         Span<int> bpp = new(Layers[BgMode][BgMode == 1 || BgMode == 7 ? 4 : 2]);
-        int mapaddr, sx, sy;
-        bool main, sub;
-        //Array.Fill<uint>(ScreenBuffer, 0xff000000, VPos * 256, 256);
-        for (int x = 0; x < 256; x++)
+        int mapaddr, sx, sy, half = 0;
+        bool main, sub, math = false;
+
+        if (VPos > 0 && VPos < Overscan && !Snes.FastForward || Snes.FastForward && FrameCounter % Snes.Config.FrameSkip == 0)
         {
-            int mx = 0, my = 0;
-            for (int i = 0; i < bpp.Length; i++)
+            EvaluateSprites(VPos);
+
+            for (int x = 0; x < 256; x++)
             {
-                main = MainBgs[i];
-                sub = SubBgs[i];
-
-                MBgs[i].Color = 0; MBgs[i].Priority = 0;
-                SBgs[i].Color = 0; SBgs[i].Priority = 0;
-
-                if (!main & !sub)
-                    continue;
-
-                int paloff = BgMode == 0 ? i * 32 : 0;
-
-                if (BgMode < 7)
+                if (!ForcedBlank)
                 {
-                    if (MosaicEnabled[i])
+                    int mx = 0, my = 0;
+                    for (int i = 0; i < bpp.Length; i++)
                     {
-                        mx = MosaicSize > 0 ? (x % MosaicSize) : 0;
-                        my = MosaicSize > 0 ? (y % MosaicSize) : 0;
-                    }
+                        main = MainBgs[i];
+                        sub = SubBgs[i];
 
-                    sx = (x - mx + BgScrollX[i]);
-                    sy = (y - my + BgScrollY[i]);
+                        MBgs[i].Color = 0; MBgs[i].Priority = 0;
+                        SBgs[i].Color = 0; SBgs[i].Priority = 0;
 
-                    if (BgMode == 2)
-                    {
-                        if (x > 7)
-                        {
-                            int h = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2], BgMapbase[2]);
-                            int v = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2] + 8, BgMapbase[2]);
-                            var bit = i == 0 ? 13 : 14;
-                            if (h.GetBit(bit))
-                                sx = (sx & 7) + (x & ~7) + (h + BgScrollX[i]) & 0x1fff;
-                            if (v.GetBit(bit))
-                                sy += (v & 0x1fff);
-                        }
-
-                        mapaddr = BgMapbase[i] + (byte)sy / 8 * 32 + (byte)sx / 8;
-                        mapaddr += BgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
-                        mapaddr += (BgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
-                    }
-                    else
-                    {
-                        if (BgCharSize[i])
-                            mapaddr = BgMapbase[i] + ((sy / 2 / 8) * 32 + (sx / 2 / 8));
-                        else
-                        {
-                            sx &= BgSizeX[i];
-                            sy &= BgSizeY[i];
-                            mapaddr = (BgMapbase[i] + ((byte)sy / 8) * 32) + (byte)sx / 8;
-                            mapaddr += (sx & 0x100) * 4;
-                        }
-                        mapaddr += (((BgSizeY[i] == 0x1ff) && (sy & 0x100) > 0 ? BgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0));
-                        mapaddr &= 0x7fff;
-                    }
-
-                    (var color, var pixel, var pal) = GetColor(sx, sy, mapaddr, BgTilebase[i], BgCharSize[i], bpp[i], paloff);
-
-                    if (main && pixel > 0)
-                    {
-                        MBgs[i].Color = color;
-                        MBgs[i].Palette = pal;
-                        MBgs[i].Priority = (Vram[mapaddr] >> 13) & 1;
-                        MBgs[i].Layer = i;
-
-                        if (WinMainBgs[i] && GetWindow(i, x))
-                            MBgs[i].Color = 0;
-                    }
-
-                    if (sub && pixel > 0)
-                    {
-                        SBgs[i].Color = color;
-                        SBgs[i].Palette = pal;
-                        SBgs[i].Priority = (Vram[mapaddr] >> 13) & 1;
-                        SBgs[i].Layer = i;
-
-                        if (SubBgs[i] && GetWindow(i, x))
-                            SBgs[i].Color = 0;
-                    }
-                }
-                else
-                {
-                    //int rx = Mode7Settings[1] ? 255 - x : x;
-                    int ry = Mode7Settings[1] ? 255 - y : y;
-                    var cx = ScrollXMode7 - M7X;
-                    var cy = ScrollYMode7 - M7Y;
-                    int ch = cx.GetBit(13) ? cx | ~0x3ff : cx & 0x3ff;
-                    int cv = cy.GetBit(13) ? cy | ~0x3ff : cy & 0x3ff;
-                    sx = ((short)M7A * ch & ~63) + (((short)M7B * cv) & ~63) + ((short)M7B * ry & ~63) + (M7X << 8);
-                    sy = (((short)M7C * ch) & ~63) + (((short)M7D * cv) & ~63) + ((short)M7D * ry & ~63) + (M7Y << 8);
-                    var ox = (sx + (short)M7A * x);
-                    var oy = (sy + (short)M7C * x);
-                    ox >>= 8;// & 0x3ff;
-                    oy >>= 8;// & 0x3ff;
-
-                    if (Mode7Settings[3] && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
-                    {
-                        ox &= 7;
-                        oy &= 7;
-                    }
-
-                    if (!Mode7Settings[3])
-                        mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
-                    else
-                        mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
-
-                    (var color, _, _) = GetColor(ox, oy, mapaddr, BgTilebase[i], BgCharSize[i], bpp[i], 0);
-
-                    if (main)
-                    {
-                        MBgs[i].Color = color;
-                    }
-                }
-            }
-
-            main = MainBgs[4] && !GetWindow(4, x);
-            sub = SubBgs[4] && !GetWindow(4, x);
-
-            MBgs[4].Color = 0; SBgs[4].Color = 0;
-            MBgs[4].Priority = 0; SBgs[4].Priority = 0;
-
-            if (main || sub)
-            {
-                for (int i = 0; i < SpritesScanline; i++)
-                {
-                    var s = SpriteScan[i];
-                    if (s.Y == 224) continue;
-                    if (s.X == -256 || s.X > 256) continue;
-                    int fx = (x - s.X);
-                    int fy = (y - s.Y);
-
-                    if (fx < 0 || fx >= s.Width) continue;
-
-                    if (s.Attrib.GetBit(6))
-                        fx = s.Width - fx - 1;
-
-                    if (s.Attrib.GetBit(7))
-                        fy = s.Height - fy - 1;
-
-                    var baseaddr = ObjTable1 + ((s.Attrib & 1) > 0 ? ObjTable2 : 0);
-                    var spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + ((byte)fy / 8) * (s.Width * s.Height);
-                    var colorid = GetPixel(spraddr, 7 - fx & 7, 4);
-                    var palid = (s.Attrib & 0x0e) >> 1;
-                    var pal = (0x80 + palid * 16 + colorid) & 0xff;
-                    var color = (ushort)(Cram[pal]);
-                    if (colorid > 0)
-                    {
-                        if (WinMainBgs[4] && GetWindow(4, x))
+                        if (!main & !sub)
                             continue;
 
-                        if (colorid > 0)
+                        int paloff = BgMode == 0 ? i * 32 : 0;
+
+                        if (BgMode < 7)
                         {
-                            if (main)
+                            if (MosaicEnabled[i])
                             {
-                                MBgs[4].Color = color | 1;
-                                MBgs[4].Palette = pal;
-                                MBgs[4].Layer = 4;
-                                MBgs[4].Priority = s.Priority;
+                                mx = MosaicSize > 0 ? (x % MosaicSize) : 0;
+                                my = MosaicSize > 0 ? (y % MosaicSize) : 0;
                             }
 
-                            if (sub)
+                            sx = (x - mx + BgScrollX[i]);
+                            sy = (y - my + BgScrollY[i]);
+
+                            if (BgMode == 2)
                             {
-                                SBgs[4].Color = color | 1;
-                                SBgs[4].Palette = pal;
-                                SBgs[4].Layer = 4;
-                                SBgs[4].Priority = s.Priority;
+                                if (x > 7)
+                                {
+                                    int h = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2], BgMapbase[2]);
+                                    int v = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2] + 8, BgMapbase[2]);
+                                    var bit = i == 0 ? 13 : 14;
+                                    if (h.GetBit(bit))
+                                        sx = (sx & 7) + (x & ~7) + (h + BgScrollX[i]) & 0x1fff;
+                                    if (v.GetBit(bit))
+                                        sy += (v & 0x1fff);
+                                }
+
+                                mapaddr = BgMapbase[i] + (byte)sy / 8 * 32 + (byte)sx / 8;
+                                mapaddr += BgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
+                                mapaddr += (BgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
                             }
-                            break;
+                            else
+                            {
+                                if (BgCharSize[i])
+                                    mapaddr = BgMapbase[i] + ((sy / 2 / 8) * 32 + (sx / 2 / 8));
+                                else
+                                {
+                                    sx &= BgSizeX[i];
+                                    sy &= BgSizeY[i];
+                                    mapaddr = (BgMapbase[i] + ((byte)sy / 8) * 32) + (byte)sx / 8;
+                                    mapaddr += (sx & 0x100) * 4;
+                                }
+                                mapaddr += (((BgSizeY[i] == 0x1ff) && (sy & 0x100) > 0 ? BgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0));
+                                mapaddr &= 0x7fff;
+                            }
+
+                            (var color, var pixel, var pal) = GetColor(sx, sy, mapaddr, BgTilebase[i], BgCharSize[i], bpp[i], paloff);
+
+                            if (main && pixel > 0)
+                            {
+                                MBgs[i].Color = color;
+                                MBgs[i].Palette = pal;
+                                MBgs[i].Priority = (Vram[mapaddr] >> 13) & 1;
+                                MBgs[i].Layer = i;
+
+                                if (WinMainBgs[i] && GetWindow(i, x))
+                                    MBgs[i].Color = 0;
+                            }
+
+                            if (sub && pixel > 0)
+                            {
+                                SBgs[i].Color = color;
+                                SBgs[i].Palette = pal;
+                                SBgs[i].Priority = (Vram[mapaddr] >> 13) & 1;
+                                SBgs[i].Layer = i;
+
+                                if (SubBgs[i] && GetWindow(i, x))
+                                    SBgs[i].Color = 0;
+                            }
+                        }
+                        else
+                        {
+                            //int rx = Mode7Settings[1] ? 255 - x : x;
+                            int ry = Mode7Settings[1] ? 255 - y : y;
+                            var cx = ScrollXMode7 - M7X;
+                            var cy = ScrollYMode7 - M7Y;
+                            int ch = cx.GetBit(13) ? cx | ~0x3ff : cx & 0x3ff;
+                            int cv = cy.GetBit(13) ? cy | ~0x3ff : cy & 0x3ff;
+                            sx = ((short)M7A * ch & ~63) + (((short)M7B * cv) & ~63) + ((short)M7B * ry & ~63) + (M7X << 8);
+                            sy = (((short)M7C * ch) & ~63) + (((short)M7D * cv) & ~63) + ((short)M7D * ry & ~63) + (M7Y << 8);
+                            var ox = (sx + (short)M7A * x);
+                            var oy = (sy + (short)M7C * x);
+                            ox >>= 8;// & 0x3ff;
+                            oy >>= 8;// & 0x3ff;
+
+                            if (Mode7Settings[3] && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
+                            {
+                                ox &= 7;
+                                oy &= 7;
+                            }
+
+                            if (!Mode7Settings[3])
+                                mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
+                            else
+                                mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
+
+                            (var color, _, _) = GetColor(ox, oy, mapaddr, BgTilebase[i], BgCharSize[i], bpp[i], 0);
+
+                            if (main)
+                            {
+                                MBgs[i].Color = color;
+                            }
+                        }
+                    }
+
+                    main = MainBgs[4] && !GetWindow(4, x);
+                    sub = SubBgs[4] && !GetWindow(4, x);
+
+                    MBgs[4].Color = 0; SBgs[4].Color = 0;
+                    MBgs[4].Priority = 0; SBgs[4].Priority = 0;
+
+                    if (main || sub)
+                    {
+                        for (int i = 0; i < SpritesScanline; i++)
+                        {
+                            var s = SpriteScan[i];
+                            if (s.Y == 224) continue;
+                            if (s.X == -256 || s.X > 256) continue;
+                            int fx = (x - s.X);
+                            int fy = (y - s.Y);
+
+                            if (fx < 0 || fx >= s.Width) continue;
+
+                            if (s.Attrib.GetBit(6))
+                                fx = s.Width - fx - 1;
+
+                            if (s.Attrib.GetBit(7))
+                                fy = s.Height - fy - 1;
+
+                            var baseaddr = ObjTable1 + ((s.Attrib & 1) > 0 ? ObjTable2 : 0);
+                            var spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + ((byte)fy / 8) * (s.Width * s.Height);
+                            var colorid = GetPixel(spraddr, 7 - fx & 7, 4);
+                            var palid = (s.Attrib & 0x0e) >> 1;
+                            var pal = (0x80 + palid * 16 + colorid) & 0xff;
+                            var color = (ushort)(Cram[pal]);
+                            if (colorid > 0)
+                            {
+                                if (WinMainBgs[4] && GetWindow(4, x))
+                                    continue;
+
+                                if (colorid > 0)
+                                {
+                                    if (main)
+                                    {
+                                        MBgs[4].Color = color | 1;
+                                        MBgs[4].Palette = pal;
+                                        MBgs[4].Layer = 4;
+                                        MBgs[4].Priority = s.Priority;
+                                    }
+
+                                    if (sub)
+                                    {
+                                        SBgs[4].Color = color | 1;
+                                        SBgs[4].Palette = pal;
+                                        SBgs[4].Layer = 4;
+                                        SBgs[4].Priority = s.Priority;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    var clip = Clip switch
+                    {
+                        1 => !GetWindow(5, x),
+                        2 or 3 => GetWindow(5, x),
+                        _ => false
+                    };
+
+                    Main = GetPriority(BgMode, MBgs);
+
+                    if (clip)
+                        Main.Color = 0;
+
+                    half = ColorMath[6] ? 1 : 0;
+                    math = GetMathEnabled(Main.Layer, x);
+
+                    if (!ColorMath[7] && AddSub)
+                    {
+                        Sub = GetPriority(BgMode, SBgs);
+                        if (Sub.Layer == 5 && BgMode != 7)
+                        {
+                            Sub.Color = Fixed.Color;
+                            half = 0;
                         }
                     }
                 }
+                ScreenBuffer[VPos * 256 + x] = GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, !ColorMath[7], half);
             }
-
-            var clip = Clip switch
-            {
-                1 => !GetWindow(5, x),
-                2 or 3 => GetWindow(5, x),
-                _ => false
-            };
-
-            Main = GetPriority(BgMode, MBgs);
-
-            if (clip)
-                Main.Color = 0;
-
-            var add = !ColorMath[7];
-            var half = ColorMath[6] ? 1 : 0;
-            var math = GetMathEnabled(Main.Layer, x);
-
-            if (math && AddSub)
-            {
-                Sub = GetPriority(BgMode, SBgs);
-                if (Sub.Layer == 5 && BgMode != 7)
-                {
-                    Sub.Color = Fixed.Color;
-                    half = 0;
-                }
-            }
-
-            ScreenBuffer[(VPos - 1) * 256 + x] = GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, add, half);
         }
     }
 
@@ -843,7 +841,7 @@ public class SnesPpu : EmuState
     }
 
 
-    private void EvaluateSprites()
+    private void EvaluateSprites(int y)
     {
         int c = SpritesScanline = 0;
         int n = ObjPrioRotation ? (InterOamAddr & 0x1fc) / 4 : 0;
@@ -856,7 +854,7 @@ public class SnesPpu : EmuState
             var t = v >> ((n & 3) << 1) & 3;
             var highbit = t & 1;
             int sy = Oam[n * 4 + 1];
-            int yp = VPos - sy - 1;
+            int yp = y - sy - 1;
             int width = ObjSizeWidth[((ObjSize | t) / 2) << 3 & 0xf];
             int height = ObjSizeHeight[((ObjSize | t) / 2) << 3 & 0xf];
 
@@ -987,7 +985,7 @@ public class SnesPpu : EmuState
         return 0x00;
     }
 
-    readonly int[] ppuaddrinc = [1, 32, 128, 128];
+    private readonly int[] ppuaddrinc = [1, 32, 128, 128];
     public void Write(int a, byte v)
     {
         switch (a & 0xff)

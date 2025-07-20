@@ -142,7 +142,7 @@ public abstract class Gui
     {
         if (name != "")
         {
-            Cheat.Save(lastname, Emu?.Cheats);
+            Cheat.Save(lastname);
             Emu?.SaveBreakpoints(lastname);
             switch (Path.GetExtension(name).ToLowerInvariant())
             {

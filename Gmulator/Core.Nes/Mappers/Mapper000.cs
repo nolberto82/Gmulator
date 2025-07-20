@@ -1,4 +1,4 @@
-﻿namespace GNes.Core.Mappers
+﻿namespace Gmulator.Core.Nes.Mappers
 {
     internal class Mapper000 : BaseMapper
     {

@@ -124,7 +124,6 @@ public static class Constants
     public static readonly string SaveDirectory = "Saves";
     public static readonly string StateDirectory = "States";
     public static readonly string CheatDirectory = "Cheats";
-    public static readonly string LuaDirectory = "Lua";
     public static readonly string ConfigDirectory = "Config";
     public static readonly string DebugDirectory = "Debugger";
 

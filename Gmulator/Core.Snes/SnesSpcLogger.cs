@@ -124,7 +124,7 @@ public class SnesSpcLogger()
                 var k = f.Value ? f.Key : f.Key.ToLower();
                 s += $"{k}";
             }
-            regtext += new string(s.Reverse().ToArray()) + " ";
+            regtext += new string([.. s.Reverse()]) + " ";
         }
 
         return new(--pc, data, name, "", regtext, size, "");

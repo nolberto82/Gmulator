@@ -103,7 +103,7 @@ namespace Gmulator.Core.Gbc
                 IO?.Reset();
                 Logger?.Reset();
                 LoadBreakpoints(Mapper.Name);
-                Cheat?.Load(this, false);
+                Cheat?.Load(this);
                 base.Reset(name, lastname, true);
             }
         }
@@ -168,7 +168,7 @@ namespace Gmulator.Core.Gbc
         public override void Close()
         {
             Mmu?.SaveRam();
-            Cheat.Save(GameName, Cheats);
+            Cheat.Save(GameName);
             SaveBreakpoints(GameName);
         }
 

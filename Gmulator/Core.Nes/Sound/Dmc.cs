@@ -1,4 +1,4 @@
-﻿namespace GNes.Core.Sound;
+﻿namespace Gmulator.Core.Nes.Sound;
 public class Dmc : BaseChannel
 {
     public int OutputLevel { get; set; }

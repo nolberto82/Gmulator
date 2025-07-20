@@ -1,7 +1,7 @@
 ﻿
-using GNes.Core.Mappers;
+using Gmulator.Core.Nes.Mappers;
 
-namespace GNes.Core;
+namespace Gmulator.Core.Nes;
 public partial class NesCpu : EmuState
 {
     private const int FC = 1 << 0;

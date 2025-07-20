@@ -79,7 +79,6 @@ namespace Gmulator.Shared
             var posy = (int)(((height - texheight * scale) / 2) + MenuHeight);
 
             IsScreenWindow = false;
-
             if (Debug)
             {
                 ImGui.SetNextWindowPos(new(5, MenuHeight + 5));

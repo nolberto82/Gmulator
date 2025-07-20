@@ -20,7 +20,7 @@ public class SnesDma : EmuState
     public bool Indirect { get; set; }
     public bool Repeat { get; set; }
     public bool TransferEnabled { get; set; }
-    readonly List<SnesDma> Dma;
+    private readonly List<SnesDma> Dma;
 
     public SnesDma() { }
     public SnesDma(List<SnesDma> dma) => Dma = dma;

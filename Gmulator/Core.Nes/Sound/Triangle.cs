@@ -1,5 +1,5 @@
 ﻿
-namespace GNes.Core.Sound;
+namespace Gmulator.Core.Nes.Sound;
 public class Triangle : BaseChannel
 {
     public int LinearCounter { get; set; }
