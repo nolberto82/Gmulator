@@ -35,6 +35,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
+	  <None Include="..\.editorconfig" Link=".editorconfig" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<PackageReference Include="ImGui.NET" Version="1.91.6.1" />
 		<PackageReference Include="NLua" Version="1.7.5" />
 		<PackageReference Include="rlImgui-cs" Version="3.2.0" />
@@ -66,7 +70,7 @@
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
 		<None Update="Lua\Super Mario World %28USA%29.lua">
-		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>
 

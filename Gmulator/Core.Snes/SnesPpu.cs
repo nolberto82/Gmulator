@@ -579,7 +579,39 @@ public class SnesPpu : EmuState
                         }
                     }
                 }
-                ScreenBuffer[VPos * 256 + x] = GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, !ColorMath[7], half);
+
+                var brightness = Brightness / 15f;
+                var mr = (Main.Color & 0x1f);
+                var mg = (Main.Color >> 5) & 0x1f;
+                var mb = (Main.Color >> 10) & 0x1f;
+
+                int r = mr, g = mg, b = mb;
+
+                if (math)
+                {
+                    var sr = Sub.Color & 0x1f;
+                    var sg = (Sub.Color >> 5) & 0x1f;
+                    var sb = (Sub.Color >> 10) & 0x1f;
+                    if (!ColorMath[7])
+                    {
+                        r += sr; g += sg; b += sb;
+                        r = (r > 0x1f ? 0x1f : r) >> half;
+                        g = (g > 0x1f ? 0x1f : g) >> half;
+                        b = (b > 0x1f ? 0x1f : b) >> half;
+                    }
+                    else
+                    {
+                        r -= sr; g -= sg; b -= sb;
+                        r = (r < 0 ? 0 : r) >> half;
+                        g = (g < 0 ? 0 : g) >> half;
+                        b = (b < 0 ? 0 : b) >> half;
+                    }
+                }
+
+                r = (int)(r * brightness); g = (int)(g * brightness); b = (int)(b * brightness);
+                var rgb = (uint)((byte)(r << 3 | r >> 2) | (byte)(g << 3 | g >> 2) << 8 | (byte)(b << 3 | b >> 2) << 16);
+
+                ScreenBuffer[VPos * 256 + x] = 0xff000000 | rgb;// GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, !ColorMath[7], half);
             }
         }
     }
@@ -772,74 +804,6 @@ public class SnesPpu : EmuState
             }
         }
     }
-
-    private void RenderObj(int x, int y)
-    {
-        var main = MainBgs[4] && !GetWindow(4, x);
-        var sub = SubBgs[4] && !GetWindow(4, x);
-
-        MBgs[4].Color = 0; SBgs[4].Color = 0;
-        MBgs[4].Priority = 0; SBgs[4].Priority = 0;
-
-        if (!main && !sub)
-            return;
-
-        for (int i = 0; i < SpritesScanline; i++)
-        {
-            SpriteData s = SpriteScan[i];
-            if (s.Y == 224) continue;
-            if (s.X == -256 || s.X > 256) continue;
-            int fx = (x - s.X);
-            int fy = (y - s.Y);
-
-            if (fx < 0 || fx >= s.Width) continue;
-
-            for (int xx = 0; xx < 8; xx++)
-            {
-                if (s.X + xx < 0 || s.X + xx > SnesWidth - 1)
-                    continue;
-            }
-
-            if (s.Attrib.GetBit(6))
-                fx = s.Width - fx - 1;
-
-            if (s.Attrib.GetBit(7))
-                fy = s.Height - fy - 1;
-
-            var baseaddr = ObjTable1 + ((s.Attrib & 1) > 0 ? ObjTable2 : 0);
-            var spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + ((byte)fy / 8) * (s.Width * s.Height);
-            var colorid = GetPixel(spraddr, 7 - fx & 7, 4);
-            var palid = (s.Attrib & 0x0e) >> 1;
-            var pal = (0x80 + palid * 16 + colorid) & 0xff;
-            var color = (ushort)(Cram[pal]);
-            if (colorid > 0)
-            {
-                if (WinMainBgs[4] && GetWindow(4, x))
-                    return;
-
-                if (colorid > 0)
-                {
-                    if (main)
-                    {
-                        MBgs[4].Color = color | 1;
-                        MBgs[4].Palette = pal;
-                        MBgs[4].Layer = 4;
-                        MBgs[4].Priority = s.Priority;
-                    }
-
-                    if (sub)
-                    {
-                        SBgs[4].Color = color | 1;
-                        SBgs[4].Palette = pal;
-                        SBgs[4].Layer = 4;
-                        SBgs[4].Priority = s.Priority;
-                    }
-                    break;
-                }
-            }
-        }
-    }
-
 
     private void EvaluateSprites(int y)
     {

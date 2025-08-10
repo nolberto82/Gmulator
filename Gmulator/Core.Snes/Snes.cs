@@ -6,6 +6,7 @@ using System.Reflection.Metadata.Ecma335;
 using System.ComponentModel.Design;
 using System.Text;
 using System.Diagnostics;
+using System.Linq;
 
 namespace Gmulator.Core.Snes;
 public class Snes : Emulator
@@ -91,6 +92,8 @@ public class Snes : Emulator
                 Audio.Update(AudioSamples.ToArray());
                 AudioSamples.Clear();
             }
+
+            ApplyRawCheats();
         }
     }
 
@@ -156,7 +159,7 @@ public class Snes : Emulator
             State = Break;
 
         lock (Cheats)
-            return ApplyCheats(bank << 16, a, v);
+            return ApplyGameGenieCheats(bank << 16, a, v);
     }
 
     internal void WriteMemory(int a, int v)
@@ -547,24 +550,22 @@ public class Snes : Emulator
     public byte ReadCram(int a) => Ppu.Cram.ToByteArray()[a];
     public byte ReadRom(int a) => Mapper.Rom[a];
 
-    private byte ApplyCheats(int bank, int a, byte v)
+    private byte ApplyGameGenieCheats(int bank, int a, byte v)
     {
         var ba = bank | a;
-        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled;
+        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled && Cheats[ba].Type == GameGenie;
         if (cht)
-        {
-            if (Cheats[ba].Type == GameGenie)
-                return Cheats[ba].Value;
-        }
-
-        //if (bank == 0x7e || bank == 0x7f)
-        {
-            foreach (var c in Cheats)
-            {
-                if (c.Value.Enabled && c.Value.Type == GameShark)
-                    Ram[c.Value.Address & 0xffff] = c.Value.Value;
-            }
-        }
+            return Cheats[ba].Value;
         return v;
+    }
+
+    public void ApplyRawCheats()
+    {
+        foreach (var c in from c in Cheats
+                          where c.Value.Enabled && c.Value.Type == GameShark
+                          select c)
+        {
+            Ram[c.Value.Address & 0xffff] = c.Value.Value;
+        }
     }
 }

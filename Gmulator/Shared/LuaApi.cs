@@ -4,6 +4,7 @@ using Gmulator.Core.Snes;
 using ImGuiNET;
 using KeraLua;
 using NLua;
+using NLua.Event;
 using NLua.Exceptions;
 using Raylib_cs;
 using System.Numerics;
@@ -22,13 +23,15 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     public float MenuHeight { get; } = menuheight;
     public bool Debug { get; private set; } = debug;
     private readonly FileSystemWatcher Watcher = new(CheatDirectory, "*.lua");
-    public List<LuaCallback> Callbacks { get; private set; } = [];
+    public List<LuaMemCallback> MemCallbacks { get; private set; } = [];
+    public List<LuaEventCallback> EventCallbacks { get; private set; } = [];
 
     private string LuaCwd;
-    private string Error;
+    private string Error = "";
     private string LuaFile = "";
     private float OldLeftThumbY;
     private bool FileChanged;
+    private int FuncIndex;
 
     public Func<int, byte> Read;
     public Action<int, int> Write;
@@ -52,24 +55,27 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Write(a + 1, v >> 8);
     }
 
-    public int GetReg(string reg) => Convert.ToInt32(GetRegister()[reg], 16);
+    public int GetReg(string reg) => Convert.ToInt32(GetRegister()[reg.ToUpperInvariant()], 16);
     public void SetReg(string reg, int v) => SetRegister(reg, v);
 
     public static string GetVersion() => EmulatorName;
 
-    public void OnExec(int a)
+    public void OnExec(int a = -1)
     {
         try
         {
-            foreach (var call in Callbacks)
+            foreach (var call in MemCallbacks)
             {
-                if (call.Addr == a)
-                    call?.Action(a);
+                if (call.Action != null)
+                {
+                    if (call.EndAddr > -1 && (call.StartAddr <= a && a <= call.EndAddr) || call.StartAddr == a)
+                        call?.Action(a);
+                }
             }
         }
         catch (LuaScriptException e)
         {
-            Notifications.Init(e.Message);
+            Error += e.Message;
         }
     }
 
@@ -87,14 +93,10 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         }
     }
 
-    public void AddCallback(Action<int> func, int a)
-    {
-        Callbacks.Add(new(func, a));
-    }
-
     private void RemoveCallbacks()
     {
-        Callbacks.Clear();
+        MemCallbacks.Clear();
+        EventCallbacks.Clear();
     }
 
     public void InitMemCallbacks(Emulator emu)
@@ -134,14 +136,14 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         var leftpos = (width - Screen.Width * scale) / 2;
         var t = text.Values;
 
-        ImGui.SetNextWindowPos(new(0, !Debug ? MenuHeight : 360));
+        ImGui.SetNextWindowPos(new(width - leftpos, !Debug ? MenuHeight + 35 : 360));
         ImGui.SetNextWindowSize(new(!Debug ? leftpos : 230, !Debug ? height : 130));
         ImGui.PushFont(Consolas[0]);
         if (ImGui.Begin(name, ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoNavFocus))
         {
             foreach (var v in t)
             {
-                ImGui.Text(v.ToString());
+                ImGui.Text($"{v}");
             }
             ImGui.End();
         }
@@ -260,18 +262,48 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         return (x, y, scale);
     }
 
+    private void DebugHook(object sender, DebugHookEventArgs e)
+    {
+        if (ImGui.Begin("Lua Debug"))
+        {
+            ImGui.Text($"{e.LuaDebug}");
+        }
+    }
+
+    public static void LogLua(string message, params object[] args)
+    {
+        if (ImGui.Begin("Lua Debug"))
+        {
+            ImGui.Text($"{message}");
+        }
+        ImGui.End();
+    }
+
     public void Update(bool opened)
     {
-        if (Lua.State != null && Lua.Globals.Any())
+        if (LuaFile == "") return;
+        try
         {
-            try
+            foreach (var call in EventCallbacks)
             {
-                Lua.GetFunction("emu.update").Call();
+                if (call.Action != null)
+                    call?.Action();
             }
-            catch (LuaScriptException e)
+        }
+        catch (LuaScriptException e)
+        {
+            Error += e.Message;
+        }
+
+        if (Error != "")
+        {
+            ImGui.SetWindowPos(new(0, 0));
+            ImGui.SetNextWindowSize(new(500, 200));
+            if (ImGui.Begin("Errors"))
             {
-                Notifications.Init(e.Message);
+                ImGui.TextWrapped(Error);
             }
+            ImGui.End();
         }
 
         var newleftstickY = Raylib.GetGamepadAxisMovement(0, GamepadAxis.LeftY);
@@ -286,18 +318,32 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         OldLeftThumbY = newleftstickY;
     }
 
+    public void AddMemCallback(Action<int> func, type type, int start, int end = -1)
+    {
+        if (type == type.exec)
+            MemCallbacks.Add(new(func, type, start, end));
+    }
+
+    public void AddEventCallback(Action func, type type)
+    {
+        if (type == type.frame)
+            EventCallbacks.Add(new(func, type));
+    }
+
     public void Load(string filename)
     {
         LuaFile = filename;
 
         Lua = new();
-        RemoveCallbacks();
+        if (MemCallbacks.Count > 0)
+            RemoveCallbacks();
 
         Lua.NewTable("emu");
-        ((LuaTable)Lua["emu"])["update"] = null;
 
-        Lua.RegisterFunction("emu.callback", this, typeof(LuaApi).GetMethod("AddCallback"));
+        Lua.RegisterFunction("emu.memcallback", this, typeof(LuaApi).GetMethod("AddMemCallback"));
+        Lua.RegisterFunction("emu.eventcallback", this, typeof(LuaApi).GetMethod("AddEventCallback"));
         Lua.RegisterFunction("emu.log", this, typeof(LuaApi).GetMethod("Log"));
+        Lua.RegisterFunction("emu.loglua", this, typeof(LuaApi).GetMethod("LogLua"));
         Lua.RegisterFunction("emu.getregister", this, typeof(LuaApi).GetMethod("GetReg"));
         Lua.RegisterFunction("emu.setregister", this, typeof(LuaApi).GetMethod("SetReg"));
 
@@ -321,8 +367,11 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Lua.RegisterFunction("mem.writebyte", this, typeof(LuaApi).GetMethod("WriteByte"));
         Lua.RegisterFunction("mem.writeword", this, typeof(LuaApi).GetMethod("WriteWord"));
 
-
         Lua.RegisterFunction("mem.onexec", this, typeof(LuaApi).GetMethod("OnExec"));
+
+        LuaRegistrationHelper.Enumeration<type>(Lua);
+
+        //Lua.RegisterLuaDelegateType(typeof(Action), typeof(LuaHandler));
 
         if (LuaCwd == "" || LuaCwd is null)
         {
@@ -352,7 +401,6 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
             Error = e.Message;
             Error += e.Source;
             LuaPrint(Error);
-            Notifications.Init(Path.GetFileName(Error));
             return;
         }
 
@@ -392,5 +440,12 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
             Raylib.UnloadTexture(t);
     }
 
-    public record LuaCallback(Action<int> Action, int Addr);
+    public record LuaMemCallback(Action<int> Action, type Type, int StartAddr, int EndAddr = -1);
+
+    public record LuaEventCallback(Action Action, type Type);
+
+    public enum type
+    {
+        read, write, exec, frame
+    }
 }

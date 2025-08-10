@@ -130,8 +130,8 @@ namespace Gmulator.Shared
                 Raylib.DrawTexturePro(
                     Screen.Texture,
                     new Rectangle(0, 0, texwidth, texheight),
-                    new Rectangle(posx, posy,
-                    texwidth * scale,
+                    new Rectangle(0, posy,
+                    width - posx,
                     texheight * scale - MenuHeight),
                     Vector2.Zero, 0, Color.White);
 

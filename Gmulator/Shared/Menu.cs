@@ -276,32 +276,33 @@ public class Menu
                             ImGui.PushStyleColor(ImGuiCol.Text, !file.IsFile ? YELLOW : DeleteFileMode ? RED : WHITE);
                             if (ImGui.Selectable($"{name}", i == ItemSelected[TabGames], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
-                                if (DeleteFileMode)
+                                if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                 {
-                                    File.Delete(file.Name);
+                                    if (file.IsFile)
+                                        File.Delete(file.Name);
                                 }
                                 else
                                 {
-                                if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
-                                {
-                                    if (File.Exists(file.Name))
+                                    if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
                                     {
-                                        ImGui.CloseCurrentPopup();
-                                        Config.Save();
-                                        Opened = false;
-                                        Reset(GameName = file.Name, LastName);
-                                        LastName = file.Name;
+                                        if (File.Exists(file.Name))
+                                        {
+                                            ImGui.CloseCurrentPopup();
+                                            Config.Save();
+                                            Opened = false;
+                                            Reset(GameName = file.Name, LastName);
+                                            LastName = file.Name;
+                                        }
+                                        else
+                                        {
+                                            Config.WorkingDir = WorkingDir = file.Name;
+                                            Config.Save();
+                                            GameFiles.Clear();
+                                            Enumerate("");
+                                            ImGui.PopStyleColor();
+                                            break;
+                                        }
                                     }
-                                    else
-                                    {
-                                        Config.WorkingDir = WorkingDir = file.Name;
-                                        Config.Save();
-                                        GameFiles.Clear();
-                                        Enumerate("");
-                                        ImGui.PopStyleColor();
-                                        break;
-                                    }
-                                }
                                 }
                             }
 
