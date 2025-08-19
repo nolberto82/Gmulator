@@ -97,6 +97,8 @@ public class Nes : Emulator
                 }
                 Ppu.Cycles -= cyclesframe;
             }
+            if (Cheats.Count > 0)
+                Mmu.ApplyRawCheats();
         }
     }
 
@@ -183,7 +185,7 @@ public class Nes : Emulator
     public override void Close()
     {
         Mmu?.SaveRam();
-        Cheat.Save(Mapper.Name);
+        //Cheat.Save(Mapper.Name);
         SaveBreakpoints(Mapper.Name);
     }
 

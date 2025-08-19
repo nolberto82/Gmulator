@@ -24,7 +24,7 @@ public class Cheat
         Enabled = enabled;
         Codes = codes;
         Type = type;
-        if (type == GameShark)
+        if (type == ProAction)
             Bank = compare;
     }
 
@@ -57,7 +57,7 @@ public class Cheat
                     var addr = Convert.ToUInt16($"{c.Substring(6, 2)}{c.Substring(4, 2)}", 16);
                     var cmp = Convert.ToByte($"{c[..2]}", 16);
                     var val = Convert.ToByte($"{c.Substring(2, 2)}", 16);
-                    return (addr, cmp, val, GameShark, GbcConsole);
+                    return (addr, cmp, val, ProAction, GbcConsole);
                 }
                 return (-1, 0, 0, -1, GbcConsole);
             }
@@ -93,7 +93,7 @@ public class Cheat
                 {
                     var addr = Convert.ToInt16(c[..4], 16);
                     var val = Convert.ToByte(c.Substring(5, 2), 16);
-                    return (addr, 0, val, GameShark, NesConsole);
+                    return (addr, 0, val, ProAction, NesConsole);
                 }
                 break;
             }
@@ -103,7 +103,7 @@ public class Cheat
                 {
                     var addr = Convert.ToInt32(c[..6], 16);
                     var val = Convert.ToByte(c.Substring(7, 2), 16);
-                    return (addr, 0, val, GameShark, SnesConsole);
+                    return (addr, 0, val, ProAction, SnesConsole);
                 }
                 else if (c.Contains(':'))
                 {

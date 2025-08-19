@@ -1697,6 +1697,7 @@ public partial class SnesCpu : EmuState, ICpu
         ["P"] = $"{PS:X4}",
         ["DB"] = $"{DB:X2}",
         ["PB"] = $"{PB:X2}",
+        ["PC"] = $"{PC:X4}"
     };
 
     public void SetReg(string reg, int v)
@@ -1710,8 +1711,6 @@ public partial class SnesCpu : EmuState, ICpu
             case "pc": PC = v; break;
         }
     }
-
-
 
     public override void Save(BinaryWriter bw)
     {

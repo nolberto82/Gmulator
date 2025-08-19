@@ -132,7 +132,7 @@ namespace Gmulator.Shared
                     new Rectangle(0, 0, texwidth, texheight),
                     new Rectangle(0, posy,
                     width - posx,
-                    texheight * scale - MenuHeight),
+                    texheight * scale + MenuHeight),
                     Vector2.Zero, 0, Color.White);
 
                 Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), Debug);

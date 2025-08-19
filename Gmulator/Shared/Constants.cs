@@ -63,7 +63,7 @@ public static class Constants
     public const double apuCyclesPerMaster = 32040 * 32 / (1364 * 262 * 60.0);
 
     public const int GameGenie = 0;
-    public const int GameShark = 1;
+    public const int ProAction = 1;
     public const int Raw = 2;
 
     public const int NoConsole = -1;

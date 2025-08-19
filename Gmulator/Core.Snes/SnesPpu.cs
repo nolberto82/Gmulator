@@ -1,6 +1,7 @@
 ﻿using Raylib_cs;
 using System;
 using System.ComponentModel.Design;
+using System.Runtime.InteropServices;
 
 namespace Gmulator.Core.Snes;
 public class SnesPpu : EmuState
@@ -292,9 +293,9 @@ public class SnesPpu : EmuState
 
     public void ProcessHdma()
     {
-        var Dma = Snes.Dma;
         int count = 0;
-        for (int i = 0; i < Dma.Count; i++)
+        Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
+        for (int i = 0; i < Dma.Length; i++)
         {
             if (Dma[i].HdmaEnabled && !Dma[i].Completed)
             {
@@ -341,8 +342,8 @@ public class SnesPpu : EmuState
 
     private void InitHdma()
     {
-        var Dma = Snes.Dma;
-        for (int i = 0; i < Dma.Count; i++)
+        Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
+        for (int i = 0; i < Dma.Length; i++)
         {
             if (Dma[i].HdmaEnabled)
             {

@@ -431,7 +431,7 @@ public class Snes : Emulator
 
     public override void Close()
     {
-        Cheat.Save(GameName);
+        //Cheat.Save(GameName);
         SaveBreakpoints(Mapper?.Name);
     }
 
@@ -562,7 +562,7 @@ public class Snes : Emulator
     public void ApplyRawCheats()
     {
         foreach (var c in from c in Cheats
-                          where c.Value.Enabled && c.Value.Type == GameShark
+                          where c.Value.Enabled && c.Value.Type == ProAction
                           select c)
         {
             Ram[c.Value.Address & 0xffff] = c.Value.Value;

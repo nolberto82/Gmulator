@@ -45,19 +45,21 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         Mapper.Reset();
     }
 
-    public void ApplyCheats(int a, ref byte v)
+    private byte ApplyGameGenieCheats(int ba, byte v)
     {
-        var found = Cheats?.ContainsKey(a);
-        if (found == true)
+        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled && Cheats[ba].Type == GameGenie;
+        if (cht)
+            return Cheats[ba].Value;
+        return v;
+    }
+
+    public void ApplyRawCheats()
+    {
+        foreach (var c in from c in Cheats
+                          where c.Value.Enabled && c.Value.Type == ProAction
+                          select c)
         {
-            var cht = Cheats[a];
-            if (cht.Enabled)
-            {
-                if (a >= 0x8000 && a == cht.Address && cht.Compare == v)
-                    v = cht.Value;
-                else if (cht.Address <= 0x07ff || (cht.Address >= 0x6000 && cht.Address <= 0x7fff))
-                    Ram[cht.Address & 0xffff] = cht.Value;
-            }
+            Ram[c.Value.Address & 0xffff] = c.Value.Value;
         }
     }
 
@@ -94,7 +96,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         else
             v = Ram[a & 0x7ff];
 
-        ApplyCheats(a, ref v);
+        ApplyGameGenieCheats(a, v);
         return v;
     }
 

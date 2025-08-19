@@ -69,6 +69,7 @@ namespace Gmulator.Core.Gbc
                     }
                     Cpu.Cycles -= cyclesframe;
                 }
+                Mmu.ApplyParCheats();
             }
         }
 
@@ -168,7 +169,7 @@ namespace Gmulator.Core.Gbc
         public override void Close()
         {
             Mmu?.SaveRam();
-            Cheat.Save(GameName);
+            //Cheat.Save(GameName);
             SaveBreakpoints(GameName);
         }
 

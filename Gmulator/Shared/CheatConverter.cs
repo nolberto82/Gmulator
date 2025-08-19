@@ -19,7 +19,7 @@ public class CheatConverter
         cheats = cheats.Replace(" ", "");
         var input = cheats.Split(["\r\n", "\r", "\n"], StringSplitOptions.RemoveEmptyEntries).ToList();
         if (input.Count == 0) return;
-        int cheatype = input[0].Contains('-') ? GameGenie : GameShark;
+        int cheatype = input[0].Contains('-') ? GameGenie : ProAction;
         cheatout = string.Empty;
         for (int i = 0; i < input.Count; i++)
         {
@@ -40,7 +40,7 @@ public class CheatConverter
                         cheatout += $"{addr:X6}:{val:X2}\n";
                 }
 
-                else if (type == GameShark)
+                else if (type == ProAction)
                     cheatout += $"{addr:X4}:{val:X2}\n";
             }
             else

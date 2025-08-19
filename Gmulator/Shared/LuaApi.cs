@@ -55,7 +55,17 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Write(a + 1, v >> 8);
     }
 
-    public int GetReg(string reg) => Convert.ToInt32(GetRegister()[reg.ToUpperInvariant()], 16);
+    public int GetReg(string reg)
+    {
+        if (reg == null) return 0;
+        var regs = GetRegister();
+        reg = reg.ToUpperInvariant();
+        if (regs.ContainsKey(reg))
+            return Convert.ToInt32(regs[reg], 16);
+        else
+            return 0;
+    }
+
     public void SetReg(string reg, int v) => SetRegister(reg, v);
 
     public static string GetVersion() => EmulatorName;
@@ -75,7 +85,13 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         }
         catch (LuaScriptException e)
         {
-            Error += e.Message;
+            Error = $"{e.Message}\n";
+            Error += $"{e.Source}\n";
+        }
+        catch (Exception e)
+        {
+            Error += $"{e.Message}\n";
+            Error += $"{e.Source}\n";
         }
     }
 
@@ -155,23 +171,20 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         if (args.Length < 3)
             return;
 
-        var fontsize = args.Length > 3 && args[3] != null ? Convert.ToInt32(args[3]) : 32;
+        var fontsize = 32;// args.Length > 3 && args[3] != null ? Convert.ToInt32(args[3]) : 32;
 
         uint textcolor = 0xffffffff;
-        if (args.Length > 4 && args[4] != null)
-            textcolor = Convert.ToUInt32(args[4]);
+        if (args.Length > 4 && args[3] != null)
+            textcolor = Convert.ToUInt32(args[3]);
 
         var text = $"{args[2]}";
         (var x, var y, _) = GetScaledPosition(args[0], args[1], Screen);
 
         var tz = Raylib.MeasureTextEx(GuiFont, text, fontsize, 1);
         var textrect = new Rectangle(x, y, tz.X, tz.Y);
-        if (args.Length == 6 && args[5] != null)
-        {
+        if (args.Length == 5)
+            Raylib.DrawRectangleRec(textrect, GetColor(args[4] == null ? 0x00000000 : Convert.ToUInt32(args[4])));
 
-            uint bgcolor = Convert.ToUInt32(args[5]);
-            Raylib.DrawRectangleRec(textrect, GetColor(bgcolor));
-        }
         Raylib.DrawTextEx(GuiFont, text, new(x + textrect.Width / 2 - tz.X / 2, y), fontsize, 0f, GetColor(textcolor));
     }
 
@@ -198,19 +211,17 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Raylib.DrawTextEx(GuiFont, text, new(x, y), fontsize, 0f, GetColor(textcolor));
     }
 
-    public static void DrawRectangle(params object[] args)
+    public void DrawRectangle(params object[] args)
     {
-        if (args.Length != 5)
+        if (args.Length < 5)
             return;
 
-        var x = Convert.ToInt32(args[0]);
-        var y = Convert.ToInt32(args[1]);
+        (var x, var y, var scale) = GetScaledPosition(args[0], args[1], Screen);
         var w = Convert.ToInt32(args[2]);
         var h = Convert.ToInt32(args[3]);
-        if ($"{args[4]}".Length != 8)
-            return;
+        var bgcolor = args[5] == null || (bool)args[5] == false ? 0xff000000 : Convert.ToUInt32(args[4]);
 
-        Raylib.DrawRectangle(x, y, w, h, GetColor(args[4]));
+        Raylib.DrawRectangle(x, y, (int)(w * scale), (int)(h * scale), GetColor((uint)bgcolor));
     }
 
     public void DrawImage(params object[] args)
@@ -240,14 +251,14 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         return Raylib.LoadTexture(($"{path}\\{args[0]}"));
     }
 
-    public static Color GetColor(object color)
+    public static Color GetColor(uint color)
     {
-        var c = Convert.ToUInt32(color);
-        var r = (byte)(c);
+        var c = color != 0xffffffff ? color ^ 0xff000000 : color;
+        var r = (byte)(c >> 16);
         var g = (byte)(c >> 8);
-        var b = (byte)(c >> 16);
-        var a = (byte)(c >> 24) == 0 ? 0xff : (byte)(c >> 24);
-        return new Color(r, g, b, a);
+        var b = (byte)(c);
+        var a = (byte)(c >> 24);
+        return new(r, g, b, a);
     }
 
     public (int, int, float) GetScaledPosition(object vx, object vy, Texture2D texture)
@@ -255,7 +266,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         var width = Raylib.GetRenderWidth();
         var height = Raylib.GetRenderHeight();
         var scale = Math.Min((float)width / texture.Width, (float)height / texture.Height);
-        var left = (width - texture.Width * scale) / 2;
+        var left = 0;// (width - texture.Width * scale) / 2;
         var top = ((height - texture.Height * scale) / 2) + MenuHeight;
         var x = (int)(Convert.ToInt64(vx) * scale + left);
         var y = (int)(Convert.ToInt64(vy) * scale + top);
@@ -282,17 +293,26 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     public void Update(bool opened)
     {
         if (LuaFile == "") return;
-        try
         {
-            foreach (var call in EventCallbacks)
+            try
             {
-                if (call.Action != null)
-                    call?.Action();
+                foreach (var call in EventCallbacks)
+                {
+
+                    if (call.Action != null)
+                        call?.Action();
+                }
             }
-        }
-        catch (LuaScriptException e)
-        {
-            Error += e.Message;
+            catch (LuaScriptException e)
+            {
+                Error += $"{e.Message}\n";
+                Error += $"{e.Source}\n";
+            }
+            catch (Exception e)
+            {
+                Error += $"{e.Message}\n";
+                Error += $"{e.Source}\n";
+            }
         }
 
         if (Error != "")
@@ -318,15 +338,15 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         OldLeftThumbY = newleftstickY;
     }
 
-    public void AddMemCallback(Action<int> func, type type, int start, int end = -1)
+    public void AddMemCallback(Action<int> func, Type type, int start, int end = -1)
     {
-        if (type == type.exec)
+        if (type == Type.Exec)
             MemCallbacks.Add(new(func, type, start, end));
     }
 
-    public void AddEventCallback(Action func, type type)
+    public void AddEventCallback(Action func, Type type)
     {
-        if (type == type.frame)
+        if (type == Type.Frame)
             EventCallbacks.Add(new(func, type));
     }
 
@@ -369,9 +389,9 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
 
         Lua.RegisterFunction("mem.onexec", this, typeof(LuaApi).GetMethod("OnExec"));
 
-        LuaRegistrationHelper.Enumeration<type>(Lua);
+        Lua.RegisterFunction("print", this, typeof(LuaApi).GetMethod("LuaPrint"));
 
-        //Lua.RegisterLuaDelegateType(typeof(Action), typeof(LuaHandler));
+        LuaRegistrationHelper.Enumeration<Type>(Lua);
 
         if (LuaCwd == "" || LuaCwd is null)
         {
@@ -398,10 +418,15 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         catch (LuaScriptException e)
         {
             Lua.Close();
-            Error = e.Message;
-            Error += e.Source;
+            Error = $"{e.Message}\n";
+            Error += $"{e.Source}\n";
             LuaPrint(Error);
             return;
+        }
+        catch (Exception e)
+        {
+            Error += $"{e.Message}\n";
+            Error += $"{e.Source}\n";
         }
 
         Error = "";
@@ -424,7 +449,16 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
             Load(name);
     }
 
-    public static void LuaPrint(object text) => System.Console.WriteLine($"{text}");
+    public static void LuaPrint(object text)
+    {
+        ImGui.SetWindowPos(new(0, 0), ImGuiCond.Once);
+        ImGui.SetNextWindowSize(new(200, 0), ImGuiCond.Once);
+        if (ImGui.Begin("log"))
+        {
+            ImGui.Text($"{text}");
+        }
+        ImGui.End();
+    }
 
     public void Reset()
     {
@@ -440,12 +474,12 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
             Raylib.UnloadTexture(t);
     }
 
-    public record LuaMemCallback(Action<int> Action, type Type, int StartAddr, int EndAddr = -1);
+    public record LuaMemCallback(Action<int> Action, Type Type, int StartAddr, int EndAddr = -1);
 
-    public record LuaEventCallback(Action Action, type Type);
+    public record LuaEventCallback(Action Action, Type Type);
 
-    public enum type
+    public enum Type
     {
-        read, write, exec, frame
+        Read, Write, Exec, Frame
     }
 }

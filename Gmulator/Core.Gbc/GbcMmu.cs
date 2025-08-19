@@ -39,7 +39,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
     {
         a &= 0xffff;
         byte v = 0xff;
-        
+
         if (a <= 0x7fff)
         {
             if (a <= 0x7fff)
@@ -47,12 +47,8 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
 
             lock (Cheats)
             {
-                var cht = Cheats.ContainsKey(a);
-                if (cht)
-                {
-                    if (Cheats[a].Enabled && Cheats[a].Compare == v)
-                        ApplyCheats(Cheats[a], a, ref v);
-                }
+                if (Cheats.Count > 0)
+                    return ApplyGameGenieCheats(a, v);
             }
             return v;
         }
@@ -240,27 +236,31 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         return rom;
     }
 
-    private void ApplyCheats(Cheat cht, int addr, ref byte v)
+    private byte ApplyGameGenieCheats(int ba, byte v)
     {
-        if (cht.Type == GameGenie)
+        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled && Cheats[ba].Compare == v && Cheats[ba].Type == GameGenie;
+        if (cht)
+            return Cheats[ba].Value;
+        return v;
+    }
+
+    public void ApplyParCheats()
+    {
+        foreach (var c in from c in Cheats
+                          where c.Value.Enabled && c.Value.Type == ProAction
+                          select c)
         {
-            if (cht.Compare == v)
-                v = cht.Value;
-        }
-        else
-        {
-            if (addr <= 0xbfff)
-                Sram[cht.Address & 0xfff] = cht.Value;
-            else if (addr <= 0xcfff)
-                Ram[cht.Address] = cht.Value;
-            else if (addr <= 0xdfff)
-                Wram[(cht.Address & 0xfff) + cht.Bank * 0x1000] = cht.Value;
+            if (c.Value.Address <= 0xbfff)
+                Sram[c.Value.Address & 0xfff] = c.Value.Value;
+            else if (c.Value.Address <= 0xcfff)
+                Ram[c.Value.Address] = c.Value.Value;
+            else if (c.Value.Address <= 0xdfff)
+                Wram[(c.Value.Address & 0xfff) + c.Value.Bank * 0x1000] = c.Value.Value;
         }
     }
 
     public override void Save(BinaryWriter bw)
     {
-        ;
         bw.Write(Vram);
         bw.Write(Sram);
         bw.Write(Wram);
