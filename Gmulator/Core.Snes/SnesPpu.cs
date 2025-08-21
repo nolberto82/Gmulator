@@ -293,48 +293,55 @@ public class SnesPpu : EmuState
 
     public void ProcessHdma()
     {
-        int count = 0;
         Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
         for (int i = 0; i < Dma.Length; i++)
         {
-            if (Dma[i].HdmaEnabled && !Dma[i].Completed)
+            ref var dma = ref Dma[i];
+            if (dma.HdmaEnabled && !dma.Completed)
             {
-                if (Dma[i].TransferEnabled)
+                if (dma.TransferEnabled)
                 {
-                    if (Dma[i].Indirect)
+                    int max = dma.Max[dma.Mode & 7];
+                    if (dma.Indirect)
                     {
-                        while (count < Dma[i].Max[Dma[i].Mode & 7])
+                        int size = dma.Size;
+                        for (int count = 0; count < max; count++)
                         {
-                            Dma[i].Transfer(Dma[i].HBank << 16 | Dma[i].Size, Dma[i].Mode, count++);
-                            Dma[i].Size++;
+                            dma.Transfer(dma.HBank << 16 | size, dma.Mode, count);
+                            size++;
                         }
-                        count = 0;
+                        dma.Size = (ushort)size;
                     }
                     else
                     {
-                        while (count < Dma[i].Max[Dma[i].Mode & 7])
+                        int hAddress = dma.HAddress;
+                        for (int count = 0; count < max; count++)
                         {
-                            Dma[i].Transfer(Dma[i].ABank << 16 | Dma[i].HAddress, Dma[i].Mode, count++);
-                            Dma[i].HAddress++;
+                            dma.Transfer(dma.ABank << 16 | hAddress, dma.Mode, count);
+                            hAddress++;
                         }
-                        count = 0;
+                        dma.HAddress = hAddress;
                     }
                 }
 
-                Dma[i].HCounter--;
-                Dma[i].TransferEnabled = Dma[i].HCounter.GetBit(7);
-                if ((Dma[i].HCounter & 0x7f) == 0)
+                dma.HCounter--;
+                dma.TransferEnabled = dma.HCounter.GetBit(7);
+                if ((dma.HCounter & 0x7f) == 0)
                 {
-                    var v = Dma[i].Read(Dma[i].ABank << 16 | Dma[i].HAddress++);
-                    Dma[i].HCounter = v;
-                    Dma[i].Repeat = v.GetBit(7);
-                    var bank = Dma[i].ABank << 16;
-                    if (Dma[i].Indirect)
-                        Dma[i].Size = (ushort)(Dma[i].Read(bank | Dma[i].HAddress++) | Dma[i].Read(bank | Dma[i].HAddress++) << 8);
+                    var v = dma.Read(dma.ABank << 16 | dma.HAddress++);
+                    dma.HCounter = v;
+                    dma.Repeat = v.GetBit(7);
+                    var bank = dma.ABank << 16;
+                    if (dma.Indirect)
+                    {
+                        int low = dma.Read(bank | dma.HAddress++);
+                        int high = dma.Read(bank | dma.HAddress++);
+                        dma.Size = (ushort)(low | (high << 8));
+                    }
 
-                    Dma[i].TransferEnabled = true;
-                    if (Dma[i].HCounter == 0)
-                        Dma[i].Completed = true;
+                    dma.TransferEnabled = true;
+                    if (dma.HCounter == 0)
+                        dma.Completed = true;
                 }
             }
         }
@@ -345,23 +352,29 @@ public class SnesPpu : EmuState
         Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
         for (int i = 0; i < Dma.Length; i++)
         {
-            if (Dma[i].HdmaEnabled)
+            ref var dma = ref Dma[i];
+            if (dma.HdmaEnabled)
             {
-                Dma[i].Completed = false;
-                Dma[i].HAddress = Dma[i].AAddress;
-                var v = Dma[i].Read(Dma[i].ABank << 16 | Dma[i].HAddress++);
-                Dma[i].HCounter = v;
-                Dma[i].Repeat = v.GetBit(7);
-                if (Dma[i].Indirect)
+                dma.Completed = false;
+                dma.HAddress = dma.AAddress;
+                int v = dma.Read(dma.ABank << 16 | dma.HAddress);
+                dma.HAddress++;
+                dma.HCounter = v;
+                dma.Repeat = v.GetBit(7);
+                if (dma.Indirect)
                 {
-                    Dma[i].Size = (ushort)(Dma[i].Read(Dma[i].ABank << 16 | Dma[i].HAddress)
-                        | Dma[i].Read(Dma[i].ABank << 16 | Dma[i].HAddress + 1) << 8);
-                    Dma[i].HAddress += 2;
+                    int addr = dma.ABank << 16 | dma.HAddress;
+                    int low = dma.Read(addr);
+                    int high = dma.Read(addr + 1);
+                    dma.Size = (ushort)(low | (high << 8));
+                    dma.HAddress += 2;
                 }
-                Dma[i].TransferEnabled = true;
+                dma.TransferEnabled = true;
             }
             else
-                Dma[i].TransferEnabled = false;
+            {
+                dma.TransferEnabled = false;
+            }
         }
     }
 
@@ -740,30 +753,40 @@ public class SnesPpu : EmuState
     {
         int pixel = 0;
         int p;
+        ushort vramVal = Vram[mapaddr];
+
         if (BgMode < 7)
         {
-            var flipx = ((Vram[mapaddr] >> 14) & 1) > 0;
-            var flipy = ((Vram[mapaddr] >> 15) & 1) > 0;
-            var fx = flipx ? 7 - (sx ^ 7) & 7 : 7 - sx & 7;
-            var fy = flipy ? (sy ^ 7) & 7 : sy & 7;
-            var tileid = Vram[mapaddr] & 0x3ff;
+            bool flipx = ((vramVal >> 14) & 1) != 0;
+            bool flipy = ((vramVal >> 15) & 1) != 0;
+            int fx = flipx ? (7 - ((sx ^ 7) & 7)) : (7 - (sx & 7));
+            int fy = flipy ? ((sy ^ 7) & 7) : (sy & 7);
+            int tileid = vramVal & 0x3ff;
+
             if (bigchar)
             {
-                tileid += (sx & 8) > 7 ? (flipx ? 0 : 1) : (flipx ? 1 : 0);
-                tileid += (sy & 8) > 7 ? (flipy ? 0 : 16) : (flipy ? 16 : 0);
+                int sx8 = sx & 8;
+                int sy8 = sy & 8;
+                tileid += (sx8 != 0) ? (flipx ? 0 : 1) : (flipx ? 1 : 0);
+                tileid += (sy8 != 0) ? (flipy ? 0 : 16) : (flipy ? 16 : 0);
             }
-            var palid = Vram[mapaddr] >> 10 & 7;
-            ushort ta = (ushort)(tilebase + tileid * bpp * 4 + fy);
+
+            int palid = (vramVal >> 10) & 7;
+            int ta = tilebase + tileid * bpp * 4 + fy;
             pixel = GetPixel(ta, fx, bpp);
-            p = (ushort)(ushort)(paloff + palid * (bpp == 4 ? 16 : bpp == 8 ? 256 : 4) + pixel);
-            return (((ushort)(Cram[p & 0xff] | (pixel > 0 ? 1 : 0))), pixel, p);
+
+            int paletteSize = bpp switch { 4 => 16, 8 => 256, _ => 4 };
+            p = paloff + palid * paletteSize + pixel;
+            ushort cramVal = Cram[p & 0xff];
+            return ((cramVal | (pixel > 0 ? 1 : 0)), pixel, p);
         }
         else
         {
-            var tileid = Vram[mapaddr] & 0xff;
-            ushort ta = (ushort)((tileid * 64 + (sy & 7) * 8 + (sx & 7)) & 0x3fff);
+            int tileid = vramVal & 0xff;
+            int ta = (tileid * 64 + ((sy & 7) * 8) + (sx & 7)) & 0x3fff;
             p = Vram[ta] >> 8;
-            return (((ushort)(Cram[p & 0xff] | 1)), pixel, p);
+            ushort cramVal = Cram[p & 0xff];
+            return ((cramVal | 1), pixel, p);
         }
     }
 
@@ -842,30 +865,42 @@ public class SnesPpu : EmuState
 
     private int GetPixel(int ta, int fx, int bpp)
     {
+        int idx0 = ta & 0x7fff;
         switch (bpp)
         {
             case 2:
             {
-                var b0 = Vram[ta & 0x7fff];
-                return ((byte)b0 >> fx & 1) | (b0 >> 8 >> fx & 1) * 2;
+                ushort b0 = Vram[idx0];
+                int bit0 = (b0 >> fx) & 1;
+                int bit1 = (b0 >> (8 + fx)) & 1;
+                return bit0 | (bit1 << 1);
             }
             case 4:
             {
-                var b0 = Vram[ta & 0x7fff];
-                var b1 = Vram[ta + 8 & 0x7fff];
-                return ((byte)b0 >> fx & 1) | (b0 >> 8 >> fx & 1) * 2 |
-                       ((byte)b1 >> fx & 1) * 4 | (b1 >> 8 >> fx & 1) * 8;
+                ushort b0 = Vram[idx0];
+                ushort b1 = Vram[(ta + 8) & 0x7fff];
+                int bit0 = (b0 >> fx) & 1;
+                int bit1 = (b0 >> (8 + fx)) & 1;
+                int bit2 = (b1 >> fx) & 1;
+                int bit3 = (b1 >> (8 + fx)) & 1;
+                return bit0 | (bit1 << 1) | (bit2 << 2) | (bit3 << 3);
             }
             case 8:
             {
-                var b0 = Vram[ta & 0x7fff];
-                var b1 = Vram[ta + 0x08 & 0x7fff];
-                var b2 = Vram[ta + 0x10 & 0x7fff];
-                var b3 = Vram[ta + 0x18 & 0x7fff];
-                return ((byte)b0 >> fx & 1) | (b0 >> 8 >> fx & 1) * 2 |
-                       ((byte)b1 >> fx & 1) * 4 | (b1 >> 8 >> fx & 1) * 8 |
-                       ((byte)b2 >> fx & 1) * 16 | (b2 >> 8 >> fx & 1) * 32 |
-                       ((byte)b3 >> fx & 1) * 64 | (b3 >> 8 >> fx & 1) * 128;
+                ushort b0 = Vram[idx0];
+                ushort b1 = Vram[(ta + 0x08) & 0x7fff];
+                ushort b2 = Vram[(ta + 0x10) & 0x7fff];
+                ushort b3 = Vram[(ta + 0x18) & 0x7fff];
+                int bit0 = (b0 >> fx) & 1;
+                int bit1 = (b0 >> (8 + fx)) & 1;
+                int bit2 = (b1 >> fx) & 1;
+                int bit3 = (b1 >> (8 + fx)) & 1;
+                int bit4 = (b2 >> fx) & 1;
+                int bit5 = (b2 >> (8 + fx)) & 1;
+                int bit6 = (b3 >> fx) & 1;
+                int bit7 = (b3 >> (8 + fx)) & 1;
+                return bit0 | (bit1 << 1) | (bit2 << 2) | (bit3 << 3)
+                     | (bit4 << 4) | (bit5 << 5) | (bit6 << 6) | (bit7 << 7);
             }
         }
         return 0;
@@ -894,7 +929,6 @@ public class SnesPpu : EmuState
                 if (OamAddr < 0x200 && (OamAddr & 1) == 1)
                 {
                     v = Oam[OamAddr];
-                    //break;
                 }
                 else if (OamAddr > 0x1ff)
                     v = Oam[OamAddr % Oam.Length];

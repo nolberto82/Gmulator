@@ -69,15 +69,13 @@ public class Snes : Emulator
 #if DEBUG || DECKDEBUG || RELEASE
                     if (Debug)
                     {
-                        switch (DebugStep(pc))
-                        {
-                            case 1: return;
-                            case 2: continue;
-                        }
+                        int stepResult = DebugStep(pc);
+                        if (stepResult == 1) return;
+                        if (stepResult == 2) continue;
                     }
 #endif
 
-                    LuaApi?.OnExec(Cpu.PB << 16 | Cpu.PC);
+                    LuaApi?.OnExec(pc);
                     Cpu.Step();
 
                     if (State == StepMain)
@@ -85,15 +83,22 @@ public class Snes : Emulator
                 }
                 Ppu.FrameReady = false;
             }
+            ApplyRawCheats();
 
-            AudioSamples.AddRange(Dsp.GetSamples());
-            if (AudioSamples.Count >= SnesMaxSamples)
+            float[] dspSamples = Dsp.GetSamples();
+            int totalSamples = AudioSamples.Count + dspSamples.Length;
+            if (totalSamples >= SnesMaxSamples)
             {
-                Audio.Update(AudioSamples.ToArray());
+                float[] outputSamples = new float[totalSamples];
+                AudioSamples.CopyTo(outputSamples, 0);
+                Array.Copy(dspSamples, 0, outputSamples, AudioSamples.Count, dspSamples.Length);
+                Audio.Update(outputSamples);
                 AudioSamples.Clear();
             }
-
-            ApplyRawCheats();
+            else
+            {
+                AudioSamples.AddRange(dspSamples);
+            }
         }
     }
 
@@ -565,7 +570,7 @@ public class Snes : Emulator
                           where c.Value.Enabled && c.Value.Type == ProAction
                           select c)
         {
-            Ram[c.Value.Address & 0xffff] = c.Value.Value;
+            Ram[c.Value.Address & 0x1ffff] = c.Value.Value;
         }
     }
 }

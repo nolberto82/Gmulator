@@ -99,13 +99,13 @@ public class Cheat
             }
             case SnesConsole:
             {
-                if (c.StartsWith("7E") || c.StartsWith("7F"))
+                if (c.Length == 9 && c.ToLowerInvariant().StartsWith("7e") || c.ToLowerInvariant().StartsWith("7f"))
                 {
                     var addr = Convert.ToInt32(c[..6], 16);
                     var val = Convert.ToByte(c.Substring(7, 2), 16);
                     return (addr, 0, val, ProAction, SnesConsole);
                 }
-                else if (c.Contains(':'))
+                else if (c.Length == 9 && c.Contains(':'))
                 {
                     var addr = Convert.ToInt32(c[..6], 16);
                     var val = Convert.ToByte(c.Substring(7, 2), 16);
@@ -187,7 +187,7 @@ public class Cheat
                 foreach (var r in rawcodes)
                 {
                     if (!Emu.Cheats.ContainsKey(r.Address))
-                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address,r.Value, r.Compare, r.Type, true, cht.Codes));
+                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Value, r.Compare, r.Type, true, cht.Codes));
                 }
             }
         }
