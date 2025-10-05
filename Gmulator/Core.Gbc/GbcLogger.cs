@@ -1,32 +1,30 @@
 ﻿using static Gmulator.Core.Gbc.GbcCpu;
 
 namespace Gmulator.Core.Gbc;
-public class GbcLogger
+public class GbcLogger(GbcCpu cpu)
 {
     public StreamWriter Outfile { get; private set; }
     public bool Logging { get; private set; }
 
-    public delegate byte Read(int a);
+    public delegate int Read(int a);
     public event Read ReadByte;
     public Func<Dictionary<string, bool>> GetFlags;
 
-    public delegate Dictionary<string, byte> GetRegs();
+    public delegate Dictionary<string, int> GetRegs();
     public event GetRegs OnGetRegs;
 
-    public GbcLogger()
-    {
-    }
+    private readonly GbcCpu Cpu = cpu;
 
-    public void LogToFile(ushort pc)
+    public void Log(int pc)
     {
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            bool gamedoctor = false;
-            DisasmEntry e = Disassemble(0, pc, true);
-            if (gamedoctor)
-                Outfile.WriteLine($"{e.regtext}");
-            else
-                Outfile.WriteLine($"{e.pc:X4}  {e.disasm,-26} {e.regtext.ToUpper()}");
+            //bool gamedoctor = false;
+            var (disasm, _, _) = Disassemble(pc, true);
+            //if (gamedoctor)
+            //    Outfile.WriteLine($"{regtext}");
+            //else
+            Outfile.WriteLine($"{pc:X4}  {disasm,-26}");
         }
     }
 
@@ -45,17 +43,17 @@ public class GbcLogger
         Outfile?.Close();
     }
 
-    public DisasmEntry Disassemble(int bank, int pc, bool get_registers, bool gamedoctor = false)
+    public (string, int, int) Disassemble(int pc, bool get_registers, bool gamedoctor = false)
     {
         string data = string.Empty;
         string bytes = string.Empty;
         string regtext = string.Empty;
-        byte b1 = ReadByte(pc + 1);
-        byte b2 = ReadByte(pc + 2);
-        byte b3 = ReadByte(pc + 3);
+        int b1 = ReadByte(pc + 1);
+        int b2 = ReadByte(pc + 2);
+        int b3 = ReadByte(pc + 3);
 
         Opcode d;
-        byte op = ReadByte(pc);
+        int op = ReadByte(pc);
         if (op == 0xcb)
             d = OpInfoCB[ReadByte(pc + 1)];
         else
@@ -182,6 +180,6 @@ public class GbcLogger
             }
         }
         data = $"{bytes,-8} {data}";
-        return new(pc, data, d.Name, d.Oper, regtext, d.Size, bytes);
+        return (data, op, d.Size);
     }
 }

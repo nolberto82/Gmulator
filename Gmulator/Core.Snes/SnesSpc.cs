@@ -9,26 +9,26 @@ public partial class SnesSpc : EmuState
     private const int FP = 1 << 5;
     private const int FV = 1 << 6;
     private const int FN = 1 << 7;
-    private int pc;
-    private byte sp, a, x, y, p;
+    private int pc, sp, a, x, y, p;
     private bool[] flags;
 
-    public int PC { get => (ushort)pc; set => pc = (ushort)value; }
-    public int SP { get => (byte)sp; set => sp = (byte)value; }
-    public int A { get => (byte)a; set => a = (byte)value; }
-    public int X { get => (byte)x; set => x = (byte)value; }
-    public int Y { get => (byte)y; set => y = (byte)value; }
-    public int PS { get => (byte)p; set => p = (byte)value; }
+    public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
+    public int SP { get => sp; set => sp = value & 0xff; }
+    public int A { get => a & 0xff; set => a = value & 0xff; }
+    public int X { get => x & 0xff; set => x = value & 0xff; }
+    public int Y { get => y & 0xff; set => y = value & 0xff; }
+    public int PS { get => p & 0xff; set => p = value & 0xff; }
 
     public bool[] Flags { get => flags; set => flags = value; }
-    public byte CF { get => (byte)(p & FC); set => p = (byte)((p & 0xfe) | value); }
-    public byte HF { get => (byte)(p & FH); }
+    public int CF { get => (p & FC) & 0xff; set => p = ((p & 0xfe) | value) & 0xff; }
+    public int HF { get => (p & FH) & 0xff; }
 
     public int StepOverAddr { get; set; }
     public int TestAddr { get; set; }
     public bool Stepped { get; set; }
 
     private Snes Snes;
+    private SnesApu Apu;
 
     public SnesSpc()
     {
@@ -37,31 +37,43 @@ public partial class SnesSpc : EmuState
         StepOverAddr = -1;
     }
 
-    public void SetSnes(Snes snes) => Snes = snes;
+    public void SetSnes(Snes snes, SnesApu apu)
+    {
+        Snes = snes;
+        Apu = apu;
+    }
 
-    public ushort GetPage() => (ushort)(((PS & FP) > 0 ? 0x100 : 0));
+    public ushort GetPage() => (ushort)(((PS & FP) != 0 ? 0x100 : 0));
 
-    private void Idle() => Snes.Apu.Idle();
+    private void Idle() => Apu.Idle();
 
     public byte ReadOp(bool debug = false)
     {
         if (!debug)
-            Snes.Apu.Cycle();
+            Apu.Cycle();
 
         pc = (pc + 1) & 0xffff;
         return Read(pc - 1);
     }
 
-    public byte Read(int a, bool debug = false) => Snes.Apu.Read(a, debug);
+    public byte Read(int a, bool debug = false) => Apu.Read(a, debug);
 
-    public void Write(int a, int v, bool debug = false) => Snes.Apu.Write(a, v);
+    public void Write(int a, int v, bool debug = false) => Apu.Write(a, v);
 
-    private ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
+    private int ReadWord(int a) => (Read(a) | Read(a + 1) << 8) & 0xffff;
 
     public void Step(bool debug = false)
     {
+#if DEBUG
+        if (PC == 0x316)
+        {
+            var a = (Read(0x100 + SP + 1) | Read(0x100 + SP + 2) << 8);
+            if (a > 0)
+                TestAddr = a;
+        }
+#endif
+
         int a1, a2;
-        var Apu = Snes.Apu;
         byte op = Read(PC++);
         switch (op)
         {
@@ -344,40 +356,36 @@ public partial class SnesSpc : EmuState
 
     public sbyte Rel() => (sbyte)ReadOp();
 
-    public ushort Dir() => (ushort)(ReadOp() | GetPage());
+    public int Dir() => (ReadOp() | GetPage()) & 0xffff;
 
-    public ushort DirX() => (ushort)(ReadOp() + x | GetPage());
-
-    public ushort DirY() => (ushort)(ReadOp() + y | GetPage());
-
-    public ushort DirIdX()
+    public int DirIdX()
     {
         var v = (ReadOp() + x & 0xff) | GetPage();
         Idle();
-        return (ushort)(v);
+        return v & 0xffff;
     }
 
-    public ushort DirIdY()
+    public int DirIdY()
     {
         var v = (ReadOp() + y & 0xff) | GetPage();
         Idle();
-        return (ushort)(v);
+        return v & 0xffff;
     }
 
-    public ushort DirIdXInd()
+    public int DirIdXInd()
     {
         var v = ReadOp() | GetPage();
         Idle();
         int a = Read((v + x & 0xff));
         a |= (Read(v + x + 1 & 0xff) << 8);
-        return (ushort)(a);
+        return a & 0xffff;
     }
 
-    public ushort DirIndY()
+    public int DirIndY()
     {
         var v = ReadOp() | GetPage();
         v = Read(v) | (Read(v + 1) << 8);
-        return (ushort)(v + y);
+        return (v + y) & 0xffff;
     }
 
     public (int, int) IndXY()
@@ -388,72 +396,72 @@ public partial class SnesSpc : EmuState
         return (a1, a2);
     }
 
-    public (byte, ushort) DirImm()
+    public (int, int) DirImm()
     {
-        var a1 = ReadOp();
-        ushort a2 = (ushort)(ReadOp() | GetPage());
-        return (a1, a2);
+        int a1 = ReadOp();
+        int a2 = (ReadOp() | GetPage()) & 0xffff;
+        return (a1 & 0xff, a2 & 0xffff);
     }
 
-    public (byte, ushort) DirDir()
+    public (int, int) DirDir()
     {
         var a1 = Read(ReadOp() | GetPage());
-        ushort a2 = (ushort)(ReadOp() | GetPage());
-        return (a1, a2);
+        int a2 = (ReadOp() | GetPage()) & 0xffff;
+        return (a1 & 0xff, a2 & 0xffff);
     }
 
-    public ushort Abs()
+    public int Abs()
     {
         int v = ReadOp();
         v |= ReadOp() << 8;
-        return (ushort)v;
+        return v & 0xffff;
     }
 
-    public ushort AbsX()
+    public int AbsX()
     {
         int v = ReadOp();
         v |= ReadOp() << 8;
-        return (ushort)(v + x);
+        return (v + x) & 0xffff;
     }
 
-    public ushort AbsIndX()
+    public int AbsIndX()
     {
         var (a1, a2) = (ReadOp(), ReadOp());
         var b = a1 | a2 << 8;
         Idle();
         var v = Read(b + x) | Read(b + x + 1 & 0xffff) << 8;
-        return (ushort)(v);
+        return v & 0xffff;
     }
 
-    public ushort AbsY()
+    public int AbsY()
     {
         int v = ReadOp();
         v |= ReadOp() << 8;
-        return (ushort)(v + y);
+        return (v + y) & 0xffff;
     }
 
     public (int, int) Mbit()
     {
-        var l = ReadOp();
-        var h = ReadOp();
-        var a1 = l | h << 8;
-        var a2 = a1 >> 13;
+        int low = ReadOp();
+        int high = ReadOp();
+        int a1 = high << 8 | low;
+        int a2 = a1 >> 13;
         return (a1 & 0x1fff, a2);
     }
 
     public (int, int) DirBit(int op = -1)
     {
-        var l = ReadOp();
-        var h = ReadOp();
-        var v = (ushort)((byte)(l + (op == -1 ? 0 : x)) + GetPage());
-        var a1 = Read(v);
+        int low = ReadOp();
+        int high = ReadOp();
+        int v = (low + (op == -1 ? 0 : x) & 0xff) + GetPage();
+        int a1 = Read(v & 0xffff);
         Idle();
-        return (a1, h);
+        return (a1, high);
     }
 
     private byte Pop() => Read(++SP | 0x100);
 
-    private void Push(byte v) => Write(0x100 | SP--, v);
+    private void Push(int v) => Write(0x100 | SP--, v);
 
     private void SetC(bool v)
     {
@@ -475,15 +483,15 @@ public partial class SnesSpc : EmuState
 
     private void SetZN(int v)
     {
-        if ((byte)v == 0) PS |= FZ;
+        if ((v & 0xff) == 0) PS |= FZ;
         else PS &= ~FZ;
-        if ((v & FN) == 0x80) PS |= FN;
+        if ((v & FN) != 0) PS |= FN;
         else PS &= ~FN;
     }
 
     private void SetZN_W(int v)
     {
-        if ((ushort)v == 0) PS |= FZ;
+        if ((v & 0xffff) == 0) PS |= FZ;
         else PS &= ~FZ;
         if ((v & 0x8000) == 0x8000) PS |= FN;
         else PS &= ~FN;
@@ -512,14 +520,14 @@ public partial class SnesSpc : EmuState
 
     public Dictionary<string, bool> GetFlags() => new()
     {
-        ["C"] = PS.GetBit(0),
-        ["Z"] = PS.GetBit(1),
-        ["I"] = PS.GetBit(2),
-        ["H"] = PS.GetBit(3),
-        ["B"] = PS.GetBit(4),
-        ["P"] = PS.GetBit(5),
-        ["V"] = PS.GetBit(6),
-        ["N"] = PS.GetBit(7),
+        ["C"] = (PS & 0x01) != 0,
+        ["Z"] = (PS & 0x02) != 0,
+        ["I"] = (PS & 0x04) != 0,
+        ["H"] = (PS & 0x08) != 0,
+        ["B"] = (PS & 0x10) != 0,
+        ["P"] = (PS & 0x20) != 0,
+        ["V"] = (PS & 0x40) != 0,
+        ["N"] = (PS & 0x80) != 0,
     };
 
     public Dictionary<string, string> GetRegs() => new()

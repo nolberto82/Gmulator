@@ -3,23 +3,23 @@
 namespace Gmulator.Core.Nes.Sound;
 public class Square1 : BaseChannel
 {
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         if (a == 0x4000)
         {
             EnvVolume = v & 0x0f;
-            ConstVolumeFlag = v.GetBit(4);
-            EnvLoop = v.GetBit(5);
-            LengthEnabled = !v.GetBit(5);
+            ConstVolumeFlag = (v & 0x10) != 0;
+            EnvLoop = (v & 0x20) != 0;
+            LengthEnabled = !((v & 0x20) != 0);
             Duty = (v & 0xc0) >> 6;
             EnvStart = true;
         }
         else if (a == 0x4001)
         {
             SweepShift = v & 0x07;
-            SweepNegate = v.GetBit(3);
+            SweepNegate = (v & 0x08) != 0;
             SweepPeriod = ((v & 0x70) >> 4) + 1;
-            SweepEnabled = v.GetBit(7) && SweepShift > 0;
+            SweepEnabled = (v & 0x80) != 0 && SweepShift > 0;
             SweepReload = true;
         }
         else if (a == 0x4002)

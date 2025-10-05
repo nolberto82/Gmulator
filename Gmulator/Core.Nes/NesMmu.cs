@@ -9,7 +9,6 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
     private NesJoypad Joypad2;
 
     public byte[] Ram { get; private set; } = new byte[0x10000];
-    public byte[] Sram { get; private set; } = new byte[0x2000];
     public byte[] Vram { get; private set; } = new byte[0x4000];
     public byte[] Oram { get; private set; } = new byte[0x100];
 
@@ -19,18 +18,18 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
     public string RomName { get; internal set; }
     public Dictionary<int, Cheat> Cheats { get; private set; } = cheats;
 
-    public Func<byte> StatusR;
-    public Func<byte> DataR;
-    public Action<byte> ControlW;
-    public Action<byte> MaskW;
-    public Action<byte> OamAddressW;
-    public Action<byte> OamDataW;
-    public Action<byte> ScrollW;
-    public Action<byte> AddressDataW;
-    public Action<byte> DataW;
-    public Action<byte> OamDamyCopy;
-    public Func<int, byte> ApuRead;
-    public Action<int, byte> ApuWrite;
+    public Func<int> StatusR;
+    public Func<int> DataR;
+    public Action<int> ControlW;
+    public Action<int> MaskW;
+    public Action<int> OamAddressW;
+    public Action<int> OamDataW;
+    public Action<int> ScrollW;
+    public Action<int> AddressDataW;
+    public Action<int> DataW;
+    public Action<int> OamDamyCopy;
+    public Func<int, int> ApuRead;
+    public Action<int, int> ApuWrite;
 
     public void Init(NesJoypad joy1, NesJoypad joy2)
     {
@@ -69,9 +68,9 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
     public byte[] ReadPrg() => Mapper.Prg;
     public byte[] ReadChr() => Mapper.Chr;
 
-    public byte Read(int a)
+    public int Read(int a)
     {
-        byte v = 0;
+        int v = 0;
         if (a < 0x2000)
             v = Ram[a & 0x7ff];
         else if (a >= 0x2000 && a <= 0x3fff)
@@ -89,15 +88,15 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
             v = 0;
         else if (a <= 0x5fff)
             v = 0xff;
-        else if (a <= 0x7fff && Mapper.Sram)
-            v = Sram[a - 0x6000];
+        else if (a <= 0x7fff && Mapper.SramEnabled)
+            v = Mapper.ReadSram(a);
         else if (a >= 0x8000)
             v = Mapper.ReadPrg(a);
         else
             v = Ram[a & 0x7ff];
 
-        ApplyGameGenieCheats(a, v);
-        return v;
+        ApplyGameGenieCheats(a, (byte)v);
+        return v & 0xff;
     }
 
     public void Write(int a, int val)
@@ -139,8 +138,11 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
 
         else if (a <= 0x5fff)
             Mapper.Write(a, v);
-        else if (a <= 0x7fff && Mapper.Sram)
-            Ram[a] = Sram[a - 0x6000] = v;
+        else if (a <= 0x7fff && Mapper.SramEnabled)
+        {
+            Ram[a] = v;
+            Mapper.WriteSram(a, v);
+        }
         else if (a >= 0x8000)
             Mapper.Write(a, v);
     }
@@ -187,9 +189,9 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
             var b6 = reader.Read();
             var b7 = reader.Read();
             Header.MapperId = (b6 & 0xf0) >> 4 | (b7 & 0xf0);
-            Header.Mirror = b6.GetBit(0) ? Vertical : Horizontal;
-            header.Battery = b6.GetBit(1);
-            header.Trainer = b6.GetBit(2);
+            Header.Mirror = (b6 & 0x01) != 0 ? Vertical : Horizontal;
+            header.Battery = (b6 & 0x02) != 0;
+            header.Trainer = (b6 & 0x04) != 0;
             reader.BaseStream.Seek(9, SeekOrigin.Begin);
             var b9 = reader.Read() & 1;
             reader.BaseStream.Seek(12, SeekOrigin.Begin);
@@ -232,31 +234,22 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
 
     public void LoadRam()
     {
-        if (Mapper != null && Mapper.Sram)
+        if (Mapper != null && Mapper.SramEnabled)
         {
+            Mapper.Sram = new byte[0x2000];
             var name = $"{Environment.CurrentDirectory}\\{SaveDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Name)}.sav";
             if (File.Exists(name))
             {
                 var v = File.ReadAllBytes($"{name}");
-                v.CopyTo(Sram, 0x0000);
+                v.CopyTo(Mapper.Sram, 0x0000);
             }
-        }
-    }
-
-    public void SaveRam()
-    {
-        if (Mapper != null && Mapper.Sram)
-        {
-            var name = Path.GetFullPath($"{SaveDirectory}/{Path.GetFileNameWithoutExtension(Mapper.Name)}.sav");
-            if (Directory.Exists(SaveDirectory))
-                File.WriteAllBytes($"{name}", [.. Sram]);
         }
     }
 
     public override void Save(BinaryWriter bw)
     {
         bw.Write(Vram);
-        bw.Write(Sram);
+        bw.Write(Mapper.Sram);
         bw.Write(Oram);
         bw.Write(Ram);
     }
@@ -264,7 +257,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
     public override void Load(BinaryReader br)
     {
         br.ReadBytes(Vram.Length).CopyTo(Vram, 0x0000);
-        br.ReadBytes(Sram.Length).CopyTo(Sram, 0x0000);
+        br.ReadBytes(Mapper.Sram.Length).CopyTo(Mapper.Sram, 0x0000);
         br.ReadBytes(Oram.Length).CopyTo(Oram, 0x0000);
         br.ReadBytes(Ram.Length).CopyTo(Ram, 0x0000);
     }

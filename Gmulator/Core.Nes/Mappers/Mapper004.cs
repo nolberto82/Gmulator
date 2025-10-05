@@ -92,20 +92,20 @@ internal class Mapper004 : BaseMapper
                                 Chr[2] = (byte)(v & 0xfe);
                                 Chr[3] = (byte)(Chr[2] + 1);
                                 break;
-                            case 2: Chr[4] = (byte)v; break;
-                            case 3: Chr[5] = (byte)v; break;
-                            case 4: Chr[6] = (byte)v; break;
-                            case 5: Chr[7] = (byte)v; break;
+                            case 2: Chr[4] = v; break;
+                            case 3: Chr[5] = v; break;
+                            case 4: Chr[6] = v; break;
+                            case 5: Chr[7] = v; break;
                         }
                     }
                     else
                     {
                         switch (BankReg & 7)
                         {
-                            case 2: Chr[0] = (byte)v; break;
-                            case 3: Chr[1] = (byte)v; break;
-                            case 4: Chr[2] = (byte)v; break;
-                            case 5: Chr[3] = (byte)v; break;
+                            case 2: Chr[0] = v; break;
+                            case 3: Chr[1] = v; break;
+                            case 4: Chr[2] = v; break;
+                            case 5: Chr[3] = v; break;
                             case 0:
                                 Chr[4] = (byte)(v & 0xfe);
                                 Chr[5] = (byte)(Chr[4] + 1);
@@ -126,7 +126,7 @@ internal class Mapper004 : BaseMapper
             else
             {
                 WriteProtect = (v >> 6) & 1;
-                Sram = v.GetBit(7);
+                SramEnabled = (v & 0x80) != 0;
             }
         }
         else if (a <= 0xdfff)

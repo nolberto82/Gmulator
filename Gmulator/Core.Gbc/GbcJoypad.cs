@@ -11,7 +11,7 @@ public class GbcJoypad
         set
         {
             status = 0xef;
-            if (!value.GetBit(4))
+            if ((value & 0x10) == 0)
             {
                 if (buttons[4])
                     status ^= 0x01;
@@ -22,7 +22,7 @@ public class GbcJoypad
                 if (buttons[7])
                     status ^= 0x08;
             }
-            else if (!value.GetBit(5))
+            else if ((value & 0x20) == 0)
             {
                 if (buttons[0])
                     status ^= 0x01;

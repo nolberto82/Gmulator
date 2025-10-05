@@ -11,19 +11,29 @@ namespace Gmulator.Core.Snes;
 public class SnesApu : EmuState
 {
     public Timer[] Timers = new Timer[3];
-    public ulong Cycles { get; private set; }
-    public byte[] SpcIO { get; set; }
-    public byte[] CpuIO { get; private set; }
-    public int[] TimerOut { get; private set; }
-    public byte[] Ram { get; private set; }
-    public bool WriteEnabled { get; private set; } = true;
-    public bool ReadEnabled { get; private set; }
-    public bool IplEnabled { get; private set; } = true;
-    public int DspAddr { get; private set; }
+    private ulong Cycles;
+    private byte[] SpcIO;
+    private byte[] CpuIO;
+    private int[] TimerOut;
+    public byte[] Ram { get => ram; private set => ram = value; }
+    public bool WriteEnabled;
+    private bool ReadEnabled;
+    private bool IplEnabled;
+    private int DspAddr;
+    private byte[] ram;
 
     public const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
 
-    public Snes Snes { get; private set; }
+    private Snes Snes;
+    private SnesSpc Spc;
+    private SnesDsp Dsp;
+    private SnesPpu Ppu;
+    private SnesSpcLogger Logger;
+
+    private SortedDictionary<int, Breakpoint> Breakpoints;
+    private Action<DebugState> SetState;
+    private Func<int, bool> ExecuteCheck;
+    private Func<int, int, RamType, bool, bool> AccessCheckSpc;
 
     public SnesApu()
     {
@@ -33,42 +43,58 @@ public class SnesApu : EmuState
         CpuIO = new byte[4];
     }
 
-    public void SetSnes(Snes snes) => Snes = snes;
+    public void SetSnes(Snes snes, SnesCpu cpu, SnesPpu ppu, SnesSpc spc, SnesDsp dsp, SnesSpcLogger spclogger)
+    {
+        Snes = snes;
+        Ppu = ppu;
+        Spc = spc;
+        Dsp = dsp;
+        Logger = spclogger;
+        Breakpoints = snes.Breakpoints;
+        SetState = snes.SetState;
+        if (snes.DebugWindow != null)
+        {
+            ExecuteCheck = snes.DebugWindow.ExecuteCheck;
+            AccessCheckSpc = snes.DebugWindow.AccessCheckSpc;
+        }
+    }
 
     public void Step()
     {
-        var Spc = Snes.Spc;
-        var syncto = (ulong)(Snes.Ppu.Cycles * apuCyclesPerMaster);
+        var syncto = (ulong)(Ppu.Cycles * apuCyclesPerMaster);
         while (Cycles < syncto)
         {
+#if !DECKRELEASE
             if (Snes.Debug)
             {
-                if (Snes.SpcLogger.Logging)
-                    Snes.SpcLogger.Log(Snes.Spc.PC);
+                DebugState state = Snes.State;
+                if (Logger.Logging)
+                    Logger.Log(Spc.PC);
 
-                if (Snes.DebugWindow.Breakpoints.Count > 0 && Snes.State == Running)
+                if (Breakpoints.Count > 0 && state == DebugState.Running)
                 {
-                    if (Snes.DebugWindow.ExecuteCheck(Snes.Spc.PC))
+                    if (ExecuteCheck(Spc.PC))
                     {
-                        Snes.State = Break;
+                        SetState(DebugState.Break);
                         return;
                     }
                 }
 
-                if (Snes.State == Break || Snes.State == StepSpc)
+                if (state == DebugState.Break || state == DebugState.StepSpc)
                 {
-                    Snes.State = Break;
+                    SetState(DebugState.Break);
                     return;
                 }
             }
-            Snes.Spc.Step();
+#endif
+            Spc.Step();
         }
     }
 
     public void Cycle()
     {
         if ((Cycles & 0x1f) == 0)
-            Snes.Dsp.Cycle();
+            Dsp.Cycle();
 
         // handle timers
         for (int i = 0; i < 3; i++)
@@ -92,28 +118,27 @@ public class SnesApu : EmuState
         Cycles++;
     }
 
-    public void Idle() => Snes.Apu.Cycle();
+    public void Idle() => Cycle();
 
     public byte Read(int a, bool debug = false)
     {
         a &= 0xffff;
-        if (!debug)
-        {
-            Snes.Apu.Cycle();
-            if (Snes.DebugWindow.AccessCheckSpc(a, -1, RamType.SpcRam, false))
-                Snes.State = Break;
-        }
+        Cycle();
+#if DEBUG || RELEASE
+        if (debug && AccessCheckSpc(a, -1, RamType.SpcRam, false))
+            SetState(DebugState.Break);
+#endif
 
         switch (a)
         {
             case 0xf0 or 0xf1 or 0xfa or 0xfb or 0xfc:
                 return 0x00;
             case 0xf2: return (byte)DspAddr;
-            case 0xf3: return Snes.Dsp.Read(DspAddr & 0x7f);
+            case 0xf3: return Dsp.Read(DspAddr & 0x7f);
             case >= 0xf4 and <= 0xf7:
-                return (byte)CpuIO[(byte)a - 0xf4];
+                return CpuIO[(byte)a - 0xf4];
             case >= 0xfd and <= 0xff:
-                var v = (byte)(Timers[a - 0xfd].Counter);
+                var v = Timers[a - 0xfd].Counter;
                 Timers[a - 0xfd].Counter = 0;
                 return v;
             case >= 0xffc0:
@@ -121,15 +146,18 @@ public class SnesApu : EmuState
                     return IplBootrom[a & 0x3f];
                 break;
         }
-        return Ram[a];
+        return ram[a];
     }
 
-    public void Write(int a, int v, bool debug = false)
+    public void Write(int addr, int value, bool debug = false)
     {
-        a &= 0xffff;
+        int a = addr & 0xffff;
+        byte v = (byte)value;
 
-        if (Snes.DebugWindow.AccessCheckSpc(a, v, RamType.SpcRam, true))
-            Snes.State = Break;
+#if DEBUG || RELEASE
+        if (debug && AccessCheckSpc(a, v, RamType.SpcRam, true))
+            SetState(DebugState.Break);
+#endif
 
         switch (a)
         {
@@ -138,7 +166,7 @@ public class SnesApu : EmuState
             case 0xf1:
                 for (int i = 0; i < Timers.Length; i++)
                 {
-                    bool b = v.GetBit(i);
+                    bool b = (v & (1 << i)) != 0;
                     if (!Timers[i].Enabled && b)
                     {
                         Timers[i].Divider = 0;
@@ -147,43 +175,43 @@ public class SnesApu : EmuState
                     Timers[i].Enabled = b;
                 }
 
-                if (v.GetBit(4))
+                if ((v & 0x10) != 0)
                 {
                     CpuIO[0] = 0;
                     CpuIO[1] = 0;
                 }
 
-                if (v.GetBit(5))
+                if ((v & 0x20) != 0)
                 {
                     CpuIO[2] = 0;
                     CpuIO[3] = 0;
                 }
-                IplEnabled = v.GetBit(7);
+                IplEnabled = (v & 0x80) != 0;
                 return;
             case 0xf2:
                 DspAddr = v;
                 return;
             case 0xf3:
                 if (DspAddr < 0x80)
-                    Snes.Dsp.Write(DspAddr, (byte)v);
+                    Dsp.Write(DspAddr, v);
                 return;
             case >= 0xf4 and <= 0xf7:
-                SpcIO[a - 0xf4] = (byte)v;
+                SpcIO[a - 0xf4] = v;
                 return;
             case 0xf8 or 0xf9:
-                Timers[0].Target = (byte)v;
+                Timers[0].Target = v;
                 return;
             case >= 0xfa and <= 0xfc:
-                Timers[(a - 0xfa) & 3].Target = (byte)v;
+                Timers[(a - 0xfa) & 3].Target = v;
                 return;
             case >= 0xfd and <= 0xff:
                 return;
         }
 
-        Ram[a] = (byte)v;
+        ram[a] = v;
     }
 
-    public byte ReadFromSpu(int a) => (byte)SpcIO[a & 3];
+    public byte ReadFromSpu(int a) => SpcIO[a & 3];
 
     public void WriteToSpu(int a, int v) => CpuIO[a] = (byte)v;
 

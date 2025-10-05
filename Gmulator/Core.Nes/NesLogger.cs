@@ -9,7 +9,7 @@ public class NesLogger(NesCpu cpu)
     private readonly NesCpu Cpu = cpu;
     public NesPpu Ppu;
 
-    public Func<int, byte> ReadByte;
+    public Func<int, int> ReadByte;
 
     public void Reset() => Logging = false;
     public void Toggle(bool log = true)
@@ -34,15 +34,15 @@ public class NesLogger(NesCpu cpu)
             outFile?.Close();
     }
 
-    public DisasmEntry Disassemble(int bank, int pc, bool get_registers, bool getbytes)
+    public (string, int, int) Disassemble(int pc, bool get_registers, bool getbytes)
     {
         if (pc + 2 >= 0x10000)
-            return new DisasmEntry(pc, "", "", "", "", 0);
+            return ("", 0, 1);
 
-        byte op = ReadByte(pc);
-        byte b0 = ReadByte(pc);
-        byte b1 = ReadByte(pc + 1);
-        byte b2 = ReadByte(pc + 2);
+        int op = ReadByte(pc);
+        int b0 = ReadByte(pc);
+        int b1 = ReadByte(pc + 1);
+        int b2 = ReadByte(pc + 2);
 
         string data = string.Empty;
         string regtext = string.Empty;
@@ -117,8 +117,8 @@ public class NesLogger(NesCpu cpu)
             }
             case INDX:
             {
-                byte lo = ReadByte(b1 + Cpu.X & 0xff);
-                byte hi = ReadByte(b1 + 1 + Cpu.X & 0xff);
+                int lo = ReadByte(b1 + Cpu.X & 0xff);
+                int hi = ReadByte(b1 + 1 + Cpu.X & 0xff);
                 ushort a = (ushort)(lo | hi << 8);
                 data = $"{b0:X2} {b1,-5:X2} {name} (${b1:X2},X) @ {b1 + Cpu.X & 0xff:X2} =" +
                     $" {a:X4}";// = {Mem.ReadDebug(a):X2}";
@@ -126,8 +126,8 @@ public class NesLogger(NesCpu cpu)
             }
             case INDY:
             {
-                byte lo = ReadByte(b1 & 0xff);
-                byte hi = ReadByte(b1 + 1 & 0xff);
+                int lo = ReadByte(b1 & 0xff);
+                int hi = ReadByte(b1 + 1 & 0xff);
                 ushort a = (ushort)(lo | hi << 8);
                 data = $"{b0:X2} {b1,-5:X2} {name} (${b1:X2}),Y [${(ushort)(a + Cpu.Y):X4}]";// [{a:X4}]";// [{(ushort)(a + Cpu.Y):X4}]";// =" +
                                                                                              //$" {Mem.ReadDebug((ushort)(a + Cpu.Y)):X2}";
@@ -163,24 +163,24 @@ public class NesLogger(NesCpu cpu)
             }
 
             regtext = $"A:{Cpu.A:X2} X:{Cpu.X:X2} Y:{Cpu.Y:X2}" +
-                $" S:{Cpu.SP:X2} P:{Cpu.Ps:X2} Cyc:{Ppu.Totalcycles} Scan:{Ppu.Scanline,-3}";
+                $" S:{Cpu.SP:X2} P:{Cpu.PS:X2} Cyc:{Ppu.Totalcycles} Scan:{Ppu.Scanline,-3}";
 
-            return new(pc, data, name, data, regtext, size, btext);
+            return (data, op, size);
         }
         else
-            return new(pc, data, name, data, regtext, size);
+            return (data, op, size);
     }
 
     internal void Log(ushort pc)
     {
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            bool gamedoctor = false;
-            DisasmEntry e = Disassemble(0, pc, true, false);
-            if (gamedoctor)
-                Outfile.WriteLine($"{e.regtext}");
-            else
-                Outfile.WriteLine($"{e.pc:X4}  {e.disasm,-26} {e.regtext.ToUpper()}");
+            //bool gamedoctor = false;
+            var (disasm, op, size) = Disassemble(pc, true, false);
+            //if (gamedoctor)
+            //    Outfile.WriteLine($"{regtext}");
+            //else
+            Outfile.WriteLine($"{pc:X4}  {disasm,-26}");
         }
     }
 

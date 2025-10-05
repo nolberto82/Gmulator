@@ -7,12 +7,12 @@ public class Triangle : BaseChannel
     public bool LinearReload { get; set; }
     public bool LinearControl { get; set; }
 
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         if (a == 0x4008)
         {
-            LinearControl = v.GetBit(7);
-            LengthEnabled = !v.GetBit(7);
+            LinearControl = (v & 0x80) != 0;
+            LengthEnabled = (v & 0x80) == 0;
             LinearLoad = v & 0x7f;
         }
         else if (a == 0x400a)

@@ -8,6 +8,7 @@ using NLua.Event;
 using NLua.Exceptions;
 using Raylib_cs;
 using System.Numerics;
+using System.Xml.Linq;
 using Color = Raylib_cs.Color;
 using Lua = NLua.Lua;
 using LuaFunction = NLua.LuaFunction;
@@ -31,11 +32,10 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     private string LuaFile = "";
     private float OldLeftThumbY;
     private bool FileChanged;
-    private int FuncIndex;
 
-    public Func<int, byte> Read;
+    public Func<int, int> Read;
     public Action<int, int> Write;
-    public Func<Dictionary<string, string>> GetRegister;
+    public Func<string, int> GetRegister;
     public Action<string, int> SetRegister;
 
     public void Init()
@@ -46,24 +46,19 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     }
 
     public void SetDebug(bool v) => Debug = v;
-    public byte ReadByte(int a) => Read(a);
-    public ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
+    public int ReadByte(int a) => Read(a);
+    public int ReadWord(int a) => (Read(a) | Read(a + 1) << 8);
     public void WriteByte(int a, int v) => Write(a, v);
     public void WriteWord(int a, int v)
     {
-        Write(a, (byte)v);
-        Write(a + 1, v >> 8);
+        Write(a, v & 0xff);
+        Write(a + 1, (v >> 8) & 0xff);
     }
 
     public int GetReg(string reg)
     {
         if (reg == null) return 0;
-        var regs = GetRegister();
-        reg = reg.ToUpperInvariant();
-        if (regs.ContainsKey(reg))
-            return Convert.ToInt32(regs[reg], 16);
-        else
-            return 0;
+        return GetRegister(reg);
     }
 
     public void SetReg(string reg, int v) => SetRegister(reg, v);
@@ -115,25 +110,12 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         EventCallbacks.Clear();
     }
 
-    public void InitMemCallbacks(Emulator emu)
+    public void InitMemCallbacks(Func<int, int> read, Action<int, int> write, Func<string, int> getreg, Action<string, int> setreg)
     {
-        switch (emu.Console)
-        {
-            case GbcConsole:
-                Read = emu.GetConsole<Gbc>().Mmu.Read;
-                Write = emu.GetConsole<Gbc>().Mmu.Write;
-                break;
-            case NesConsole:
-                Read = emu.GetConsole<Nes>().Mmu.Read;
-                Write = emu.GetConsole<Nes>().Mmu.Write;
-                break;
-            case SnesConsole:
-                Read = emu.GetConsole<Snes>().ReadMemory;
-                Write = emu.GetConsole<Snes>().WriteMemory;
-                GetRegister = emu.GetConsole<Snes>().Cpu.GetRegs;
-                SetRegister = emu.GetConsole<Snes>().Cpu.SetReg;
-                break;
-        }
+        Read = read;
+        Write = write;
+        GetRegister = getreg;
+        SetRegister = setreg;
     }
 
     private void OnChanged(object sender, FileSystemEventArgs e)
@@ -221,7 +203,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         var h = Convert.ToInt32(args[3]);
         var bgcolor = args[5] == null || (bool)args[5] == false ? 0xff000000 : Convert.ToUInt32(args[4]);
 
-        Raylib.DrawRectangle(x, y, (int)(w * scale), (int)(h * scale), GetColor((uint)bgcolor));
+        Raylib.DrawRectangle(x, y, (int)(w * scale), (int)(h * scale), GetColor(bgcolor));
     }
 
     public void DrawImage(params object[] args)
@@ -266,7 +248,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         var width = Raylib.GetRenderWidth();
         var height = Raylib.GetRenderHeight();
         var scale = Math.Min((float)width / texture.Width, (float)height / texture.Height);
-        var left = 0;// (width - texture.Width * scale) / 2;
+        var left = (width - texture.Width * scale) / 2;
         var top = ((height - texture.Height * scale) / 2) + MenuHeight;
         var x = (int)(Convert.ToInt64(vx) * scale + left);
         var y = (int)(Convert.ToInt64(vy) * scale + top);
@@ -281,7 +263,7 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         }
     }
 
-    public static void LogLua(string message, params object[] args)
+    public static void LogLua(string message)
     {
         if (ImGui.Begin("Lua Debug"))
         {
@@ -352,6 +334,16 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
 
     public void Load(string filename)
     {
+        if (filename.Contains("alttpr - "))
+            filename = "alttpr";
+
+        filename = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(filename)}.lua";
+        if (!File.Exists(filename))
+        {
+            Lua.Close();
+            return;
+        }
+
         LuaFile = filename;
 
         Lua = new();
@@ -404,16 +396,8 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Lua.DoString(@"package.path = package.path ..';" + LuaCwd + "/?.lua'");
         try
         {
-            if (File.Exists(@$"{filename}"))
-            {
-                Lua.DoFile(@$"{filename}");
-                Notifications.Init("Lua File Loaded Successfully");
-            }
-            else
-            {
-                Lua.Close();
-                return;
-            }
+            Lua.DoFile(@$"{filename}");
+            Notifications.Init("Lua File Loaded Successfully");
         }
         catch (LuaScriptException e)
         {
@@ -432,21 +416,17 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         Error = "";
     }
 
-    public void Save(string name)
+    public void Save(string filename)
     {
+        if (filename.Contains("alttpr - "))
+            return;
+
         if (File.Exists(LuaFile))
         {
-            name = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
+            filename = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(filename)}.lua";
             var text = File.ReadAllText(LuaFile);
-            File.WriteAllText(name, text);
+            File.WriteAllText(filename, text);
         }
-    }
-
-    public void CheckLuaFile(string name)
-    {
-        name = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(name)}.lua";
-        if (File.Exists(name))
-            Load(name);
     }
 
     public static void LuaPrint(object text)

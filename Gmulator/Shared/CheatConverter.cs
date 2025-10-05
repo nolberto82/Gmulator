@@ -72,7 +72,7 @@ public class CheatConverter
                 foreach (var r in rawcodes)
                 {
                     if (!Cheats.ContainsKey(r.Address))
-                        Cheats.Add(r.Address, new(cheatname, r.Address,r.Value, r.Compare, r.Type, true, string.Join("", codes.ToArray())));
+                        Cheats.Add(r.Address, new(cheatname, r.Address, r.Value, r.Compare, r.Type, true, string.Join("", codes.ToArray())));
                 }
             }
         }
@@ -82,7 +82,7 @@ public class CheatConverter
     {
         if (Cheats == null || Cheats.Count == 0) return;
         var cheats = Cheats.Values.DistinctBy(c => c.Description).ToList();
-        var chtfile = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}_cheats.cht";
+        var chtfile = Path.GetFullPath(@$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}.cht");
         using var sw = new StreamWriter(new FileStream(chtfile, FileMode.OpenOrCreate, FileAccess.Write));
         sw.Write($"cheats = {cheats.Count}\n");
         sw.Write("\n");

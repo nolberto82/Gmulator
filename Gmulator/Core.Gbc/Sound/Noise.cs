@@ -46,8 +46,8 @@ public class Noise : BaseChannel
         }
         else if (a == 0x23)
         {
-            LengthEnabled = v.GetBit(6);
-            if (v.GetBit(7))
+            LengthEnabled = (v & 0x40) != 0;
+            if ((v & 0x80) != 0)
             {
                 Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
                 Trigger(64, 4);

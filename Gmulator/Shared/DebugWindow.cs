@@ -11,27 +11,31 @@ namespace Gmulator.Shared
         private string BpAddr = "";
         private string GotoAddr = "";
         private string BPCondition = "";
+        public string GameName { get; set; } = "";
         public int StepOverAddr = -1;
         public bool FollowPc { get; private set; } = true;
         public bool IsSpc { get; private set; }
         public bool? ShowSa1 { get; set; } = false;
-        public bool? ShowSpc { get; set; } = false;
+        public bool? ShowSpc { get; set; } = true;
         public bool[] BreakTypes { get; private set; } = [false, false, false];
         public Dictionary<string, Action<int>> ButtonNames { get; set; }
         public Dictionary<string, Action<bool>> ButtonNamesSa1 { get; set; }
         public List<MemRegion> MemRegions { get; set; } = [];
+        public string[] RamNames { get; set; }
         public int AsmOffset { get; private set; }
-        public List<int> JumpAddr { get; set; } = [];
-        public List<int> ScrollY { get; set; } = [];
+        public int[] JumpAddr { get; set; }
+        public int[] ScrollY { get; set; }
         public SortedDictionary<int, Breakpoint> Breakpoints { get; set; }
         public Dictionary<int, FreezeMem> FreezeValues { get; private set; } = [];
         public MemoryEditor MemoryEditor { get; set; }
-        public Func<int, int, bool, bool, DisasmEntry>[] OnTrace { get; set; }
+        public Func<int, bool, bool, (string, int, int)>[] OnTrace { get; set; }
+        public Action<string> SaveBreakpoints { get; set; }
         public const int MainCpu = 0;
         public const int Sa1Cpu = 1;
         public const int SpcCpu = 2;
+        public const int GsuCpu = 3;
 
-        public readonly string[] RamNames = ["WRAM", "SRAM", "VRAM", "ORAM", "ROM", "CRAM", "SPCRAM", "SPCROM", "REG"];
+
 
         public DebugWindow()
         {
@@ -45,11 +49,12 @@ namespace Gmulator.Shared
                 ["Trace"] = ToggleTrace,
             };
 
-            MemoryEditor = new(AddBreakpoint, AddFreezeValue);
+            MemoryEditor = new(AddBreakpoint);
         }
 
+        public virtual void SetCpu(Snes snes) { }
         public virtual void Draw() { }
-        public virtual void RenderSa1() { }
+        public virtual void DrawCoProcessors() { }
         public virtual void DrawCpuInfo() { }
         public virtual void DrawStackInfo(Span<byte> data, int addr, int start, string name)
         {
@@ -106,7 +111,7 @@ namespace Gmulator.Shared
                     JumpAddr[i] = res;
             }
             else
-                JumpAddr[i] = (ushort)addr;
+                JumpAddr[i] = (int)addr;
             AsmOffset = 0;
             ScrollY[i] = 0;
             FollowPc = false;
@@ -141,7 +146,13 @@ namespace Gmulator.Shared
                 if (ImGui.BeginTable("##bptable", columns, ImGuiTableFlags.RowBg))
                 {
                     for (int i = 0; i < columns; i++)
-                        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed);
+                    {
+                        if (i != 3)
+                            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed);
+                        else
+                            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 55);
+                    }
+
                     ImGui.TableNextColumn();
                     foreach (var bp in Breakpoints.Values.ToList())
                     {
@@ -149,18 +160,21 @@ namespace Gmulator.Shared
                         var types = (bp.Type & BPType.Exec) > 0 ? "X" : ".";
                         types += (bp.Type & BPType.Write) > 0 ? "W" : ".";
                         types += (bp.Type & BPType.Read) > 0 ? "R" : ".";
-                        if (ImGui.Button($"{bp.Addr:X6}")) { }
-                        //    SetJumpAddress(bp.Addr);
+                        if (ImGui.Button($"{bp.Addr:X6}"))
+                            SetJumpAddress(bp.Addr, 0);
                         ImGui.TableNextColumn();
                         ImGui.PushID(bp.Addr);
                         bool enabled = bp.Enabled;
-                        ImGui.Checkbox("E", ref enabled);
-                        bp.Enabled = enabled;
+                        if (ImGui.Checkbox("E", ref enabled))
+                        {
+                            bp.Enabled = enabled;
+                            SaveBreakpoints(GameName);
+                        }
 
                         ImGui.TableNextColumn();
                         ImGui.Text(types);
                         ImGui.TableNextColumn();
-                        ImGui.Text(RamNames[bp.RamType > 0 ? bp.RamType % RamNames.Length : 0]);
+                        ImGui.Text(RamNames[bp.RamType > 0 ? (int)bp.RamType % RamNames.Length : 0]);
                         ImGui.TableNextColumn();
                         ImGui.Text(bp.Condition > -1 ? $"{bp.Condition:X4}" : "    ");
                         ImGui.TableNextColumn();
@@ -181,7 +195,7 @@ namespace Gmulator.Shared
 
                         if (ImGui.Button("x"))
                         {
-                            Breakpoints.Remove(bp.Addr);
+                            AddBreakpoint(bp.Addr, bp.Type, bp.Condition, bp.Write);
                             ImGui.PopID();
                             break;
                         }
@@ -226,9 +240,9 @@ namespace Gmulator.Shared
                 types += BreakTypes[2] ? BPType.Read : 0;
                 IsSpc = itemindex == 6;
                 if (!edit)
-                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1], itemindex);
+                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1], (RamType)itemindex);
                 else
-                    EditBreakpoint(BpAddr.ToInt(), bp.Addr, types, condition, BreakTypes[1], itemindex);
+                    EditBreakpoint(BpAddr.ToInt(), bp.Addr, types, condition, BreakTypes[1], (RamType)itemindex);
                 ImGui.CloseCurrentPopup();
             }
             ImGui.SameLine();
@@ -239,7 +253,8 @@ namespace Gmulator.Shared
 
         public virtual void DrawRegisters(List<RegistersInfo> ioregisters)
         {
-            if (ImGui.Begin("##ioregswin"))
+            ImGui.SetNextWindowSize(new(300, 600));
+            if (ImGui.Begin("IO Registers"))
             {
                 ImGui.BeginTable("##ioregs", 3, ImGuiTableFlags.RowBg);
                 ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 55);
@@ -250,6 +265,18 @@ namespace Gmulator.Shared
                     TableRowCol3(v.Address, v.Name, v.Value);
                 }
                 ImGui.EndTable();
+            }
+            ImGui.End();
+        }
+
+        public virtual void DrawTestAddr(int[] a, string[] testcpu)
+        {
+            ImGui.SetNextWindowPos(new(5, 420));
+            ImGui.SetNextWindowSize(new(0, 0));
+            if (ImGui.Begin("Test Error"))
+            {
+                for (int i = 0; i < a.Length; i++)
+                    ImGui.Text($"{testcpu[i]} Test Address: {a[i]:X6}");
             }
             ImGui.End();
         }
@@ -326,7 +353,7 @@ namespace Gmulator.Shared
                 {
                     if (a == bp.Addr)
                     {
-                        if (bp.Type == BPType.Exec || bp.Type == BPType.SpcExec)
+                        if (bp.Type == BPType.Exec || bp.Type == BPType.SpcExec || bp.Type == BPType.GsuExec)
                         {
                             //UpdateScroll();
                             return true;
@@ -337,7 +364,7 @@ namespace Gmulator.Shared
             return false;
         }
 
-        public bool AccessCheck(int a, int v, int memtype, bool write)
+        public bool AccessCheck(int a, int v, RamType memtype, bool write)
         {
             Breakpoints.TryGetValue(a, out Breakpoint bp);
             if (bp != null && bp.Enabled && bp.RamType == memtype && bp.Type > 0)
@@ -352,7 +379,7 @@ namespace Gmulator.Shared
             return false;
         }
 
-        public bool AccessCheckSpc(int a, int v, int memtype, bool write)
+        public bool AccessCheckSpc(int a, int v, RamType memtype, bool write)
         {
             Breakpoints.TryGetValue(a, out Breakpoint bp);
             if (bp != null && bp.Enabled && bp.RamType == memtype && (bp.Type & (BPType.Read | BPType.Write)) > 0)
@@ -372,7 +399,7 @@ namespace Gmulator.Shared
             FreezeValues.Add(a, new FreezeMem(a, v));
         }
 
-        public virtual void AddBreakpoint(int a, int type, int condition, bool write, int index = 0)
+        public virtual void AddBreakpoint(int a, int type, int condition, bool write, RamType index = 0)
         {
             if (a == -1) return;
             Breakpoints.TryGetValue(a, out Breakpoint bp);
@@ -380,9 +407,10 @@ namespace Gmulator.Shared
                 Breakpoints.Add(a, new(a, -1, type, write, true, index));
             else
                 Breakpoints.Remove(a);
+            SaveBreakpoints(GameName);
         }
 
-        public virtual void EditBreakpoint(int a, int o, int type, int condition, bool write, int index = 0)
+        public virtual void EditBreakpoint(int a, int o, int type, int condition, bool write, RamType index = 0)
         {
             if (a == -1 || o == -1) return;
             Breakpoints.TryGetValue(o, out Breakpoint bp);
@@ -390,6 +418,7 @@ namespace Gmulator.Shared
             {
                 Breakpoints.Remove(o);
                 Breakpoints[a] = new(a, condition, type, write, bp.Enabled, index);
+                SaveBreakpoints(GameName);
             }
         }
     }

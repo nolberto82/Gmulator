@@ -5,19 +5,19 @@ public class Noise : BaseChannel
     public ushort ShiftReg { get; private set; }
     public bool Mode { get; private set; }
 
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         if (a == 0x400c)
         {
             EnvVolume = v & 0x0f;
-            ConstVolumeFlag = v.GetBit(4);
-            EnvLoop = v.GetBit(5);
+            ConstVolumeFlag = (v & 0x10) != 0;
+            EnvLoop = (v & 0x20) != 0;
             LengthEnabled = !EnvLoop;
         }
         else if (a == 0x400e)
         {
-            Frequency = (ushort)NoiseTable[v & 0x0f];
-            Mode = v.GetBit(7);
+            Frequency = NoiseTable[v & 0x0f] & 0xffff;
+            Mode = (v & 0x80) != 0;
         }
         else if (a == 0x400f)
         {

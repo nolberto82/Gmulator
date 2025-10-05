@@ -18,17 +18,14 @@ public abstract class Gui
 {
     public const string FontName = "Assets/naga10.ttf";
 
-    public LuaApi LuaApi { get; private set; }
-    public Audio Audio { get; set; }
-    public Cheat Cheat { get; set; }
-    public Menu Menu { get; set; }
-
+    private LuaApi LuaApi;
+    private Audio Audio { get; set; }
+    private Cheat Cheat { get; set; }
+    private Menu Menu;
     public float MenuHeight { get; set; }
-    public Dictionary<int, Breakpoint> Breakpoints { get; private set; } = [];
-    public int System { get; private set; }
     public RenderTexture2D Screen { get; private set; }
-    public Emulator Emu { get; private set; } = new();
-    public ImFontPtr[] DebuFont { get; set; }
+    public Emulator Emulator { get; private set; } = new();
+    public ImFontPtr[] DebugFont { get; private set; }
     private Font GuiFont;
 
     private bool ShowPpuDebug;
@@ -45,14 +42,14 @@ public abstract class Gui
 
             rlImGui.Begin();
 
-            Emu?.Execute(Menu.Opened, 1);
-            Emu?.Render(MenuHeight);
-            Emu?.Update();
+            Emulator?.Execute(Menu.Opened);
+            Emulator?.Render(MenuHeight);
+            Emulator?.Update();
             LuaApi?.Update(Menu.Opened);
 
-            Input.UpdateGuiInput(Emu, Menu);
+            Input.UpdateGuiInput(Emulator, Menu);
 
-            ImGui.PushFont(DebuFont[0]);
+            ImGui.PushFont(DebugFont[0]);
             Menu.Update(isdeck);
             Menu.Render(isdeck, Cheat);
             if (!isdeck)
@@ -63,8 +60,8 @@ public abstract class Gui
             Raylib.EndDrawing();
         }
 
-        Emu?.Close();
-        Emu?.Config.Save();
+        Emulator?.Close();
+        Emulator?.Config.Save();
 
         LuaApi?.Unload();
         Raylib.UnloadFont(GuiFont);
@@ -86,7 +83,7 @@ public abstract class Gui
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
-        Emu.Debug = false;
+        Emulator.Debug = false;
 #endif
 #endif
 
@@ -112,22 +109,22 @@ public abstract class Gui
             io.ConfigFlags |= ImGuiConfigFlags.NoMouseCursorChange;
         }
 
-        Emu.Config = new();
+        Emulator?.Config = new();
         Config.CreateDirectories(isdeck);
-        Emu?.Config.Load();
+        Emulator?.Config.Load();
 
         Menu = new();
         Menu.Init(isdeck, [".gb", ".gbc", ".nes", ".sfc", ".smc"]);
-        Menu.Open(Emu);
+        Menu.Open(Emulator);
 
         if (File.Exists(FontName))
         {
-            DebuFont = [null, null];
-            DebuFont[0] = io.Fonts.AddFontFromFileTTF(FontName, 23f);
-            DebuFont[1] = io.Fonts.AddFontFromFileTTF(FontName, 15f);
+            DebugFont = [null, null];
+            DebugFont[0] = io.Fonts.AddFontFromFileTTF(FontName, 23f);
+            DebugFont[1] = io.Fonts.AddFontFromFileTTF(FontName, 15f);
             GuiFont = Raylib.LoadFont(FontName);
             rlImGui.ReloadFonts();
-            Notifications.SetFont(DebuFont[0], GuiFont);
+            Notifications.SetFont(DebugFont[0], GuiFont);
         }
 
         if (File.Exists("Assets/GBC_1.png"))
@@ -138,46 +135,51 @@ public abstract class Gui
         Menu.Reset = Reset;
     }
 
-    public virtual void Reset(string name, string lastname)
+    public virtual void Reset(string name)
     {
         if (name != "")
         {
-            Cheat.Save(lastname);
-            Emu?.SaveBreakpoints(lastname);
             switch (Path.GetExtension(name).ToLowerInvariant())
             {
                 case ".gb" or ".gbc":
-                    Emu = new Gbc();
-                    Emu.Init(GbWidth, GbHeight, GbcConsole, MenuHeight, DebuFont, GuiFont);
-                    LuaApi = Emu.LuaApi;
+                    Gbc gbc = new Gbc();
+                    Emulator = gbc;
+                    Emulator.Init(GbWidth, GbHeight, GbcConsole, MenuHeight, DebugFont, GuiFont);
+                    LuaApi = Emulator.LuaApi;
+                    gbc.LuaMemoryCallbacks();
                     Audio.Init(GbcAudioFreq, 4096, 4096, 32);
                     break;
                 case ".nes":
-                    Emu = new Nes();
-                    Emu.Init(NesWidth, NesHeight, NesConsole, MenuHeight, DebuFont, GuiFont);
-                    LuaApi = Emu.LuaApi;
+                    Nes nes = new();
+                    Emulator = nes;
+                    Emulator.Init(NesWidth, NesHeight, NesConsole, MenuHeight, DebugFont, GuiFont);
+                    LuaApi = Emulator.LuaApi;
+                    nes.LuaMemoryCallbacks();
                     Audio.Init(NesAudioFreq, 4096, 4096, 32);
                     break;
                 case ".sfc" or ".smc":
-                    Emu = new Snes();
-                    Emu.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebuFont, GuiFont);
-                    LuaApi = Emu.LuaApi;
+                    Snes snes = new();
+                    Emulator = snes;
+                    Emulator.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebugFont, GuiFont);
+                    LuaApi = Emulator.LuaApi;
+                    snes.LuaMemoryCallbacks();
                     Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
                     break;
                 default: return;
             }
 
-            //Emu?.SetLua();
             LuaApi.Init();
-            LuaApi.InitMemCallbacks(Emu);
-            Emu.Config = new();
-            Emu?.Config.Load();
+            Emulator.Config = new();
+            Emulator?.Config.Load();
             LuaApi?.Reset();
         }
 
-        Emu?.Reset(name, Menu.LastName, false);
-        LuaApi?.CheckLuaFile(name);
-        Emu?.Config?.Load();
+        Emulator?.Reset(name, false);
+        Emulator?.Config?.Load();
+
+        string gameName = Emulator?.GameName;
+        Cheat?.Load(Emulator, gameName);
+        LuaApi?.Load(gameName);
     }
 
     private void RenderMenuBar()
@@ -191,32 +193,32 @@ public abstract class Gui
                 {
                     if (!Menu.Opened)
                     {
-                        Menu.Open(Emu);
-                        Emu.State = Paused;
+                        Menu.Open(Emulator);
+                        Emulator.State = DebugState.Paused;
                         ImGui.OpenPopup("Menu");
                     }
                 }
                 if (ImGui.MenuItem("Reset"))
-                    Emu.Reset("", Menu.LastName, true);
+                    Emulator.Reset("", true);
 
                 ImGui.EndMenu();
             }
 
-            ImGui.BeginDisabled(Emu == null);
+            ImGui.BeginDisabled(Emulator == null);
             if (ImGui.BeginMenu("Debug"))
             {
-                if (ImGui.MenuItem("Show Debugger", "", Emu.Debug))
+                if (ImGui.MenuItem("Show Debugger", "", Emulator.Debug))
                 {
-                    Emu.Debug = !Emu.Debug;
-                    LuaApi.SetDebug(Emu.Debug);
+                    Emulator.Debug = !Emulator.Debug;
+                    LuaApi.SetDebug(Emulator.Debug);
                 }
 
-                ImGui.BeginDisabled(Emu.Console != SnesConsole);
-                if (ImGui.MenuItem("Show Sa1", "", Emu.DebugWindow?.ShowSa1 == true))
-                    Emu.DebugWindow.ShowSa1 = !Emu.DebugWindow.ShowSa1;
+                ImGui.BeginDisabled(Emulator.Console != SnesConsole);
+                if (ImGui.MenuItem("Show Sa1", "", Emulator.DebugWindow?.ShowSa1 == true))
+                    Emulator.DebugWindow.ShowSa1 = !Emulator.DebugWindow.ShowSa1;
 
-                if (ImGui.MenuItem("Show Spc", "", Emu.DebugWindow?.ShowSpc == true))
-                    Emu.DebugWindow.ShowSpc = !Emu.DebugWindow.ShowSpc;
+                if (ImGui.MenuItem("Show Spc", "", Emulator.DebugWindow?.ShowSpc == true))
+                    Emulator.DebugWindow.ShowSpc = !Emulator.DebugWindow.ShowSpc;
                 ImGui.EndDisabled();
 
                 if (ImGui.MenuItem("Show Ppu Debug", "", ShowPpuDebug))

@@ -54,7 +54,7 @@
         {
             if (a <= 0xffff)
             {
-                if (v.GetBit(7))
+                if ((v & 0x80) != 0)
                 {
                     Control |= 0xc;
                     Shift = 0x10;
@@ -88,7 +88,7 @@
                     else if (a <= 0xffff)
                     {
                         UpdatePrg((byte)Shift);
-                        Sram = true;
+                        SramEnabled = true;
                     }
                     Writes = 0;
                 }

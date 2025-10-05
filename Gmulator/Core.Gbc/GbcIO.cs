@@ -55,8 +55,8 @@ public partial class GbcIO : EmuState
     public GbcMmu Mmu { get; private set; }
     public GbcPpu Ppu { get; private set; }
 
-    public int SpeedMode { get => KEY1.GetBit(7) ? 2 : 1; }
-    public bool DMAactive { get => HDMA5.GetBit(7); }
+    public int SpeedMode { get => (KEY1 & 0x80) != 0 ? 2 : 1; }
+    public bool DMAactive { get => (HDMA5 & 0x80) != 0; }
     public bool DMAHBlank { get; set; }
 
     public GbcIO(GbcTimer timer)
@@ -143,7 +143,7 @@ public partial class GbcIO : EmuState
         {
             BGPD = Ppu.CGBBkgPal[BGPI & 0x3f];
             if (!editor)
-                BGPI += (byte)(BGPI.GetBit(7) ? 1 : 0);
+                BGPI += (byte)((BGPI & 0x80) != 0 ? 1 : 0);
             return BGPD;
         }
         else if (io == 0x6a)
@@ -152,7 +152,7 @@ public partial class GbcIO : EmuState
         {
             OBPD = Ppu.CGBObjPal[OBPI & 0x3f];
             if (!editor)
-                OBPI += (byte)(OBPI.GetBit(7) ? 1 : 0);
+                OBPI += (byte)((OBPI & 0x80) != 0 ? 1 : 0);
             return OBPD;
         }
         else if (io == 0x70)
@@ -194,7 +194,7 @@ public partial class GbcIO : EmuState
         else if (io == 0x41)
         {
             STAT = (byte)(v & 0x78 | STAT & 7 | 0x80);
-            if ((v.GetBit(3) || v.GetBit(4) || v.GetBit(5)) && !v.GetBit(6))
+            if (((v & 0x08) != 0 || (v & 0x10) != 0 || (v & 0x20) != 0) && (v & 0x40) == 0)
                 IF |= 2;
         }
         else if (io == 0x42)
@@ -238,7 +238,7 @@ public partial class GbcIO : EmuState
             HDMA5 = (byte)(v & 0x7f);
             if (!DMAactive)
             {
-                DMAHBlank = v.GetBit(7);
+                DMAHBlank = (v & 0x80) != 0;
                 if (!DMAHBlank)
                 {
                     var src = (HDMA1 << 8 | HDMA2) & 0xfff0;
@@ -253,7 +253,7 @@ public partial class GbcIO : EmuState
         {
             BGPD = v;
             Ppu.SetBkgPalette(BGPI, v);
-            BGPI += (byte)(BGPI.GetBit(7) ? 1 : 0);
+            BGPI += (byte)((BGPI & 0x80) != 0 ? 1 : 0);
         }
         else if (io == 0x6a)
             OBPI = v;
@@ -261,7 +261,7 @@ public partial class GbcIO : EmuState
         {
             OBPD = v;
             Ppu.SetObjPalette(OBPI, v);
-            OBPI += (byte)(OBPI.GetBit(7) ? 1 : 0);
+            OBPI += (byte)((OBPI & 0x80) != 0 ? 1 : 0);
         }
         else if (io == 0x70)
         {
@@ -282,107 +282,108 @@ public partial class GbcIO : EmuState
         BGPD = 0xff;
     }
 
-    public Dictionary<string, dynamic> GetLCDC() => new()
-    {
-        ["Background"] = LCDC.GetBit(0),
-        ["Sprites"] = LCDC.GetBit(1),
-        ["Sprite Size"] = LCDC.GetBit(2) ? "8x16" : "8x8",
-        ["BG Map"] = LCDC.GetBit(3) ? "9C00:9FFF" : "9800:9BFF",
-        ["BG Tile"] = LCDC.GetBit(4) ? "8000:8FFF" : "8800:97FF",
-        ["Window"] = LCDC.GetBit(5),
-        ["Window Map"] = LCDC.GetBit(6) ? "9C00:9FFF" : "9800:9BFF",
-        ["LCD"] = LCDC.GetBit(7),
-    };
+    public List<RegistersInfo> GetLCDC() =>
+    [
+        new("FF40.0","Background", (LCDC & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("FF40.1","Sprites", (LCDC & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("FF40.2","Sprite Size", (LCDC & 0x04) != 0 ? "8x16" : "8x8"),
+        new("FF40.3","BG Map", (LCDC & 0x08) != 0 ? "9C00:9FFF" : "9800:9BFF"),
+        new("FF40.4","BG Tile", (LCDC & 0x10) != 0 ? "8000:8FFF" : "8800:97FF"),
+        new("FF40.5","Window", (LCDC & 0x20) != 0 ? "Enabled" : "Disabled"),
+        new("FF40.6","Window Map", (LCDC & 0x40) != 0 ? "9C00:9FFF" : "9800:9BFF"),
+        new("FF40.7","LCD", (LCDC & 0x80) != 0 ? "Enabled" : "Disabled"),
+    ];
 
-    public Dictionary<string, dynamic> GetSTAT() => new()
-    {
-        ["PPU mode"] = STAT & 3,
-        ["LYC == LY"] = STAT.GetBit(2),
-        ["Mode 0 select"] = STAT.GetBit(3),
-        ["Mode 1 select"] = STAT.GetBit(4),
-        ["Mode 2 select"] = STAT.GetBit(5),
-        ["LYC select"] = STAT.GetBit(6),
-    };
+    public List<RegistersInfo> GetSTAT() =>
+    [
+        new("FF41.0-1","PPU mode", $"{(STAT & 3)}"),
+        new("FF41.2","LYC == LY", (STAT & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("FF41.3","Mode 0 select", (STAT & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("FF41.4","Mode 1 select", (STAT & 0x10) != 0 ? "Enabled" : "Disabled"),
+        new("FF41.5","Mode 2 select", (STAT & 0x20) != 0 ? "Enabled" : "Disabled"),
+        new("FF41.6","LYC select", (STAT & 0x40) != 0 ? "Enabled" : "Disabled"),
+    ];
 
-    public Dictionary<string, dynamic> GetIF() => new()
-    {
-        ["Vblank"] = IF.GetBit(0),
-        ["LCD"] = IF.GetBit(1),
-        ["Timer"] = IF.GetBit(2),
-        ["Serial"] = IF.GetBit(3),
-        ["Joypad"] = IF.GetBit(4),
-    };
+    public List<RegistersInfo> GetIF() =>
+    [
+        new("FF0F.0","Vblank", (IF & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("FF0F.1","LCD", (IF & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("FF0F.2","Timer", (IF & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("FF0F.3","Serial", (IF & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("FF0F.4","Joypad", (IF & 0x10) != 0 ? "Enabled" : "Disabled"),
+    ];
 
-    public Dictionary<string, dynamic> GetIE() => new()
-    {
-        ["Vblank"] = IF.GetBit(0),
-        ["LCD"] = IF.GetBit(1),
-        ["Timer"] = IF.GetBit(2),
-        ["Serial"] = IF.GetBit(3),
-        ["Joypad"] = IF.GetBit(4),
-    };
+    public List<RegistersInfo> GetIE() =>
+    [
+        new("FFFF.0","Vblank", (IE & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("FFFF.1","LCD", (IE & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("FFFF.2","Timer", (IE & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("FFFF.3","Serial", (IE & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("FFFF.4","Joypad", (IE & 0x10) != 0 ? "Enabled" : "Disabled"),
+    ];
 
-    public Dictionary<string, dynamic> GetChannel1() => new()
-    {
-        ["Sweep Shift"] = Apu.Square1.SweepShift,
-        ["Sweep Negate"] = Apu.Square1.SweepNegate,
-        ["Sweep Period"] = Apu.Square1.SweepPeriod,
-        ["Length"] = Apu.Square1.LengthCounter,
-        ["Duty"] = Apu.Square1.Duty,
-        ["Env Period"] = Apu.Square1.EnvPeriod,
-        ["Env Increase"] = Apu.Square1.EnvDirection,
-        ["Env Volume"] = Apu.Square1.EnvVolume,
-        ["Frequency"] = Apu.Square1.Frequency,
-        ["Length Enabled"] = Apu.Square1.LengthEnabled,
-        ["Enabled"] = Apu.Square1.Enabled,
-        ["Timer"] = Apu.Square1.Timer,
-        ["Duty Position"] = Apu.Square1.Position,
-        ["Sweep Enabled"] = Apu.Square1.SweepPeriod > 0,
-        ["Sweep Frequency"] = Apu.Square1.ShadowFrequency,
-        ["Sweep Timer"] = Apu.Square1.SweepTimer,
-        ["Env Timer"] = Apu.Square1.Duty,
-    };
+    public List<RegistersInfo> GetChannel1() =>
+    [
+        new("FF10.0-2","Sweep Shift", $"{Apu.Square1.SweepShift}"),
+        new("FF10.3","Sweep Negate", $"{Apu.Square1.SweepNegate}"),
+        new("FF10.4-7","Sweep Period", $"{Apu.Square1.SweepPeriod}"),
+        new("FF11.0-5","Length", $"{Apu.Square1.LengthCounter}"),
+        new("FF11.6-7","Duty", $"{Apu.Square1.Duty}"),
+        new("FF12.0-2","Env Period", $"{Apu.Square1.EnvPeriod}"),
+        new("FF12.3","Env Increase", $"{Apu.Square1.EnvDirection}"),
+        new("FF12.4-7","Env Volume", $"{Apu.Square1.EnvVolume}"),
+        new("FF13/4.0-2","Frequency", $"{Apu.Square1.Frequency}"),
+        new("FF14.6","Length Enabled", $"{Apu.Square1.LengthEnabled}"),
+        new("FF14.7","Enabled", $"{Apu.Square1.Enabled}"),
+        new("","Timer", $"{Apu.Square1.Timer}"),
+        new("","Duty Position", $"{Apu.Square1.Position}"),
+        new("","Sweep Enabled", $"{Apu.Square1.SweepPeriod > 0}"),
+        new("","Sweep Frequency", $"{Apu.Square1.ShadowFrequency}"),
+        new("","Sweep Timer", $"{Apu.Square1.SweepTimer}"),
+        new("","Env Timer", $"{Apu.Square1.Duty}"),
+    ];
 
-    public Dictionary<string, dynamic> GetChannel2() => new()
-    {
-        ["Length"] = Apu.Square2.LengthCounter,
-        ["Duty"] = Apu.Square2.Duty,
-        ["Env Period"] = Apu.Square2.EnvPeriod,
-        ["Env Increase"] = Apu.Square2.EnvDirection,
-        ["Env Volume"] = Apu.Square2.EnvVolume,
-        ["Frequency"] = Apu.Square2.Frequency,
-        ["Length Enabled"] = Apu.Square2.LengthEnabled,
-        ["Enabled"] = Apu.Square2.Enabled,
-        ["Timer"] = Apu.Square2.Timer,
-        ["Duty Position"] = Apu.Square2.Position,
-        ["Env Timer"] = Apu.Square2.Duty,
-    };
+    public List<RegistersInfo> GetChannel2() =>
+    [
+        new("FF16.0-5","Length", $"{Apu.Square2.LengthCounter}"),
+        new("FF16.6-7","Duty", $"{Apu.Square2.Duty}"),
+        new("FF17.0-2","Env Period", $"{Apu.Square2.EnvPeriod}"),
+        new("FF17.3","Env Increase", $"{Apu.Square2.EnvDirection}"),
+        new("FF17.4-7","Env Volume", $"{Apu.Square2.EnvVolume}"),
+        new("FF18/9.0-2","Frequency", $"{Apu.Square2.Frequency}"),
+        new("FF19.6","Length Enabled", $"{Apu.Square2.LengthEnabled}"),
+        new("FF19.7","Enabled", $"{Apu.Square2.Enabled}"),
+        new("","Timer", $"{Apu.Square2.Timer}"),
+        new("","Duty Position", $"{Apu.Square2.Position}"),
+        new("","Env Timer", $"{Apu.Square2.Duty}"),
+    ];
 
-    public Dictionary<string, dynamic> GetChannel3() => new()
-    {
-        ["Sound Enabled"] = Apu.Wave.Dac,
-        ["Length"] = Apu.Wave.LengthCounter,
-        ["Volume"] = Apu.Wave.VolumeShift,
-        ["Frequency"] = Apu.Wave.Frequency,
-        ["Length Enabled"] = Apu.Wave.LengthEnabled,
-        ["Enabled"] = Apu.Wave.Enabled,
-        ["Timer"] = Apu.Wave.Timer,
-        ["Position"] = Apu.Wave.Position,
-    };
+    public List<RegistersInfo> GetChannel3() =>
+    [
+        new("FF1A.7","Sound Enabled", $"{Apu.Wave.Dac}"),
+        new("FF1B","Length", $"{Apu.Wave.LengthCounter}"),
+        new("FF1C.5-6","Volume", $"{Apu.Wave.VolumeShift}"),
+        new("FF1D/E.0-2","Frequency", $"{Apu.Wave.Frequency}"),
+        new("FF1E.6","Length Enabled", $"{Apu.Wave.LengthEnabled}"),
+        new("FF1E.7","Enabled", $"{Apu.Wave.Enabled}"),
+        new("","Timer", $"{Apu.Wave.Timer}"),
+        new("","Position", $"{Apu.Wave.Position}"),
+    ];
 
-    public Dictionary<string, dynamic> GetChannel4() => new()
-    {
-        ["Length"] = Apu.Noise.LengthCounter,
-        ["Env Period"] = Apu.Noise.EnvPeriod,
-        ["Env Increase"] = Apu.Noise.EnvDirection,
-        ["Env Volume"] = Apu.Noise.EnvVolume,
-        ["Volume"] = Apu.Noise.Shift,
-        ["Frequency"] = Apu.Noise.Frequency,
-        ["Length Enabled"] = Apu.Noise.LengthEnabled,
-        ["Enabled"] = Apu.Noise.Enabled,
-        ["Timer"] = Apu.Noise.Timer,
-        ["Position"] = Apu.Noise.Position,
-    };
+    public List<RegistersInfo> GetChannel4() =>
+    [
+        new("FF20.0-5","Length", $"{Apu.Noise.LengthCounter}"),
+        new("FF21.0-2","Env Period", $"{Apu.Noise.EnvPeriod}"),
+        new("FF21.3","Env Increase", $"{Apu.Noise.EnvDirection}"),
+        new("FF21.4-7","Env Volume", $"{Apu.Noise.EnvVolume}"),
+        new("FF22.0-2","Divisor", $"{Apu.Noise.Shift}"),
+        new("FF22.3","Width", $"{Apu.Noise.LFSR}"),
+        new("FF22.4-7","Frequency", $"{Apu.Noise.Frequency}"),
+        new("FF23.6","Length Enabled", $"{Apu.Noise.LengthEnabled}"),
+        new("FF23.7","Enabled", $"{Apu.Noise.Enabled}"),
+        new("","Timer", $"{Apu.Noise.Timer}"),
+        new("","Position", $"{Apu.Noise.Position}"),
+    ];
 
     public override void Save(BinaryWriter bw)
     {

@@ -55,7 +55,7 @@ public class Wave : BaseChannel
     {
         if (a == 0x1a)
         {
-            Dac = v.GetBit(7);
+            Dac = (v & 0x80) != 0;
             NR30 = v;
         }
         else if (a == 0x1b)
@@ -78,8 +78,8 @@ public class Wave : BaseChannel
             if (Dac)
             {
                 Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-                LengthEnabled = v.GetBit(6);
-                if (v.GetBit(7))
+                LengthEnabled = (v & 0x40) != 0;
+                if ((v & 0x80) != 0)
                     Trigger(256, 2);
             }
             NR34 = v;
@@ -139,6 +139,6 @@ public class Wave : BaseChannel
         NR33 = br.ReadByte();
         NR34 = br.ReadByte();
 
-        Dac = NR30.GetBit(7);
+        Dac = (NR30 & 0x80) != 0;
     }
 }

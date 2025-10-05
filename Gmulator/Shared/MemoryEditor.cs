@@ -63,7 +63,7 @@ public unsafe class MemoryEditor
         public float WindowWidth;
     };
 
-    public MemoryEditor(Action<int, int, int, bool, int> addbp, Action<int, byte> addcheat)
+    public MemoryEditor(Action<int, int, int, bool, RamType> addbp)
     {
         // Settings
         Open = true;
@@ -88,7 +88,6 @@ public unsafe class MemoryEditor
         HighlightMin = HighlightMax = -1;
         PreviewDataType = ImGuiDataType.S32;
         AddBreakpoint = addbp;
-        AddCheat = addcheat;
     }
 
     // Standalone Memory Editor window
@@ -164,7 +163,8 @@ public unsafe class MemoryEditor
         {
             // Move cursor but only apply on next frame so scrolling with be synchronized (because currently we can't change the scrolling while the window is being rendered)
             if (ImGui.IsKeyPressed(ImGuiKey.UpArrow) && DataEditingAddr >= Cols)
-data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKeyPressed(ImGuiKey.DownArrow) && DataEditingAddr < mem_size - Cols)
+                data_editing_addr_next = DataEditingAddr - Cols;
+            else if (ImGui.IsKeyPressed(ImGuiKey.DownArrow) && DataEditingAddr < mem_size - Cols)
             { data_editing_addr_next = DataEditingAddr + Cols; }
             else if (ImGui.IsKeyPressed(ImGuiKey.LeftArrow) && DataEditingAddr > 0)
             { data_editing_addr_next = DataEditingAddr - 1; }
@@ -409,7 +409,7 @@ data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKe
             if (ImGui.DragInt("##cols", ref Cols, 0.2f, 4, 32, "%d cols")) { ContentsWidthChanged = true; if (Cols < 1) Cols = 1; }
             ImGui.Checkbox("Show Data Preview", ref OptShowDataPreview);
             ImGui.Checkbox("Show HexII", ref OptShowHexII);
-            if (ImGui.Checkbox("Show Ascii", ref OptShowAscii)) ContentsWidthChanged = true;             ImGui.Checkbox("Grey out zeroes", ref OptGreyOutZeroes);
+            if (ImGui.Checkbox("Show Ascii", ref OptShowAscii)) ContentsWidthChanged = true; ImGui.Checkbox("Grey out zeroes", ref OptGreyOutZeroes);
             ImGui.Checkbox("Uppercase Hex", ref OptUpperCaseHex);
 
             ImGui.EndPopup();
@@ -516,7 +516,7 @@ data_editing_addr_next = DataEditingAddr - Cols;             else if (ImGui.IsKe
     }
 
     private static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
-    private readonly Action<int, int, int, bool, int> AddBreakpoint;
+    private readonly Action<int, int, int, bool, RamType> AddBreakpoint;
     private readonly Action<int, byte> AddCheat;
 
     private static int DataTypeGetSize(ImGuiDataType data_type)

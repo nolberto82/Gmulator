@@ -16,14 +16,19 @@ public static class Constants
     public const int IntSerial = 0x08;
     public const int IntJoypad = 0x10;
 
-    public const int Break = 0;
-    public const int StepMain = 1;
-    public const int StepSpc = 2;
-    public const int StepOverMain = 3;
-    public const int StepOverSpc = 4;
-    public const int Running = 5;
-    public const int Paused = 6;
-    public const int Stopped = 7;
+    public enum DebugState : int
+    {
+        Break,
+        StepMain,
+        StepSpc,
+        StepGsu,
+        StepOverMain,
+        StepOverSpc,
+        Running,
+        Paused,
+        Stopped,
+    };
+
 
     public const int Horizontal = 3;
     public const int Vertical = 2;
@@ -119,7 +124,6 @@ public static class Constants
     };
 
     public const string EmulatorName = "Gmulator";
-    public const string SaveStateVersion = "1.07";
     public static readonly string RomDirectory = "Roms";
     public static readonly string SaveDirectory = "Saves";
     public static readonly string StateDirectory = "States";
@@ -145,36 +149,4 @@ public static class Constants
         public int size = size;
         public int addr;
     }
-
-    public static readonly Dictionary<int, string> MapperTypes = new()
-    {
-        [0x00] = "ROM ONLY",
-        [0x01] = "MBC1",
-        [0x02] = "MBC1RAM",
-        [0x03] = "MBC1RAMBATTERY",
-        [0x05] = "MBC2",
-        [0x06] = "MBC2BATTERY",
-        [0x08] = "ROMRAM 1",
-        [0x09] = "ROMRAMBATTERY 1",
-        [0x0B] = "MMM01",
-        [0x0C] = "MMM01RAM",
-        [0x0D] = "MMM01RAMBATTERY",
-        [0x0F] = "MBC3TIMERBATTERY",
-        [0x10] = "MBC3TIMERRAMBATTERY 2",
-        [0x11] = "MBC3",
-        [0x12] = "MBC3RAM 2",
-        [0x13] = "MBC3RAMBATTERY 2",
-        [0x19] = "MBC5",
-        [0x1A] = "MBC5RAM",
-        [0x1B] = "MBC5RAMBATTERY",
-        [0x1C] = "MBC5RUMBLE",
-        [0x1D] = "MBC5RUMBLERAM",
-        [0x1E] = "MBC5RUMBLERAMBATTERY",
-        [0x20] = "MBC6",
-        [0x22] = "MBC7SENSORRUMBLERAMBATTERY",
-        [0xFC] = "POCKET CAMERA",
-        [0xFD] = "BANDAI TAMA5",
-        [0xFE] = "HuC3",
-        [0xFF] = "HuC1RAMBATTERY",
-    };
 }

@@ -20,21 +20,21 @@ public partial class NesCpu : EmuState
     private bool[] flags;
 
     public int PC { get => (ushort)pc; set => pc = (ushort)value; }
-    public int SP { get => (byte)sp; set => sp = (byte)value; }
-    public int A { get => (byte)a; set => a = (byte)value; }
-    public int X { get => (byte)x; set => x = (byte)value; }
-    public int Y { get => (byte)y; set => y = (byte)value; }
+    public int SP { get => (byte)sp; set => sp = value & 0xff; }
+    public int A { get => a&0xff; set => a = value & 0xff; }
+    public int X { get => (byte)x; set => x = value & 0xff; }
+    public int Y { get => y & 0xff; set => y = (byte)value; }
     public int Instructions { get; private set; }
     public int Cycles { get; set; }
     public int CycleTotal { get; set; }
-    public int Ps { get => (byte)ps; set => ps = (ushort)value; }
+    public int PS { get => ps & 0xff; set => ps = (ushort)value; }
     public static int NmiTriggered { get; set; }
     public bool[] Flags { get => flags; set => flags = value; }
     private int StallCycles;
 
     public int StepOverAddr;
     public Action<int> PpuStep;
-    public Func<int, byte> ReadByte;
+    public Func<int, int> ReadByte;
     public Action<int, int> WriteByte;
     public Func<int, int> ReadWord;
     public Action<int> SetState { get; internal set; }
@@ -46,13 +46,13 @@ public partial class NesCpu : EmuState
         CreateOpcodes();
     }
 
-    public byte ReadDmc(int a)
+    public int ReadDmc(int a)
     {
         StallCycles += 4;
         return ReadByte(a);
     }
 
-    private byte TickRead(int a, int opbit = 0)
+    private int TickRead(int a, int opbit = 0)
     {
         Cycles++;
         PpuStep(3);
@@ -184,15 +184,15 @@ public partial class NesCpu : EmuState
 
     private void Adc(int mode)
     {
-        byte v = TickRead(AddrModeR(mode));
-        int b = A + v + (Ps & FC);
+        int v = TickRead(AddrModeR(mode));
+        int b = A + v + (PS & FC);
 
         SetFlag(b >= 0x100, FC);
         SetFlag((byte)b == 0, FZ);
         SetFlag(b & 0x80, FN);
         SetFlag(~(A ^ v) & (A ^ b) & 0x80, FV);
 
-        A = (byte)b;
+        A = b;
     }
 
     private void And(int mode)
@@ -225,7 +225,7 @@ public partial class NesCpu : EmuState
     private void Brp(int mode, int f)
     {
         int v = (sbyte)AddrModeR(mode);
-        if ((Ps & f) == f)
+        if ((PS & f) == f)
         {
             ushort addr = (ushort)(PC + v);
             TickRead(PC);
@@ -238,7 +238,7 @@ public partial class NesCpu : EmuState
     private void Brn(int mode, int f)
     {
         int v = (sbyte)AddrModeR(mode);
-        if ((Ps & f) != f)
+        if ((PS & f) != f)
         {
             ushort addr = (ushort)(PC + v);
             TickRead(PC);
@@ -250,7 +250,7 @@ public partial class NesCpu : EmuState
 
     private void Bit(int mode)
     {
-        byte v = TickRead(AddrModeR(mode), 1);
+        int v = TickRead(AddrModeR(mode), 1);
         var b = A & v;
         SetFlag(b == 0, FZ);
         SetFlag(v & 0x80, FN);
@@ -259,7 +259,7 @@ public partial class NesCpu : EmuState
 
     private void Cmp(int mode)
     {
-        byte v = TickRead(AddrModeR(mode));
+        int v = TickRead(AddrModeR(mode));
         sbyte b = (sbyte)(A - v);
         SetFlag(A >= v, FC);
         SetFlag(b == 0, FZ);
@@ -268,7 +268,7 @@ public partial class NesCpu : EmuState
 
     private void Cpx(int mode)
     {
-        byte v = TickRead(AddrModeR(mode));
+        int v = TickRead(AddrModeR(mode));
         sbyte b = (sbyte)(X - v);
         SetFlag(X >= v, FC);
         SetFlag(b == 0, FZ);
@@ -277,7 +277,7 @@ public partial class NesCpu : EmuState
 
     private void Cpy(int mode)
     {
-        byte v = TickRead(AddrModeR(mode));
+        int v = TickRead(AddrModeR(mode));
         sbyte b = (sbyte)(Y - v);
         SetFlag(Y >= v, FC);
         SetFlag(b == 0, FZ);
@@ -375,18 +375,18 @@ public partial class NesCpu : EmuState
 
     private void Lsr(int mode)
     {
-        byte b; TickRead(PC);
+        int b; TickRead(PC);
         if (mode == ACCU)
         {
             SetFlag(A & 0x01, FC);
-            A = b = (byte)((A >> 1) & 0x7f);
+            A = b = (A >> 1) & 0x7f;
         }
         else
         {
             int a = AddrModeW(mode);
             b = TickRead(a);
             SetFlag(b & 0x01, FC);
-            b = (byte)((b >> 1) & 0x7f);
+            b = (b >> 1) & 0x7f;
             TickWrite(a, b);
         }
         SetFlag(b == 0, FZ);
@@ -409,7 +409,7 @@ public partial class NesCpu : EmuState
     private void Php(int mode)
     {
         TickRead(PC);
-        Push(SP--, Ps | 0x30);
+        Push(SP--, PS | 0x30);
     }
 
     private void Pla(int mode)
@@ -423,21 +423,20 @@ public partial class NesCpu : EmuState
     private void Plp(int mode)
     {
         TickRead(PC); TickRead(PC);
-        Ps = Pop() & ~0x30;// & ~0x10 | 0x20;
+        PS = Pop() & ~0x30;// & ~0x10 | 0x20;
         //SetFlags();
     }
 
     private void Rol(int mode)
     {
-        byte b;
-        int bit7;
+        int b, bit7;
         TickRead(PC);
 
         if (mode == ACCU)
         {
             bit7 = A & 0x80;
-            A <<= 1;
-            if ((Ps & FC) > 0)
+            A <<= 1 & 0xff;
+            if ((PS & FC) != 0)
                 A |= 0x01;
             b = (byte)A;
         }
@@ -446,8 +445,8 @@ public partial class NesCpu : EmuState
             int a = AddrModeW(mode);
             b = TickRead(a);
             bit7 = b & 0x80;
-            b = (byte)(b << 1);
-            if ((Ps & FC) > 0)
+            b = (b << 1) & 0xff;
+            if ((PS & FC) != 0)
                 b |= 0x01;
 
             TickWrite(a, b);
@@ -459,15 +458,14 @@ public partial class NesCpu : EmuState
 
     private void Ror(int mode)
     {
-        byte b;
-        int bit0;
+        int b, bit0;
         TickRead(PC);
 
         if (mode == ACCU)
         {
             bit0 = A & 0x01;
             A >>= 1;
-            if ((Ps & FC) > 0)
+            if ((PS & FC) != 0)
                 A |= 0x80;
             b = (byte)A;
         }
@@ -477,7 +475,7 @@ public partial class NesCpu : EmuState
             b = TickRead(a);
             bit0 = b & 0x01;
             b = (byte)(b >> 1);
-            if ((Ps & FC) > 0)
+            if ((PS & FC) != 0)
                 b |= 0x80;
 
             TickWrite(a, b);
@@ -490,7 +488,7 @@ public partial class NesCpu : EmuState
     private void Rti(int mode)
     {
         TickRead(PC); TickRead(PC);
-        Ps = Pop() & ~0x10 | 0x20;
+        PS = Pop() & ~0x10 | 0x20;
         PC = Pop();
         PC |= Pop() << 8;
         SetFlags();
@@ -506,8 +504,8 @@ public partial class NesCpu : EmuState
 
     private void Sbc(int mode)
     {
-        byte v = TickRead(AddrModeR(mode));
-        int b = A + ~v + (Ps & FC);
+        int v = TickRead(AddrModeR(mode));
+        int b = A + ~v + (PS & FC);
         SetFlag((b & 0xff00) == 0, FC);
         SetFlag((b & 0xff) == 0, FZ);
         SetFlag(b & 0x80, FN);
@@ -575,7 +573,7 @@ public partial class NesCpu : EmuState
     {
         And(mode);
         A <<= 1;
-        if ((Ps & FC) > 0)
+        if ((PS & FC) != 0)
             A |= 0x01;
     }
 
@@ -674,17 +672,17 @@ public partial class NesCpu : EmuState
             }
             case INDX:
             {
-                byte b1 = TickRead(PC++);
-                byte lo = TickRead(b1 + X & 0xff);
-                byte hi = TickRead(b1 + 1 + X & 0xff);
+                int b1 = TickRead(PC++);
+                int lo = TickRead(b1 + X & 0xff);
+                int hi = TickRead(b1 + 1 + X & 0xff);
                 TickRead(PC);
                 return (ushort)((hi << 8) | lo);
             }
             case INDY:
             {
-                byte b1 = TickRead(PC++);
-                byte lo = TickRead(b1 & 0xff);
-                byte hi = TickRead(b1 + 1 & 0xff);
+                int b1 = TickRead(PC++);
+                int lo = TickRead(b1 & 0xff);
+                int hi = TickRead(b1 + 1 & 0xff);
                 ushort oldaddr = ((ushort)(hi << 8 | lo));
                 ushort addr = (ushort)(oldaddr + Y);
                 if ((addr & 0xff00) != (oldaddr & 0xff00)) TickRead(PC);
@@ -693,18 +691,18 @@ public partial class NesCpu : EmuState
             case INDI:
             {
                 int addr = TickRead(PC++) | TickRead(PC++) << 8;
-                byte h, l;
+                int high, low;
                 if ((addr & 0xff) == 0xff)
                 {
-                    l = TickRead(addr++);
-                    h = TickRead(addr - 0x100 & 0xff00);
-                    addr = (ushort)((h << 8) | l);
+                    low = TickRead(addr++);
+                    high = TickRead(addr - 0x100 & 0xff00);
+                    addr = (ushort)((high << 8) | low);
                 }
                 else
                 {
-                    l = TickRead(addr++);
-                    h = TickRead(addr);
-                    addr = (ushort)((h << 8) | l);
+                    low = TickRead(addr++);
+                    high = TickRead(addr);
+                    addr = (ushort)((high << 8) | low);
                 }
                 return addr;
             }
@@ -746,15 +744,17 @@ public partial class NesCpu : EmuState
             }
             case INDX:
             {
-                byte b1 = TickRead(PC++);
-                byte lo = TickRead(b1 + X & 0xff); byte hi = TickRead(b1 + 1 + X & 0xff);
+                int b1 = TickRead(PC++);
+                int lo = TickRead(b1 + X & 0xff);
+                int hi = TickRead(b1 + 1 + X & 0xff);
                 TickRead(PC);
                 return (ushort)((hi << 8) | lo);
             }
             case INDY:
             {
-                byte b1 = TickRead(PC++);
-                byte lo = TickRead(b1 & 0xff); byte hi = TickRead(b1 + 1 & 0xff);
+                int b1 = TickRead(PC++);
+                int lo = TickRead(b1 & 0xff);
+                int hi = TickRead(b1 + 1 & 0xff);
                 TickRead(PC);
                 return (ushort)(((hi << 8) | lo) + Y);
             }
@@ -769,7 +769,7 @@ public partial class NesCpu : EmuState
 
         PC = ReadWord(INT_RESET);
         SP = 0xfd;
-        Ps = 0x04;
+        PS = 0x04;
         X = 0x00;
         A = 0x00;
         Y = 0x00;
@@ -784,22 +784,22 @@ public partial class NesCpu : EmuState
         TickRead(PC);
         Push(SP--, PC >> 8);
         Push(SP--, PC & 0xff);
-        Push(SP--, Ps);
+        Push(SP--, PS);
         PC = ReadWord(INT_NMI);
     }
 
-    private byte Pop() => TickRead(++SP | 0x100);
+    private int Pop() => TickRead(++SP | 0x100);
 
     private void Push(int addr, int v) => TickWrite(addr | 0x100, (byte)v);
 
     private void Brk(int pc)
     {
-        Ps |= FB | FU;
+        PS |= FB | FU;
         TickRead(PC++);
         Push(SP--, pc >> 8);
         Push(SP--, (pc + 1) & 0xff);
-        Push(SP--, Ps);
-        Ps |= FI;
+        Push(SP--, PS);
+        PS |= FI;
         PC = ReadWord(INT_BRK);
         TickRead(PC);
         TickRead(PC);
@@ -809,37 +809,37 @@ public partial class NesCpu : EmuState
     {
         Push(SP--, PC >> 8);
         Push(SP--, PC & 0xff);
-        Ps &= ~(FB | FU);
-        Push(SP--, Ps | FB | FU);
+        PS &= ~(FB | FU);
+        Push(SP--, PS | FB | FU);
         PC = ReadWord(INT_BRK);
-        Ps |= FI;
+        PS |= FI;
     }
 
     private void SetFlag(bool flag, int v)
     {
         if (flag)
-            Ps |= v;
+            PS |= v;
         else
-            Ps &= ~v;
+            PS &= ~v;
     }
 
     private void SetFlag(int flag, int v)
     {
-        if (flag > 0)
-            Ps |= v;
+        if (flag != 0)
+            PS |= v;
         else
-            Ps &= ~v;
+            PS &= ~v;
     }
 
-    public bool GetFlag(int v) => (Ps & v) > 0;
+    public bool GetFlag(int v) => (PS & v) != 0;
 
     private void Set(int mode, int v)
     {
         AddrModeR(mode);
         if (v > 0)
-            Ps |= v;
+            PS |= v;
         else
-            Ps &= v;
+            PS &= v;
     }
 
     public byte GetFlag()
@@ -854,7 +854,7 @@ public partial class NesCpu : EmuState
     public void SetFlags()
     {
         for (int i = 0; i < Flags.Length; i++)
-            Flags[i] = (Ps & (1 << i)) > 0;
+            Flags[i] = (PS & (1 << i)) != 0;
     }
 
     public Dictionary<string, bool> GetFlags() => new()
@@ -869,12 +869,37 @@ public partial class NesCpu : EmuState
         ["N"] = Flags[7],
     };
 
-    public Dictionary<string, byte> GetRegs() => new()
+    public Dictionary<string, byte> GetRegisters() => new()
     {
         ["A:"] = (byte)A,
         ["X:"] = (byte)X,
         ["Y:"] = (byte)Y,
     };
+
+    public int GetReg(string reg)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "a": return A;
+            case "x": return X;
+            case "y": return Y;
+            case "p": return PS;
+            case "pc": return PC;
+            default: return 0;
+        }
+    }
+
+    public void SetReg(string reg, int v)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "a": A = v; break;
+            case "x": X = v; break;
+            case "y": Y = v; break;
+            case "p": PS = v; break;
+            case "pc": PC = v; break;
+        }
+    }
 
     public override void Save(BinaryWriter bw)
     {
@@ -886,7 +911,7 @@ public partial class NesCpu : EmuState
         bw.Write(Instructions);
         bw.Write(Cycles);
         bw.Write(CycleTotal);
-        bw.Write(Ps);
+        bw.Write(PS);
         bw.Write(NmiTriggered);
         bw.Write(StepOverAddr);
     }
@@ -901,7 +926,7 @@ public partial class NesCpu : EmuState
         Instructions = br.ReadInt32();
         Cycles = br.ReadInt32();
         CycleTotal = br.ReadInt32();
-        Ps = br.ReadInt32();
+        PS = br.ReadInt32();
         NmiTriggered = br.ReadInt32();
         StepOverAddr = br.ReadInt32();
     }

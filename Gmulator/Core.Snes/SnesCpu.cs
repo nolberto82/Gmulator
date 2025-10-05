@@ -1,12 +1,15 @@
-﻿namespace Gmulator.Core.Snes;
+﻿using Gmulator.Core.Snes.Mappers;
+using System.ComponentModel.DataAnnotations;
+
+namespace Gmulator.Core.Snes;
 public partial class SnesCpu : EmuState, ICpu
 {
     private const int FC = 1 << 0;
     private const int FZ = 1 << 1;
     private const int FI = 1 << 2;
     private const int FD = 1 << 3;
-    private const int FX = 1 << 4;
-    private const int FM = 1 << 5;
+    public const int FX = 1 << 4;
+    public const int FM = 1 << 5;
     private const int FV = 1 << 6;
     private const int FN = 1 << 7;
     private const int COPn = 0xFFE4;
@@ -17,74 +20,100 @@ public partial class SnesCpu : EmuState, ICpu
     private const int RESETe = 0xFFFC;
     private const int BRKe = 0xFFFE;
 
-    private int pc, sp, ra, rx, ry, ps;
+    private int pc, sp, ra, rx, ry, ps, db, pb, pbr, dr;
     private bool Imme, Wait;
 
-    public int PC { get => (ushort)pc; set => pc = (ushort)value; }
-    public int SP { get => (ushort)sp; set => sp = (ushort)value; }
-    public int A { get => (ushort)ra; set => ra = (ushort)value; }
+    public int PC
+    {
+        get => pc & 0xffff;
+        private set => pc = value & 0xffff;
+    }
+    public int SP
+    {
+        get => sp & 0xffff;
+        private set => sp = value & 0xffff;
+    }
+    public int A
+    {
+        get => MMem ? ra & 0xff00 | ra & 0xff : ra & 0xffff;
+        private set => ra = MMem ? ra & 0xff00 | value & 0xff : value & 0xffff;
+    }
     public int X
     {
-        get => !E && !XMem ? (ushort)rx : (byte)rx;
-        set => rx = (ushort)value;
+        get => !E && !XMem ? rx & 0xffff : rx & 0xff;
+        private set => rx = !E && !XMem ? value & 0xffff : value & 0xff;
     }
     public int Y
     {
-        get => !E && !XMem ? (ushort)ry : (byte)ry;
-        set => ry = (ushort)value;
+        get => !E && !XMem ? ry & 0xffff : ry & 0xff;
+        private set => ry = !E && !XMem ? value & 0xffff : value & 0xff;
     }
-    public int PS { get => (byte)ps; set => ps = (byte)value; }
-    public int PB { get; set; }
-    public int DB { get; set; }
+    public int PS
+    {
+        get => ps & 0xff;
+        private set => ps = value & 0xff;
+    }
+    public int PB { get => pb & 0xff; set => pb = value & 0xff; }
+    public int DB { get => db & 0xff; private set => db = value & 0xff; }
     public bool E { get; set; }
-    public int D { get; private set; }
+    public int D { get => dr & 0xffff; private set => dr = value & 0xffff; }
     public bool FastMem { get; set; }
-    public byte OpenBus { get; set; }
+    public int OpenBus { get; set; }
     private bool NmiEnabled;
     private bool IRQEnabled;
     public int StepOverAddr;
-    public int Cycles { get; set; }
+    public int Cycles { get => cycles; private set => cycles = value; }
 
-    public bool XMem { get => ps.GetBit(4); }
-    public bool MMem { get => ps.GetBit(5); }
-    private int PBR { get => PB << 16; }
+    public bool XMem => (PS & FX) != 0;
+    public bool MMem => (PS & FM) != 0;
 
     private Snes Snes;
-    public int TestAddr { get; set; }
-    private int C { get => PS & FC; }
-    private bool I { get => (PS & FI) == FI; }
-    public int Instructions { get; private set; }
+    private SnesPpu Ppu;
+    private BaseMapper Mapper;
+    private int C => PS & FC;
+    private bool I => (PS & FI) != 0;
     public Action<int> SetState;
+    private int cycles;
+
+    public int TestAddr { get; private set; }
 
     public SnesCpu() => CreateOpcodes();
 
-    public void SetSnes(Snes snes) => Snes = snes;
+    public void SetSnes(Snes snes, SnesPpu ppu, BaseMapper mapper)
+    {
+        Snes = snes;
+        Ppu = ppu;
+        Mapper = mapper;
+    }
+
+    public void ResetCycles() => cycles = 0;
 
     private void Idle()
     {
-        Snes.HandleDma();
-        Snes.Ppu?.Step(6);
+        Snes?.HandleDma();
+        Ppu?.Step(6);
     }
 
-    public void Idle8() => Snes?.Ppu.Step(8);
-
-    public byte Read(int a)
+    public void Idle8()
     {
-        Cycles++;
+        Ppu?.Step(8);
+    }
+
+    public int Read(int a)
+    {
         var c = GetClockSpeed(a);
-        Snes?.Ppu.Step(c);
+        Ppu?.Step(c);
         Snes?.HandleDma();
-        return OpenBus = Snes?.ReadMemory(a) ?? 0;
+        int v = Snes?.ReadMemory(a) ?? 0;
+        return OpenBus = v & 0xff;
     }
 
     public void Write(int a, int v)
     {
-        Cycles++;
         var c = GetClockSpeed(a);
-        Snes?.Ppu.Step(c);
+        Ppu?.Step(c);
         Snes?.HandleDma();
         Snes?.WriteMemory(a, v);
-
     }
 
     private int GetClockSpeed(int a)
@@ -95,7 +124,7 @@ public partial class SnesCpu : EmuState, ICpu
         {
             if (a < 0x2000)
                 return 8;
-            else if (a < 0x4000)
+            if (a < 0x4000)
                 return 6;
             if (a < 0x4200)
                 return 12;
@@ -109,34 +138,35 @@ public partial class SnesCpu : EmuState, ICpu
         return FastMem && bank >= 0x80 ? 6 : 8;
     }
 
-    private ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
+    private int ReadWord(int a)
+    {
+        int low = Read(a);
+        int high = Read(a + 1);
+        return (high << 8 | low) & 0xffff;
+    }
 
-    private int ReadLong(int a) => (Read(a) | Read(a + 1) << 8) | Read(a + 2) << 16;
+    private int ReadLong(int a)
+    {
+        int low = Read(a);
+        int mid = Read(a + 1);
+        int high = Read(a + 2);
+        return (high << 16 | mid << 8 | low) & 0xffffff;
+    }
 
     private void WriteWord(int a, int v)
     {
-        Write(a, (byte)v);
-        Write(a + 1, v >> 8);
+        Write(a, v & 0xff);
+        Write(a + 1, (v >> 8) & 0xff);
     }
 
-    private byte GetGet8bitImm(int a)
+    private int GetGet8bitImm(int a)
     {
-        if (Imme) return (byte)a;
-        else return Read(a);
+        return Imme ? a & 0xff : Read(a);
     }
 
-    private ushort GetGet16bitImm(int a)
+    private int GetGet16bitImm(int a)
     {
-        if (Imme) return (ushort)a;
-        else return ReadWord(a);
-    }
-
-    private static void SetRegValue(ref int r, int v, bool bitmode)
-    {
-        if (bitmode)
-            r = (r & 0xff00) | v;
-        else
-            r = v;
+        return Imme ? a & 0xffff : ReadWord(a);
     }
 
     private void WrapSp()
@@ -173,11 +203,21 @@ public partial class SnesCpu : EmuState, ICpu
             return;
         }
 
-        var op = Read(PBR | PC++);
+        int pbr = pb << 16;
+#if DEBUG
+        if (PC == 0x8000 || PC == 0x8266)
+        {
+            var a = (Read(SP + 1) | Read(SP + 2) << 8) - 2;
+            if (a > 0)
+                TestAddr = pbr | a;
+        }
+#endif
+
+        int op = Read(pb << 16 | PC++) & 0xff;
         ExecOp(op);
     }
 
-    public void ExecOp(byte op)
+    public void ExecOp(int op)
     {
         int mode = Disasm[op].Mode;
         Imme = Disasm[op].Immediate;
@@ -199,21 +239,21 @@ public partial class SnesCpu : EmuState, ICpu
             case BRL: Bra(mode); break;
             case BVC: Brn(mode, 6); break;
             case BVS: Brp(mode, 6); break;
-            case CLC: GetMode(mode); PS &= ~FC; Idle(); break;
-            case CLD: GetMode(mode); PS &= ~FD; Idle(); break;
-            case CLI: GetMode(mode); PS &= ~FI; Idle(); break;
-            case CLV: GetMode(mode); PS &= ~FV; Idle(); break;
+            case CLC: PS &= ~FC; Idle(); break;
+            case CLD: PS &= ~FD; Idle(); break;
+            case CLI: PS &= ~FI; Idle(); break;
+            case CLV: PS &= ~FV; Idle(); break;
             case CMP: Cmp(GetMode(mode)); break;
             case COP: Cop(); break;
             case CPX: Cpx(GetMode(mode)); break;
             case CPY: Cpy(GetMode(mode)); break;
             case DEC: Dec(GetMode(mode), mode); break;
-            case DEX: Dex(GetMode(mode)); Idle(); break;
-            case DEY: Dey(GetMode(mode)); Idle(); break;
+            case DEX: Dex(); Idle(); break;
+            case DEY: Dey(); Idle(); break;
             case EOR: Eor(GetMode(mode)); break;
             case INC: Inc(GetMode(mode), mode); break;
-            case INX: Inx(GetMode(mode)); Idle(); break;
-            case INY: Iny(GetMode(mode)); Idle(); break;
+            case INX: Inx(); Idle(); break;
+            case INY: Iny(); Idle(); break;
             case JML: Jml(GetMode(mode), mode); break;
             case JMP: Jmp(GetMode(mode), mode); break;
             case JSR: Jsr(GetMode(mode), mode); break;
@@ -230,12 +270,12 @@ public partial class SnesCpu : EmuState, ICpu
             case PEI: Pei(GetMode(mode)); break;
             case PER: Per(GetMode(mode)); break;
             case PHA: Pha(); break;
-            case PHB: Push((byte)DB); break;
+            case PHB: Push(db); break;
             case PHD: Phd(); break;
             case PHK: Phk(); break;
             case PHP: Php(); break;
-            case PHX: PushX(X); break;
-            case PHY: PushX(Y); break;
+            case PHX: PushX(rx); break;
+            case PHY: PushX(ry); break;
             case PLA: Pla(); break;
             case PLB: Plb(); break;
             case PLD: Pld(); break;
@@ -251,60 +291,66 @@ public partial class SnesCpu : EmuState, ICpu
             case SBC: Sbc(GetMode(mode)); break;
             case SEC: PS |= FC; Idle(); break;
             case SED: PS |= FD; Idle(); break;
-            case SEI: GetMode(mode); PS |= FI; Idle(); break;
+            case SEI: PS |= FI; Idle(); break;
             case SEP: Sep(GetMode(Immediate)); break;
             case STA: Sta(GetMode(mode)); break;
             case STP: GetMode(mode, true); Idle(); Idle(); break;
             case STX: Stx(GetMode(mode)); break;
             case STY: Sty(GetMode(mode)); break;
             case STZ: Stz(GetMode(mode)); break;
-            case TAX: GetMode(mode); Tax(); break;
-            case TAY: GetMode(mode); Tay(); break;
-            case TCD: GetMode(mode); Tcd(); break;
-            case TCS: GetMode(mode); Tcs(); break;
-            case TDC: GetMode(mode); Tdc(); break;
+            case TAX: Tax(); break;
+            case TAY: Tay(); break;
+            case TCD: Tcd(); break;
+            case TCS: Tcs(); break;
+            case TDC: Tdc(); break;
             case TRB: Trb(GetMode(mode)); break;
             case TSB: Tsb(GetMode(mode)); break;
-            case TSC: GetMode(mode); Tsc(); break;
-            case TSX: GetMode(mode); Tsx(); break;
-            case TXA: GetMode(mode); Txa(); break;
-            case TXS: GetMode(mode); Txs(); break;
-            case TXY: GetMode(mode); Txy(); break;
-            case TYA: GetMode(mode); Tya(); break;
-            case TYX: GetMode(mode); Tyx(); break;
+            case TSC: Tsc(); break;
+            case TSX: Tsx(); break;
+            case TXA: Txa(); break;
+            case TXS: Txs(); break;
+            case TXY: Txy(); break;
+            case TYA: Tya(); break;
+            case TYX: Tyx(); break;
             case WAI: GetMode(mode, true); Idle(); Idle(); Wait = true; break;
             case WDM: PC++; break;
-            case XBA: GetMode(mode, true); Xba(); break;
-            case XCE: GetMode(mode, true); Xce(); break;
+            case XBA: Xba(); break;
+            case XCE: Xce(); break;
         }
     }
 
     private void Adc(int a)
     {
         int v, b;
-        if (MMem)
+        bool decimalMode = (PS & FD) != 0;
+        bool mmem = MMem;
+        if (mmem)
         {
             v = GetGet8bitImm(a);
-            if (PS.GetBit(3))
+
+            if (decimalMode)
             {
-                b = (ushort)((A & 0xf) + (v & 0xf) + (PS & FC));
+                b = (ra & 0xf) + (v & 0xf) + (PS & FC);
                 if (b > 0x09) b += 0x06;
                 SetFlagC(b >= 0x10);
-                b = (ushort)((A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
+                b = ((A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
             }
             else
-                b = (ushort)((byte)A + v + (PS & FC));
+            {
+                b = (byte)A + v + (PS & FC);
+            }
 
-            SetFlagV((~((byte)A ^ v) & ((byte)A ^ b) & 0x80) == 0x80);
-            if (PS.GetBit(3) && (byte)b > 0x9f) b += 0x60;
+            SetFlagV((~(ra & 0xff ^ v) & (ra & 0xff ^ b) & 0x80) == 0x80);
+
+            if (decimalMode && (byte)b > 0x9f) b += 0x60;
 
             SetFlagC(b >= 0x100);
-            SetRegValue(ref ra, (byte)b, MMem);
+            ra = (ra & 0xff00) | (b & 0xff);
         }
         else
         {
             v = GetGet16bitImm(a);
-            if (PS.GetBit(3))
+            if (decimalMode)
             {
                 b = (A & 0xf) + (v & 0xf) + (PS & FC);
                 if (b > 0x09) b += 0x06;
@@ -316,54 +362,64 @@ public partial class SnesCpu : EmuState, ICpu
                 b = (A & 0xf000) + (v & 0xf000) + (b & 0x1000) + (b & 0xfff);
             }
             else
+            {
                 b = A + v + (PS & FC);
+            }
 
             SetFlagV((~(A ^ v) & (A ^ b) & 0x8000) == 0x8000);
-            if (PS.GetBit(3) && b > 0x9fff) b += 0x6000;
+
+            if (decimalMode && b > 0x9fff) b += 0x6000;
 
             SetFlagC(b >= 0x10000);
-
-            A = (ushort)b;
+            ra = b & 0xffff;
         }
-        SetFlagZN(b, MMem);
+        SetFlagZN(b, mmem);
     }
 
     private void And(int a)
     {
-        int v;
-        if (MMem)
+        bool mmem = MMem;
+        if (Imme)
         {
-            v = A & GetGet8bitImm(a);
-            SetRegValue(ref ra, v, MMem);
+            if (mmem)
+                ra = (ra & 0xff00) | ra & a;
+            else
+                ra &= a;
         }
         else
-            A &= GetGet16bitImm(a);
-        SetFlagZN(A, MMem);
+        {
+            if (mmem)
+                ra = ra & 0xff00 | Read(a) & ra;
+            else
+                ra &= ReadWord(a);
+        }
+        SetFlagZN(ra, mmem);
     }
 
     private void Asl(int a, int mode)
     {
         int b;
+        bool mmem = MMem;
         if (mode == Accumulator)
         {
-            if (MMem)
+            if (mmem)
             {
-                SetFlagC((A & 0x80) > 0);
-                b = (A << 1) & 0xfe;
+                SetFlagC((A & 0x80) != 0);
+                b = ra & 0xff00 | ((ra & 0xff) << 1) & 0xfe;
             }
             else
             {
-                SetFlagC((A & 0x8000) > 0);
-                b = (A << 1) & 0xfffe;
+                SetFlagC((A & 0x8000) != 0);
+                b = (ra << 1) & 0xfffe;
             }
-            SetRegValue(ref ra, b, MMem);
+            ra = b;
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = Read(a);
-                SetFlagC((b & 0x80) > 0);
+                SetFlagC((b & 0x80) != 0);
                 b = (b << 1) & 0xfe;
                 Write(a, b);
             }
@@ -376,12 +432,12 @@ public partial class SnesCpu : EmuState, ICpu
                 Idle(); Idle();
             }
         }
-        SetFlagZN(b, MMem);
+        SetFlagZN(b, mmem);
     }
 
     private void Brp(int m, int f)
     {
-        if (PS.GetBit(f))
+        if ((PS & (1 << f)) != 0)
         {
             Bra(m);
             Idle();
@@ -395,7 +451,7 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Brn(int m, int f)
     {
-        if (!PS.GetBit(f))
+        if ((PS & (1 << f)) == 0)
         {
             Bra(m);
             Idle();
@@ -417,40 +473,40 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Bit(int a, int mode)
     {
-        int v;
-        int b;
+        int v, b;
+        bool mmem = MMem;
         if (Imme)
         {
-            if (MMem)
+            if (mmem)
             {
                 b = GetGet8bitImm(a);
                 v = (byte)A & b;
-                PS = (byte)v == 0 ? PS |= FZ : PS &= ~FZ;
+                PS = ((v & 0xFF) == 0) ? (PS | FZ) : (PS & ~FZ);
             }
             else
             {
                 b = GetGet16bitImm(a);
                 v = A & b;
-                PS = (ushort)v == 0 ? PS |= FZ : PS &= ~FZ;
+                PS = ((v & 0xFFFF) == 0) ? (PS | FZ) : (PS & ~FZ);
             }
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = Read(a);
                 v = (byte)A & b;
-                PS = (byte)v == 0 ? PS |= FZ : PS &= ~FZ;
-                PS = (b & FN) == FN ? PS |= FN : PS &= ~FN;
-                SetFlagV((b & FV) == FV);
+                PS = ((v & 0xFF) == 0) ? (PS | FZ) : (PS & ~FZ);
+                PS = ((b & FN) != 0) ? (PS | FN) : (PS & ~FN);
+                SetFlagV((b & FV) != 0);
             }
             else
             {
                 b = ReadWord(a);
                 v = A & b;
-                PS = (ushort)v == 0 ? PS |= FZ : PS &= ~FZ;
-                PS = (b & 0x8000) == 0x8000 ? PS |= FN : PS &= ~FN;
-                SetFlagV((b & 0x4000) == 0x4000);
+                PS = ((v & 0xFFFF) == 0) ? (PS | FZ) : (PS & ~FZ);
+                PS = ((b & 0x8000) != 0) ? (PS | FN) : (PS & ~FN);
+                SetFlagV((b & 0x4000) != 0);
                 Idle();
             }
         }
@@ -459,57 +515,57 @@ public partial class SnesCpu : EmuState, ICpu
     private void Cmp(int a)
     {
         int v, r;
-        if (MMem)
+        bool mmem = MMem;
+        if (mmem)
             v = GetGet8bitImm(a);
         else
             v = GetGet16bitImm(a);
 
-        r = A - v;
-        SetFlagC(MMem ? (byte)A >= v : A >= v);
-        SetFlagZN(r, MMem);
+        r = ra - v;
+        SetFlagC(mmem ? (ra & 0xff) >= v : (ra & 0xffff) >= v);
+        SetFlagZN(r, mmem);
     }
 
     private void Cpx(int a)
     {
         int v, r;
-        if (XMem)
+        bool xmem = XMem;
+        if (xmem)
             v = GetGet8bitImm(a);
         else
             v = GetGet16bitImm(a);
 
         r = X - v;
         SetFlagC(X >= v);
-        SetFlagZN(r, XMem);
+        SetFlagZN(r, xmem);
     }
 
     private void Cpy(int a)
     {
         int v, r;
-        if (XMem)
+        bool xmem = XMem;
+        if (xmem)
             v = GetGet8bitImm(a);
         else
             v = GetGet16bitImm(a);
 
         r = Y - v;
         SetFlagC(Y >= v);
-        SetFlagZN(r, XMem);
+        SetFlagZN(r, xmem);
     }
 
     private void Dec(int a, int mode)
     {
         int b;
+        var mmem = MMem;
         if (mode == Accumulator)
         {
-            if (MMem)
-                b = (byte)(A - 1);
-            else
-                b = A - 1;
-            SetRegValue(ref ra, b, MMem);
-            SetFlagZN(A, MMem);
+            A--;
+            SetFlagZN(ra, mmem);
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = (byte)(Read(a) - 1);
                 Write(a, b);
@@ -519,61 +575,58 @@ public partial class SnesCpu : EmuState, ICpu
                 b = (ushort)(ReadWord(a) - 1);
                 WriteWord(a, b);
             }
-            SetFlagZN(b, MMem);
+            SetFlagZN(b, mmem);
         }
     }
 
-    private void Dex(int v)
+    private void Dex()
     {
         X--;
-        if (XMem)
-        {
-            X &= 0xff;
-        }
-
-        SetFlagZN(X, XMem);
+        SetFlagZN(rx, XMem);
     }
 
-    private void Dey(int v)
+    private void Dey()
     {
         Y--;
-        SetFlagZN(Y, XMem);
+        SetFlagZN(ry, XMem);
     }
 
     private void Eor(int v)
     {
+        var mmem = MMem;
         if (Imme)
         {
-            v = A ^ v;
-            SetRegValue(ref ra, v, MMem);
+            v = ra ^ v;
+            ra = v;
         }
         else
         {
-            if (MMem)
-                SetRegValue(ref ra, A ^ Read(v), MMem);
+            if (mmem)
+                ra ^= Read(v);
             else
-                SetRegValue(ref ra, A ^ ReadWord(v), MMem);
+                ra ^= ReadWord(v);
         }
-        SetFlagZN(A, MMem);
+        SetFlagZN(ra, mmem);
     }
 
     private void Inc(int a, int mode)
     {
+        var mmem = MMem;
         if (mode == Accumulator)
         {
-            if (MMem)
+            if (mmem)
             {
-                int v = A + 1;
-                A = (A & 0xff00) | (byte)v;
+                int v = ra + 1;
+                ra = (ra & 0xff00) | (byte)v;
             }
             else
-                A++;
-            SetFlagZN(A, MMem);
+                ra++;
+            SetFlagZN(ra, mmem);
         }
         else
         {
             int b;
-            if (MMem)
+            if (mmem)
             {
                 b = (byte)(Read(a) + 1);
                 Write(a, b);
@@ -583,34 +636,33 @@ public partial class SnesCpu : EmuState, ICpu
                 b = (ushort)(ReadWord(a) + 1);
                 WriteWord(a, b);
             }
-            SetFlagZN(b, MMem);
+            SetFlagZN(b, mmem);
         }
     }
 
-    private void Inx(int v)
+    private void Inx()
     {
         X++;
-        SetFlagZN(X, XMem);
+        SetFlagZN(rx, XMem);
     }
 
-    private void Iny(int v)
+    private void Iny()
     {
         Y++;
-        SetFlagZN(Y, XMem);
+        SetFlagZN(ry, XMem);
     }
 
     private void Jml(int v, int mode)
     {
-
         if (mode == AbsoluteLong)
         {
             PB = v >> 16;
-            PC = (ushort)v;
+            PC = v;
         }
         else if (mode == AbsoluteIndirectLong)
         {
             var a = ReadLong(v);
-            PC = (short)a;
+            PC = a;
             PB = a >> 16;
         }
     }
@@ -638,7 +690,7 @@ public partial class SnesCpu : EmuState, ICpu
         if (mode == Absolute || mode == AbsoluteLong)
         {
             PushWord(PC, true);
-            PC = PBR | v;
+            PC = pb << 16 | (ushort)v;
         }
         else
         {
@@ -650,10 +702,11 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Jsl(int v, int mode)
     {
-        PC--;
-        Push((byte)PB);
-        Push((byte)(PC >> 8));
-        Push((byte)PC);
+        var pc = PC - 1;
+        var pb = PB;
+        Push((byte)pb);
+        Push((byte)(pc >> 8));
+        Push((byte)pc);
         PC = v;
         PB = v >> 16;
         WrapSp();
@@ -662,112 +715,110 @@ public partial class SnesCpu : EmuState, ICpu
     private void Lda(int v)
     {
         if (Imme)
-            SetRegValue(ref ra, v, MMem);
+            A = v;
         else
         {
             if (MMem)
-                SetRegValue(ref ra, Read(v), MMem);
+                A = Read(v);
             else
-                SetRegValue(ref ra, ReadWord(v), MMem);
+                A = ReadWord(v);
         }
-        SetFlagZN(A, MMem);
+        SetFlagZN(ra, MMem);
     }
 
     private void Ldx(int v)
     {
+        var xmem = XMem;
         if (Imme)
-            SetRegValue(ref rx, v, XMem);
+            rx = v;
         else
         {
-            if (XMem)
-                SetRegValue(ref rx, Read(v), XMem);
+            if (xmem)
+                X = Read(v);
             else
-                SetRegValue(ref rx, ReadWord(v), XMem);
+                X = ReadWord(v);
         }
-        SetFlagZN(X, XMem);
+        SetFlagZN(rx, xmem);
     }
 
     private void Ldy(int v)
     {
+        var xmem = XMem;
         if (Imme)
-            SetRegValue(ref ry, v, XMem);
+            ry = v;
         else
         {
-            if (XMem)
-                SetRegValue(ref ry, Read(v), XMem);
+            if (xmem)
+                ry = Read(v);
             else
-                SetRegValue(ref ry, ReadWord(v), XMem);
+                ry = ReadWord(v);
         }
-        SetFlagZN(Y, XMem);
+        SetFlagZN(ry, xmem);
     }
 
     private void Lsr(int a, int mode)
     {
         int b;
+        bool mmem = MMem;
         if (mode == Accumulator)
         {
-            SetFlagC(((byte)A & 0x01) > 0);
-            if (MMem)
-                b = (byte)((A >> 1) & 0x7f);
+            SetFlagC(((byte)ra & 0x01) != 0);
+            if (mmem)
+            {
+                b = A & 0xff;
+                b = (b >> 1) & 0x7f;
+            }
             else
-                b = (A >> 1) & 0x7fff;
-            SetRegValue(ref ra, b, MMem);
+                b = (ra >> 1) & 0x7fff;
+            A = b;
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = Read(a);
-                SetFlagC((b & 0x01) > 0);
+                SetFlagC((b & 0x01) != 0);
                 b = (byte)((b >> 1) & 0x7f);
                 Write(a, b);
             }
             else
             {
                 b = ReadWord(a);
-                SetFlagC((b & 0x01) > 0);
+                SetFlagC((b & 0x01) != 0);
                 b = (ushort)((b >> 1) & 0x7fff);
                 WriteWord(a, b);
             }
         }
-        SetFlagZN(b, MMem);
+        SetFlagZN(b, mmem);
     }
 
     private void Mvn()
     {
-        var src = Read(PBR | PC + 1);
-        var dst = Read(PBR | PC);
+        bool xmem = XMem;
+        int src = Read(pb << 16 | (PC + 1));
+        int dst = Read(pb << 16 | PC);
         DB = dst;
-        var v = Read(src << 16 | X);
-        Write(dst << 16 | Y, v);
-        A--;
-        int b = XMem ? (byte)(X + 1) : X + 1;
-        SetRegValue(ref rx, b, XMem);
-        b = XMem ? (byte)(Y + 1) : Y + 1;
-        SetRegValue(ref ry, b, XMem);
-        if (A != 0xffff)
-            PC--;
-        else
-            PC += 2;
+        int v = Read((src << 16) | (xmem ? (byte)rx : rx));
+        Write((dst << 16) | (xmem ? (byte)ry : ry), v);
+        ra = (ra - 1) & 0xffff;
+        X++;
+        Y++;
+        PC = (ra != 0xffff) ? (PC - 1) : (PC + 2);
         Idle();
     }
 
     private void Mvp()
     {
-        var src = Read(PBR | PC + 1);
-        var dst = Read(PBR | PC);
+        bool xmem = XMem;
+        int src = Read(pb << 16 | (PC + 1));
+        int dst = Read(pb << 16 | PC);
         DB = dst;
-        var v = Read(src << 16 | X);
-        Write(dst << 16 | Y, v);
-        A--;
-        int b = XMem ? (byte)(X - 1) : X - 1;
-        SetRegValue(ref rx, b, XMem);
-        b = XMem ? (byte)(Y - 1) : Y - 1;
-        SetRegValue(ref ry, b, XMem);
-        if (A != 0xffff)
-            PC--;
-        else
-            PC += 2;
+        int v = Read((src << 16) | (xmem ? (byte)rx : rx));
+        Write((dst << 16) | (xmem ? (byte)ry : ry), v);
+        ra = (ra - 1) & 0xffff;
+        X--;
+        Y--;
+        PC = (ra != 0xffff) ? (PC - 1) : (PC + 2);
         Idle();
     }
 
@@ -796,19 +847,20 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Ora(int v)
     {
+        bool mmem = MMem;
         if (Imme)
         {
-            v = A | v;
-            SetRegValue(ref ra, v, MMem);
+            v = ra | v;
+            ra = v;
         }
         else
         {
-            if (MMem)
-                SetRegValue(ref ra, A | Read(v), MMem);
+            if (mmem)
+                ra |= Read(v);
             else
-                SetRegValue(ref ra, A | ReadWord(v), MMem);
+                ra |= ReadWord(v);
         }
-        SetFlagZN(A, MMem);
+        SetFlagZN(ra, mmem);
     }
 
     private void Pea(int v)
@@ -843,23 +895,24 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Phk()
     {
-        Push((byte)PB);
+        Push(PB);
         WrapSp();
     }
 
     private void Php()
     {
-        Push((byte)PS);
+        Push(PS);
         WrapSp();
     }
 
     private void Pla()
     {
-        if (MMem)
-            SetRegValue(ref ra, Pop(true), MMem);
+        bool mmem = MMem;
+        if (mmem)
+            ra = ra & 0xff00 | Pop(true);
         else
-            SetRegValue(ref ra, PopWord(), MMem);
-        SetFlagZN(A, MMem);
+            ra = PopWord();
+        SetFlagZN(ra, mmem);
     }
 
     private void Pld()
@@ -871,20 +924,22 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Plx()
     {
-        if (XMem)
-            SetRegValue(ref rx, Pop(true), XMem);
+        bool xmem = XMem;
+        if (xmem)
+            rx = rx & 0xff00 | Pop(true);
         else
-            SetRegValue(ref rx, PopWord(), XMem);
-        SetFlagZN(X, XMem);
+            rx = PopWord();
+        SetFlagZN(rx, xmem);
     }
 
     private void Ply()
     {
-        if (XMem)
-            SetRegValue(ref ry, Pop(true), XMem);
+        bool xmem = XMem;
+        if (xmem)
+            ry = ry & 0xff00 | Pop(true);
         else
-            SetRegValue(ref ry, PopWord(), XMem);
-        SetFlagZN(Y, XMem);
+            ry = PopWord();
+        SetFlagZN(ry, xmem);
     }
 
     private void Plb()
@@ -904,15 +959,15 @@ public partial class SnesCpu : EmuState, ICpu
 
         if (XMem)
         {
-            X &= 0xff;
-            Y &= 0xff;
+            rx &= 0xff;
+            ry &= 0xff;
         }
         WrapSp();
     }
 
     private void Rep(int v)
     {
-        PS &= (byte)~v;
+        ps &= ~v;
         if (E)
             PS |= FX | FM;
     }
@@ -921,34 +976,35 @@ public partial class SnesCpu : EmuState, ICpu
     {
         int msb;
         int b;
+        bool mmem = MMem;
         if (mode == Accumulator)
         {
-            if (MMem)
+            if (mmem)
             {
                 msb = A & 0x80;
-                b = (byte)A;
+                b = ra & 0xff;
                 b <<= 1;
-                if ((PS & FC) > 0)
+                if ((PS & FC) != 0)
                     b |= 0x01;
-                SetRegValue(ref ra, (byte)b, MMem);
+                A = b;
             }
             else
             {
-                msb = A & 0x8000;
-                A <<= 1;
+                msb = ra & 0x8000;
+                ra <<= 1;
                 if ((PS & FC) == FC)
-                    A |= 0x01;
-                b = (ushort)A;
+                    ra |= 0x01;
+                b = ra & 0xffff;
             }
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = Read(a);
                 msb = b & 0x80;
                 b = (byte)(b << 1);
-                if ((PS & FC) > 0)
+                if ((PS & FC) != 0)
                     b |= 0x01;
                 Write(a, b);
             }
@@ -962,42 +1018,42 @@ public partial class SnesCpu : EmuState, ICpu
                 WriteWord(a, b);
             }
         }
-        SetFlagC(msb > 0);
-        SetFlagZN(b, MMem);
+        SetFlagC(msb != 0);
+        SetFlagZN(b, mmem);
     }
 
     private void Ror(int a, int mode)
     {
-        int bit0;
-
-        int b;
+        int bit0, b;
+        bool mmem = MMem;
         if (mode == Accumulator)
         {
-            if (MMem)
+            if (mmem)
             {
-                bit0 = A & 0x01;
-                b = (byte)(A) >> 1;
-                if ((PS & FC) > 0)
+                b = A & 0xff;
+                bit0 = b & 0x01;
+                b >>= 1;
+                if ((PS & FC) != 0)
                     b |= 0x80;
-                SetRegValue(ref ra, (byte)b, MMem);
+                A = b;
             }
             else
             {
-                bit0 = A & 0x01;
-                A >>= 1;
+                bit0 = ra & 0x01;
+                ra >>= 1;
                 if ((PS & FC) == FC)
-                    A |= 0x8000;
-                b = A;
+                    ra |= 0x8000;
+                b = ra & 0xffff;
             }
         }
         else
         {
-            if (MMem)
+            if (mmem)
             {
                 b = Read(a);
                 bit0 = b & 0x01;
                 b = (byte)(b >> 1);
-                if ((PS & FC) > 0)
+                if ((PS & FC) != 0)
                     b |= 0x80;
                 Write(a, b);
             }
@@ -1006,14 +1062,14 @@ public partial class SnesCpu : EmuState, ICpu
                 b = ReadWord(a);
                 bit0 = b & 0x01;
                 b = (ushort)(b >> 1);
-                if ((PS & FC) > 0)
+                if ((PS & FC) != 0)
                     b |= 0x8000;
                 WriteWord(a, b);
             }
 
         }
-        SetFlagC(bit0 > 0);
-        SetFlagZN(b, MMem);
+        SetFlagC(bit0 != 0);
+        SetFlagZN(b, mmem);
     }
 
     private void Rti()
@@ -1033,9 +1089,9 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Rtl()
     {
-        var v = PBR | PopWord();
+        var v = pb << 16 | PopWord();
         PB = Pop();
-        PC = v | PBR;
+        PC = v | pb << 16;
         PC++;
         WrapSp();
     }
@@ -1044,30 +1100,32 @@ public partial class SnesCpu : EmuState, ICpu
     {
         PC = Pop(true);
         PC |= Pop(true) << 8;
-        PC |= PBR;
+        PC |= pb << 16;
         PC++;
     }
 
     private void Sep(int v)
     {
-        PS |= v;
+        ps |= v;
         if (E)
             PS |= FX | FM;
 
         if (XMem)
         {
-            X &= (byte)X;
-            Y &= (byte)Y;
+            rx &= 0xFF;
+            ry &= 0xFF;
         }
     }
 
     private void Sbc(int a)
     {
         int v, b;
-        if (MMem)
+        bool decimalMode = (PS & FD) != 0;
+        bool mmem = MMem;
+        if (mmem)
         {
-            v = (byte)~GetGet8bitImm(a);
-            if (PS.GetBit(3))
+            v = ~GetGet8bitImm(a) & 0xff;
+            if (decimalMode)
             {
                 b = (ushort)((A & 0xf) + (v & 0xf) + C);
                 if (b < 0x10) b -= 0x06;
@@ -1075,18 +1133,18 @@ public partial class SnesCpu : EmuState, ICpu
                 b = (ushort)((A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
             }
             else
-                b = (byte)A + v + C;
+                b = (ra & 0xff) + v + C;
 
-            SetFlagV((~((byte)A ^ v) & ((byte)A ^ b) & 0x80) == 0x80);
-            if (PS.GetBit(3) && b < 0x100) b -= 0x60;
+            SetFlagV((~(ra & 0xff ^ v) & (ra & 0xff ^ b) & 0x80) == 0x80);
+            if (decimalMode && b < 0x100) b -= 0x60;
 
             SetFlagC(b > 0xff);
-            SetRegValue(ref ra, (byte)b, MMem);
+            ra = ra & 0xff00 | b & 0xff;
         }
         else
         {
             v = (ushort)~GetGet16bitImm(a);
-            if (PS.GetBit(3))
+            if (decimalMode)
             {
                 b = (A & 0xf) + (v & 0xf) + C;
                 if (b < 0x10) b -= 0x06;
@@ -1101,37 +1159,37 @@ public partial class SnesCpu : EmuState, ICpu
                 b = A + v + C;
 
             SetFlagV((~(A ^ v) & (A ^ b) & 0x8000) == 0x8000);
-            if (PS.GetBit(3) && b < 0x10000) b -= 0x6000;
+            if (decimalMode && b < 0x10000) b -= 0x6000;
 
             SetFlagC(b > 0xffff);
 
-            A = (ushort)b;
+            ra = b & 0xffff;
         }
-        SetFlagZN(b, MMem);
+        SetFlagZN(b, mmem);
     }
 
     private void Sta(int a)
     {
         if (MMem)
-            Write(a, (byte)A);
+            Write(a, ra);
         else
-            WriteWord(a, A);
+            WriteWord(a, ra);
     }
 
     private void Stx(int a)
     {
         if (XMem)
-            Write(a, (byte)X);
+            Write(a, rx);
         else
-            WriteWord(a, X);
+            WriteWord(a, rx);
     }
 
     private void Sty(int a)
     {
         if (XMem)
-            Write(a, (byte)Y);
+            Write(a, ry);
         else
-            WriteWord(a, Y);
+            WriteWord(a, ry);
     }
 
     private void Stz(int a)
@@ -1144,52 +1202,54 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Tcd()
     {
-        D = A;
+        dr = ra;
         Idle();
-        SetFlagZN(D, false);
+        SetFlagZN(dr, false);
     }
 
     private void Tdc()
     {
-        A = D;
+        ra = D;
         Idle();
-        SetFlagZN(A, false);
+        SetFlagZN(ra, false);
     }
 
     private void Trb(int a)
     {
         int v;
-        if (MMem)
+        bool mmem = MMem;
+        if (mmem)
         {
             v = Read(a);
-            Write(a, (byte)v & ~ra);
-            v &= (byte)A;
+            Write(a, (v & 0xff) & ~ra);
+            v &= A;
         }
         else
         {
             v = ReadWord(a);
-            WriteWord(a, (ushort)(v & ~ra));
+            WriteWord(a, v & ~ra);
             v &= A;
         }
-        SetFlagZ(v, MMem);
+        SetFlagZ(v, mmem);
     }
 
     private void Tsb(int a)
     {
-        int v;
-        if (MMem)
+        bool mmem = MMem;
+        if (mmem)
         {
-            v = Read(a);
-            Write(a, (byte)(v | A));
-            v &= (byte)A;
+            int v = Read(a);
+            Write(a, v | A);
+            v &= A;
+            SetFlagZ(v, mmem);
         }
         else
         {
-            v = ReadWord(a);
-            WriteWord(a, (ushort)(v | A));
+            int v = ReadWord(a);
+            WriteWord(a, v | A);
             v &= A;
+            SetFlagZ(v, mmem);
         }
-        SetFlagZ(v, MMem);
     }
 
     private void Tcs()
@@ -1203,143 +1263,84 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Tsc()
     {
-        A = SP;
+        ra = sp;
         Idle();
-        SetFlagZN(A, false);
+        SetFlagZN(ra, false);
     }
 
     private void Tax()
     {
-        if (XMem)
-        {
-            X = (X & 0xff00) | (byte)A;
-            SetFlagZN((byte)X, XMem);
-        }
-        else
-        {
-            X = A;
-            SetFlagZN(X, XMem);
-        }
+        X = A;
+        SetFlagZN(rx, XMem);
         Idle();
     }
 
     private void Tay()
     {
-        if (XMem)
-        {
-            Y = (Y & 0xff00) | (byte)A;
-            SetFlagZN(Y, XMem);
-        }
-        else
-        {
-            Y = A;
-            SetFlagZN(Y, XMem);
-        }
+        Y = A;
+        SetFlagZN(ry, XMem);
         Idle();
     }
 
     private void Tsx()
     {
-        if (XMem)
-        {
-            SetRegValue(ref rx, (byte)sp, XMem);
-            SetFlagZN((byte)X, XMem);
-        }
-        else
-        {
-            X = SP;
-            SetFlagZN(X, XMem);
-        }
+        rx = sp;
+        SetFlagZN(rx, XMem);
         Idle();
     }
 
     private void Txa()
     {
-        if (MMem)
-        {
-            SetRegValue(ref ra, (byte)rx, MMem);
-            SetFlagZN(A, MMem);
-        }
-        else
-        {
-            A = X;
-            SetFlagZN(A, MMem);
-        }
+        ra = !MMem ? rx & 0xffff : ra & 0xff00 | rx & 0xff;
+        SetFlagZN(ra, MMem);
         Idle();
     }
 
     private void Txs()
     {
-        if (E)
-            SP = (byte)X | 0x100;
-        else
-            SP = X;
+        sp = E ? rx | 0x100 : rx;
         Idle();
     }
 
     private void Txy()
     {
-        if (XMem)
-        {
-            SetRegValue(ref ry, (byte)rx, MMem);
-            SetFlagZN(X, XMem);
-        }
-        else
-        {
-            Y = X;
-            SetFlagZN(X, XMem);
-        }
+        Y = rx;
+        SetFlagZN(rx, XMem);
         Idle();
     }
 
     private void Tyx()
     {
-        if (XMem)
-        {
-            SetRegValue(ref rx, (byte)ry, MMem);
-            SetFlagZN(X, XMem);
-        }
-        else
-        {
-            X = Y;
-            SetFlagZN(X, XMem);
-        }
+        X = ry;
+        SetFlagZN(rx, XMem);
         Idle();
     }
 
     private void Tya()
     {
-        if (MMem)
-        {
-            SetRegValue(ref ra, (byte)ry, MMem);
-            SetFlagZN(A, MMem);
-        }
-        else
-        {
-            A = Y;
-            SetFlagZN(A, MMem);
-        }
+        A = ry;
+        SetFlagZN(ra, MMem);
         Idle();
     }
 
     private void Xba()
     {
         int al, ah;
-        (al, ah) = (A >> 8, (byte)A);
-        A = ah << 8 | al;
+        (al, ah) = (ra >> 8, (byte)A);
+        ra = ah << 8 | al;
         Idle(); Idle();
         SetFlagZN(A, true);
     }
 
     private void Xce()
     {
-        (E, bool c) = (PS.GetBit(0), E);
+        (E, bool c) = (C != 0, E);
         PS = c ? PS |= FC : PS &= ~FC;
         if (E)
         {
             PS |= FX | FM;
-            X &= 0xff;
-            Y &= 0xff;
+            rx &= 0xff;
+            ry &= 0xff;
             SP &= 0xff | 1 << 8;
         }
         Idle();
@@ -1347,183 +1348,181 @@ public partial class SnesCpu : EmuState, ICpu
 
     public int GetMode(int mode, bool implied2 = false)
     {
+        int pbr = pb << 16;
         switch (mode)
         {
+
             case Absolute:
             {
-                var a = Read(PBR | PC++) | Read(PBR | PC++) << 8;
-                return DB << 16 | a;
+                var a = Read(pbr | PC++) | Read(pbr | PC++) << 8;
+                return db << 16 | a;
             }
             case AbsoluteIndexedIndirect:
             {
-                var a = (ushort)((Read(PBR | PC++) | Read(PBR | PC++) << 8) + X);
-                return PBR | a;
+                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8) + X & 0xffff;
+                return pbr | a;
             }
             case AbsoluteIndexedX:
             {
-                var a = (ushort)(Read(PBR | PC++) | Read(PBR | PC++) << 8);
+                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8) & 0xffff;
                 if ((a + X & 0xff00) != (a & 0xff00)) Idle();
                 if (!XMem) Idle();
-                return DB << 16 | a + (XMem ? (byte)X : X);
+                return db << 16 | a + (XMem ? (byte)X : X);
             }
             case AbsoluteIndexedY:
             {
                 Idle();
-                var a = (ushort)(Read(PBR | PC++) | Read(PBR | PC++) << 8);
+                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8) & 0xffff;
                 if ((a + X & 0xff00) != (a & 0xff00)) Idle();
                 if (!XMem) Idle();
-                return DB << 16 | a + (XMem ? (byte)Y : Y);
+                return db << 16 | a + Y;
             }
             case AbsoluteIndirect:
             {
-                var a = Read(PBR | PC++) | Read(PBR | PC++) << 8;
+                var a = Read(pbr | PC++) | Read(pbr | PC++) << 8;
                 return a;
             }
             case AbsoluteIndirectLong:
             {
-                var a = Read(PBR | PC++) | Read(PBR | PC++) << 8;
+                var a = Read(pbr | PC++) | Read(pbr | PC++) << 8;
                 return a;
             }
             case AbsoluteLong:
             {
-                var a = (Read(PBR | PC++) | Read(PBR | PC++) << 8 | Read(PBR | PC++) << 16);
+                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8 | Read(pbr | PC++) << 16);
                 return a;
             }
             case AbsoluteLongIndexedX:
             {
-                var a = (Read(PBR | PC++) | Read(PBR | PC++) << 8 | Read(PBR | PC++) << 16) + X;
+                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8 | Read(pbr | PC++) << 16) + X;
                 return a;
             }
             case Accumulator: return 0;
             case DPIndexedIndirectX:
             {
-                int a = Read(PBR | PC++);
-                var b = (ushort)(a + X);
-                if ((byte)D > 0) Idle();
+                int a = Read(pbr | PC++);
+                var b = (a + X) & 0xffff;
+                if ((dr & 0xff) != 0) Idle();
                 Idle();
-                if (E && (byte)D == 0)
+                if (E && (D & 0xff) == 0)
                 {
-                    int d = (D & 0xff00) | (byte)b;
+                    int d = (dr & 0xff00) | b & 0xff;
                     a = Read(d);
                     a |= Read((d & 0xff) == 0xff ? b + 1 : b + 1) << 8;
                 }
                 else
                 {
-                    int d = (ushort)(b + D);
+                    int d = (b + dr) & 0xffff;
                     a = Read(d);
                     a |= Read((d & 0xff) == 0xff ? (d & 0xff00) : d + 1) << 8;
                 }
-                return DB << 16 | a;
+                return db << 16 | a;
             }
             case DPIndexedX:
             {
-                if ((byte)D > 0) Idle();
+                if ((dr & 0xff) != 0) Idle();
                 Idle();
-                var a = (ushort)(Read(PBR | PC++) + D + X);
-                a = (ushort)(E && a > 0xff ? a & 0xff | 0x100 : a);
+                var a = (Read(pbr | PC++) + dr + X) & 0xffff;
+                a = (E && a > 0xff ? a & 0xff | 0x100 : a) & 0xffff;
                 return a;
             }
             case DPIndexedY:
             {
-                int a = Read(PBR | PC++);
-                var b = (ushort)(a + Y);
-                if (E && (byte)D == 0)
-                    a = (D & 0xff00) | (byte)b;
+                int a = Read(pbr | PC++);
+                var b = (a + Y) & 0xffff;
+                if (E && (dr & 0xff) == 0)
+                    a = (dr & 0xff00) | b & 0xff;
                 else
-                    a = (ushort)(b + D);
+                    a = (b + D) & 0xffff;
                 return a;
             }
             case DPIndirect:
             {
-                var b = (ushort)(Read(PBR | PC++));
-                if ((byte)D > 0) Idle();
-                var a = DB << 16 | ReadWord(b + D);
+                var b = (Read(pbr | PC++)) & 0xffff;
+                if ((dr & 0xff) != 0) Idle();
+                var a = db << 16 | ReadWord(b + dr);
                 return a;
             }
             case DPIndirectIndexedY:
             {
-                var b = (ushort)(Read(PBR | PC++));
-                if ((byte)D > 0) Idle();
+                var b = Read(pbr | PC++) & 0xffff;
+                if ((dr & 0xff) != 0) Idle();
                 Idle();
-                var a = (DB << 16) | ReadWord(b + D) + Y;
+                int a = (db << 16) | ReadWord(b + dr) + Y;
                 return a;
             }
             case DPIndirectLong:
             {
-                var a = ReadLong((ushort)(Read(PBR | PC++) + D));
+                int a = ReadLong((Read(pbr | PC++) + dr) & 0xffff);
                 return a;
             }
             case DPIndirectLongIndexedY:
             {
-                var b = (ushort)(Read(PBR | PC++));
-                if ((byte)D > 0) Idle();
-                var a = ReadLong(b + D) + Y;
-                return a;
+                int b = Read(pbr | PC++) & 0xffff;
+                if ((dr & 0xff) != 0) Idle();
+                return ReadLong(b + dr) + Y;
             }
             case DirectPage:
             {
-                var a = Read(PBR | PC++);
-                return (ushort)(a + D);
+                int a = Read(pbr | PC++);
+                return (a + dr) & 0xffff;
             }
             case Immediate:
             {
-                var a = Read(PBR | PC++);
+                int a = Read(pbr | PC++);
                 Idle();
                 return a;
             }
             case ImmediateIndex:
             {
                 if (!XMem)
-                    return (ushort)(Read(PBR | PC++) | Read(PBR | PC++) << 8);
+                    return (Read(pbr | PC++) | Read(pbr | PC++) << 8) & 0xffff;
                 else
-                    return Read(PBR | PC++);
+                    return Read(pbr | PC++);
             }
             case ImmediateMemory:
             {
                 if (!MMem)
-                    return Read(PBR | PC++) | Read(PBR | PC++) << 8;
+                    return Read(pbr | PC++) | Read(pbr | PC++) << 8;
                 else
-                    return Read(PBR | PC++);
+                    return Read(pbr | PC++);
             }
             case Implied:
-                //AddCycles(6);
-                //if (implied2)
-                //    AddCycles(6);
                 return 0;
             case ProgramCounterRelative:
-                return PBR | (ushort)(PC + (sbyte)Read(PBR | PC) + 1);
+                return pbr | (PC + (sbyte)Read(pbr | PC) + 1) & 0xffff;
 
             case ProgramCounterRelativeLong:
             {
-                var a = Read(PBR | PC) | (Read(PBR | PC + 1) << 8);
-                return PBR | PC + (short)a + 2;
+                var a = Read(pbr | PC) | (Read(pbr | PC + 1) << 8);
+                return pbr | PC + a + 2 & 0xffff;
             }
             case SRIndirectIndexedY:
             {
                 Idle(); Idle();
-                return DB << 16 | ReadWord((ushort)(Read(PBR | PC++) + D + SP)) + Y;
+                return db << 16 | ReadWord((Read(pbr | PC++) + D + SP) & 0xffff) + Y;
             }
             case StackAbsolute:
-                return Read(PBR | PC++) | Read(PBR | PC++) << 8;
+                return Read(pbr | PC++) | Read(pbr | PC++) << 8;
 
             case StackDPIndirect:
             {
-                var a = Read(PBR | (ushort)(PC++));
-                return (ushort)(a + D);
+                var a = Read(pbr | PC++);
+                return (a + D) & 0xffff;
             }
             case StackInterrupt: return 0;
-            case StackPCRelativeLong: return Read(PBR | PC++) | Read(PBR | PC++) << 8;
+            case StackPCRelativeLong: return Read(pbr | PC++) | Read(pbr | PC++) << 8;
             case StackRelative:
             {
-                if ((byte)D > 0) Idle();
+                if ((D & 0xff) != 0) Idle();
                 Idle();
-                return Read(PBR | PC++) + SP;
+                return Read(pbr | PC++) + SP;
             }
         }
         return 0;
     }
 
-    private byte Pop(bool e = false)
+    private int Pop(bool e = false)
     {
         SetSp(SP + 1, e);
         return Read(SP);
@@ -1531,34 +1530,34 @@ public partial class SnesCpu : EmuState, ICpu
 
     private ushort PopWord() => (ushort)(Read(++SP) | Read(++SP) << 8);
 
-    private void Push(byte v, bool e = false)
+    private void Push(int v, bool e = false)
     {
         Idle();
-        Write(SP, v);
+        Write(SP, v & 0xff);
         SetSp(SP - 1, e);
     }
 
     private void PushWord(int v, bool e = false)
     {
-        Push((byte)(v >> 8), e);
-        Push((byte)(v), e);
+        Push(v >> 8, e);
+        Push(v, e);
     }
 
     private void PushM(int v)
     {
         if (MMem)
-            Push((byte)v);
+            Push(v);
         else
             PushWord(v);
     }
     private void PushX(int v)
     {
         if (XMem)
-            Push((byte)v);
+            Push(v);
         else
         {
-            Push((byte)(v >> 8));
-            Push((byte)v);
+            Push(v >> 8);
+            Push(v);
         }
         WrapSp();
     }
@@ -1569,14 +1568,14 @@ public partial class SnesCpu : EmuState, ICpu
         if (E)
         {
             PushWord(PC, true);
-            Push((byte)(PS | FM), true);
+            Push(PS | FM, true);
             PC = ReadWord(BRKe);
         }
         else
         {
-            Push((byte)PB);
+            Push(PB);
             PushWord(PC);
-            Push((byte)PS, true);
+            Push(PS, true);
             PC = ReadWord(BRKn);
         }
         PS |= FI;
@@ -1586,18 +1585,18 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void Cop()
     {
-        Read(PC++);
+        Read((ushort)PC++);
         if (E)
         {
             PushWord(PC);
-            Push((byte)(PS | FM), true);
+            Push(PS | FM, true);
             PC = ReadWord(COPe);
         }
         else
         {
-            Push((byte)PB);
+            Push(PB);
             PushWord(PC);
-            Push((byte)PS, true);
+            Push(PS, true);
             PC = ReadWord(COPn);
             Idle();
         }
@@ -1610,12 +1609,11 @@ public partial class SnesCpu : EmuState, ICpu
     {
         SP = 0x0200;
         Read(0);
-        Snes?.Cpu.Idle();
-        Read(0x100 | sp--);
-        Read(0x100 | sp--);
-        Read(0x100 | sp--);
+        Idle();
+        Read(0x100 | SP--);
+        Read(0x100 | SP--);
         PC = Read(RESETe) | Read(RESETe + 1) << 8;
-        A = X = Y = 0;
+        ra = rx = ry = 0;
         PS = 0x34;
         DB = 0x00;
         PB = 0x00;
@@ -1630,21 +1628,21 @@ public partial class SnesCpu : EmuState, ICpu
 
     private void SetFlagC(bool flag)
     {
-        if (flag) PS |= FC;
-        else PS &= ~FC;
+        if (flag) ps |= FC;
+        else ps &= ~FC;
     }
 
     private void SetFlagZ(int v, bool isbyte)
     {
         if (isbyte)
         {
-            if ((byte)v == 0) PS |= FZ;
-            else PS &= ~FZ;
+            if ((v & 0xff) == 0) ps |= FZ;
+            else ps &= ~FZ;
         }
         else
         {
-            if ((ushort)v == 0) PS |= FZ;
-            else PS &= ~FZ;
+            if ((v & 0xffff) == 0) ps |= FZ;
+            else ps &= ~FZ;
         }
     }
 
@@ -1652,42 +1650,40 @@ public partial class SnesCpu : EmuState, ICpu
     {
         if (isbyte)
         {
-            if ((byte)v == 0) PS |= FZ;
-            else PS &= ~FZ;
-            if ((v & FN) == 0x80) PS |= FN;
-            else PS &= ~FN;
+            if ((v & 0xff) == 0) ps |= FZ;
+            else ps &= ~FZ;
+            if ((v & FN) != 0) ps |= FN;
+            else ps &= ~FN;
         }
         else
         {
-            if ((ushort)v == 0) PS |= FZ;
-            else PS &= ~FZ;
-            if ((v & FN << 8) == FN << 8) PS |= FN;
-            else PS &= ~FN;
+            if ((v & 0xffff) == 0) ps |= FZ;
+            else ps &= ~FZ;
+            if ((v & FN << 8) != 0) ps |= FN;
+            else ps &= ~FN;
         }
     }
 
     private void SetFlagV(bool flag)
     {
-        if (flag) PS |= FV;
-        else PS &= ~FV;
+        if (flag) ps |= FV;
+        else ps &= ~FV;
     }
-
-
 
     public Dictionary<string, bool> GetFlags() => new()
     {
-        ["C"] = PS.GetBit(0),
-        ["Z"] = PS.GetBit(1),
-        ["I"] = PS.GetBit(2),
-        ["D"] = PS.GetBit(3),
-        ["X"] = PS.GetBit(4),
-        ["M"] = PS.GetBit(5),
-        ["V"] = PS.GetBit(6),
-        ["N"] = PS.GetBit(7),
+        ["C"] = (ps & FC) != 0,
+        ["Z"] = (ps & FZ) != 0,
+        ["I"] = (ps & FI) != 0,
+        ["D"] = (ps & FD) != 0,
+        ["X"] = (ps & FX) != 0,
+        ["M"] = (ps & FM) != 0,
+        ["V"] = (ps & FV) != 0,
+        ["N"] = (ps & FN) != 0,
         ["E"] = E
     };
 
-    public Dictionary<string, string> GetRegs() => new()
+    public Dictionary<string, string> GetRegisters() => new()
     {
         ["A"] = $"{A:X4}",
         ["X"] = $"{X:X4}",
@@ -1699,6 +1695,19 @@ public partial class SnesCpu : EmuState, ICpu
         ["PB"] = $"{PB:X2}",
         ["PC"] = $"{PC:X4}"
     };
+
+    public int GetReg(string reg)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "a": return A;
+            case "x": return X;
+            case "y": return Y;
+            case "p": return PS;
+            case "pc": return PC;
+            default: return 0;
+        }
+    }
 
     public void SetReg(string reg, int v)
     {

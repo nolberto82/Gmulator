@@ -7,14 +7,11 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
 
     public int Type { get; private set; }
     public int RomSize { get; private set; }
-
-    public string RomName { get; private set; } = "";
     public bool IsBios { get; private set; }
 
     public byte[] Ram { get; private set; } = new byte[0x10000];
     public byte[] Rom { get; private set; }
     public byte[] Vram { get; private set; } = new byte[0x4000];
-    public byte[] Sram { get; private set; } = new byte[0x8000];
     public byte[] Wram { get; private set; } = new byte[0x8000];
 
     public GbcCpu Cpu { get; private set; }
@@ -32,10 +29,11 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
 
     public byte[] ReadWram() => Ram;
     public byte[] ReadVram() => Ram;
+    public byte[] ReadSram() => Mapper.Sram;
     public byte[] ReadOram() => Ram.AsSpan(0xfe00, 0x100).ToArray();
     public byte[] ReadRom() => Rom;
 
-    public byte Read(int a)
+    public int Read(int a)
     {
         a &= 0xffff;
         byte v = 0xff;
@@ -57,7 +55,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         else if (a <= 0xbfff)
         {
             if (Mapper.CartRamOn)
-                return Sram[a - 0xa000 + (0x2000 * Mapper.Rambank)];
+                return Mapper.Sram[(a - 0xa000 + (0x2000 * Mapper.Rambank)) & 0x1fff];
             return 0xff;
         }
         else if (a <= 0xcfff)
@@ -92,8 +90,9 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         {
             if (Mapper.CartRamOn)
             {
-                Sram[a - 0xa000 + (0x2000 * IO.Mmu.Mapper.Rambank)] = v;
+                Mapper.Sram[(a - 0xa000 + (0x2000 * IO.Mmu.Mapper.Rambank)) & 0x1fff] = v;
                 Ram[a] = v;
+                Mapper.Write();
             }
         }
         else if (a <= 0xcfff)
@@ -127,7 +126,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         if (src <= 0x7fff)
             srcbytes = Mapper.ReadRomBlock(src, size);
         else if (src >= 0xa000 && src <= 0xbfff)
-            srcbytes = new Span<byte>(Sram, src, size);
+            srcbytes = new Span<byte>(Mapper.Sram, src, size);
         else if (src >= 0xd000 && src <= 0xdfff)
             srcbytes = new Span<byte>(Wram, src - 0xd000 + (IO.SVBK * 0x1000), size);
         else
@@ -190,8 +189,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         if (Mapper != null)
         {
             Mapper.Init(Rom, filename);
-            RomName = filename;
-            LoadRam();
+            Mapper.LoadSram();
         }
         return Mapper;
     }
@@ -202,33 +200,34 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
         if (File.Exists(name))
         {
             var v = File.ReadAllBytes($"{name}");
-            v.CopyTo(Sram, 0x0000);
+            v.CopyTo(Mapper.Sram, 0x0000);
         }
     }
 
     public void SaveRam()
     {
-        if (Mapper != null && Mapper.Ramsize > 0)
+        if (Mapper != null && Mapper.Ramsize != 0)
         {
             var name = Path.GetFullPath($"{SaveDirectory}/{Path.GetFileNameWithoutExtension(Mapper.Name)}.srm");
             if (Directory.Exists(SaveDirectory))
-                File.WriteAllBytes($"{name}", Sram.AsSpan(0x0000, 0x2000).ToArray());
+                File.WriteAllBytes($"{name}", Mapper.Sram.AsSpan(0x0000, 0x2000).ToArray());
         }
     }
 
-    public void Reset(string filename) => Mapper.Init(Rom, filename);
+    public void Reset(string filename)
+    {
+        Mapper.Reset();
+        Mapper.Init(Rom, filename);
+    }
 
     public byte[] LoadFile(string filename)
     {
         byte[] rom = File.ReadAllBytes(filename);
-        RomName = filename;
 
         if (Path.GetFileName(filename.ToLower()) != "dmg_boot.gb")
         {
             IsBios = false;
             Type = rom[0x147];
-            if (MapperTypes.TryGetValue(Type, out string value))
-                Console.WriteLine($"Mapper: {value}");
             rom = new Patch().Run(rom, filename);
         }
         else
@@ -251,7 +250,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
                           select c)
         {
             if (c.Value.Address <= 0xbfff)
-                Sram[c.Value.Address & 0xfff] = c.Value.Value;
+                Mapper.Sram[c.Value.Address & 0xfff] = c.Value.Value;
             else if (c.Value.Address <= 0xcfff)
                 Ram[c.Value.Address] = c.Value.Value;
             else if (c.Value.Address <= 0xdfff)
@@ -262,7 +261,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
     public override void Save(BinaryWriter bw)
     {
         bw.Write(Vram);
-        bw.Write(Sram);
+        bw.Write(Mapper.Sram);
         bw.Write(Wram);
         bw.Write(Ram);
     }
@@ -270,7 +269,7 @@ public class GbcMmu(GbcIO io, Dictionary<int, Cheat> cheats) : EmuState
     public override void Load(BinaryReader br)
     {
         br.ReadBytes(Vram.Length).CopyTo(Vram, 0x0000);
-        br.ReadBytes(Sram.Length).CopyTo(Sram, 0x0000);
+        br.ReadBytes(Mapper.Sram.Length).CopyTo(Mapper.Sram, 0x0000);
         br.ReadBytes(Wram.Length).CopyTo(Wram, 0x0000);
         br.ReadBytes(Ram.Length).CopyTo(Ram, 0x0000);
     }

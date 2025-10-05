@@ -19,22 +19,21 @@ internal class GuiDesktop : Gui
         base.Init(isdeck);
     }
 
-    public override void Reset(string name, string lastname)
+    public override void Reset(string name)
     {
-        base.Reset(name, lastname);
+        base.Reset(name);
 
 #if DEBUG
-        Emu.Debug = true;
+        Emulator.Debug = true;
 #endif
 
-        Emu?.Reset(name, Menu.LastName, false);
-        LuaApi?.CheckLuaFile(name);
-        Emu?.Config?.Load();
+        Emulator?.Reset(name, false);
+        Emulator?.Config?.Load();
 
-        if (Emu.Debug)
-            Emu.State = Break;
+        if (Emulator.Debug)
+            Emulator.State = DebugState.Break;
         else
-            Emu.State = Running;
+            Emulator.State = DebugState.Running;
     }
 
     private void DisableInputs()

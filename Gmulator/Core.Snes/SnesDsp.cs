@@ -96,10 +96,10 @@ public class SnesDsp : EmuState
         DirPage = 0;
     }
 
-    public void SetSnes(Snes snes)
+    public void SetSnes(Snes snes, SnesApu apu)
     {
         Snes = snes;
-        Apu = Snes.Apu;
+        Apu = apu;
     }
 
     public void Cycle()
@@ -137,7 +137,7 @@ public class SnesDsp : EmuState
 
     public byte Read(int adr) => Ram[adr & 0x7f];
 
-    public void Write(int adr, byte value)
+    public void Write(int adr, int value)
     {
         int channel = (adr & 0x70) >> 4;
         switch (adr)
@@ -266,7 +266,7 @@ public class SnesDsp : EmuState
             case 0x0f or 0x1f or 0x2f or 0x3f or 0x4f or 0x5f or 0x6f or 0x7f:
                 break;
         }
-        Ram[adr & 0x7f] = value;
+        Ram[adr & 0x7f] = (byte)value;
     }
 
     private void DecodeBrr(int ch)
@@ -485,7 +485,7 @@ public class SnesDsp : EmuState
             samples[i * 2 + 1] = SamplesL[(int)total];
             total += add;
         }
-        Snes.Dsp.SampleOffset = 0;
+        SampleOffset = 0;
         return samples;
     }
 

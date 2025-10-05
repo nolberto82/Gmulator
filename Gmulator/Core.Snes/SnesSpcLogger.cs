@@ -2,14 +2,21 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesSpcLogger()
+public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
 {
-    public Snes Snes { get; private set; }
+    private SnesCpu Cpu;
+    private SnesSpc Spc;
+    private SnesApu Apu;
     public bool Logging { get; private set; }
     public StreamWriter Outfile { get; private set; }
     public Func<ushort> GetDp;
 
-    public void SetSnes(Snes snes) => Snes = snes;
+    public void SetSnes(Snes snes, SnesCpu cpu, SnesSpc spc, SnesApu apu)
+    {
+        Cpu = cpu;
+        Spc = spc;
+        Apu = apu;
+    }
 
     private readonly Dictionary<int, string> Labels = new()
     {
@@ -19,12 +26,12 @@ public class SnesSpcLogger()
         [0xfc] = "T2TARGET", [0xfd] = "T0OUT", [0xfe] = "T1OUT", [0xff] = "T2OUT",
     };
 
-    public DisasmEntry Disassemble(int bank, int pc, bool getregs, bool getbytes)
+    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes)
     {
-        byte op = Snes.Apu.Read(pc, true);
+        byte op = Apu.Read(pc, true);
 
         List<DisasmEntry> entry = [];
-        Opcode dops = Snes.Spc.Disasm[op];
+        Opcode dops = Spc.Disasm[op];
 
         string name = dops.Name;
         int size = dops.Size;
@@ -33,7 +40,7 @@ public class SnesSpcLogger()
 
         byte[] b = new byte[size];
         for (int i = 0; i < b.Length; i++)
-            b[i] = Snes.Spc.Read(pc + i, true);
+            b[i] = Spc.Read(pc + i, true);
 
         pc++;
         string oper = dops.Oper.ToLower();
@@ -113,10 +120,10 @@ public class SnesSpcLogger()
 
         if (getregs)
         {
-            var r = Snes.Spc.GetRegs();
+            var r = Spc.GetRegs();
             regtext = $" A:{r["A"]} X:{r["X"]} Y:{r["Y"]} S:{r["S"]} P:";
             string s = "";
-            foreach (var f in Snes.Spc.GetFlags())
+            foreach (var f in Spc.GetFlags())
             {
                 if (f.Key == "E")
                     break;
@@ -127,7 +134,7 @@ public class SnesSpcLogger()
             regtext += new string([.. s.Reverse()]) + " ";
         }
 
-        return new(--pc, data, name, "", regtext, size, "");
+        return (data, op, size);
     }
 
     internal void Log(int pc)
@@ -135,8 +142,8 @@ public class SnesSpcLogger()
         if (!Logging) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            DisasmEntry e = Disassemble(0, pc, true, false);
-            Outfile.WriteLine($"{e.pc:X4}  {e.disasm,-31} {e.regtext.TrimEnd()}");
+            var (disasm, op, size) = Disassemble(pc, true, false);
+            Outfile.WriteLine($"{pc:X4}  {disasm,-31}");
         }
     }
 
@@ -157,5 +164,5 @@ public class SnesSpcLogger()
 
     public void Reset() => Close();
 
-    public ushort ReadWord(int a) => (ushort)(Snes.Spc.Read(a, true) | Snes.Spc.Read(a + 1, true) << 8);
+    public ushort ReadWord(int a) => (ushort)(Spc.Read(a, true) | Spc.Read(a + 1, true) << 8);
 }

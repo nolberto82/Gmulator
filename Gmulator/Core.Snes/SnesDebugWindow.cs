@@ -1,37 +1,85 @@
-﻿using ImGuiNET;
+﻿using Gmulator.Core.Nes;
+using Gmulator.Core.Snes.Mappers;
+using ImGuiNET;
 using static Gmulator.Core.Snes.SnesLogger;
 
 namespace Gmulator.Core.Snes;
 
 internal class SnesDebugWindow : DebugWindow
 {
-    public Snes Snes { get; }
+    private readonly string[] testcpu = ["Cpu", "Spc", "Gsu"];
+    private const int CpuNumbers = 3;
+    private Snes Snes;
+    private SnesCpu Cpu;
+    private SnesPpu Ppu;
+    private SnesSpc Spc;
+    private SnesApu Apu;
+    private SnesSa1 Sa1;
+    private SnesLogger Logger;
+    private SnesSpcLogger SpcLogger;
+    private Action<DebugState> SetState;
+    private Action<bool> SetRun;
 
-    public SnesDebugWindow(Snes snes)
+    private Func<int, int> ReadOp;
+
+    private int CoProcessor;
+    private BaseMapper Mapper;
+    private SnesDma Dma;
+
+    public SnesDebugWindow(Snes snes, SnesCpu cpu, SnesPpu ppu, SnesSpc spc, SnesApu apu, SnesSa1 sa1, BaseMapper mapper, SnesDma dma, SnesLogger logger, SnesSpcLogger spclogger)
     {
         Snes = snes;
+        Cpu = cpu;
+        Ppu = ppu;
+        Spc = spc;
+        Apu = apu;
+        Sa1 = sa1;
+        Mapper = mapper;
+        Dma = dma;
+        Logger = logger;
+        SpcLogger = spclogger;
         Breakpoints = snes.Breakpoints;
+        SetState = snes.SetState;
+        SetRun = snes.SetRun;
+        ReadOp = snes.ReadOp;
+        SaveBreakpoints = snes.SaveBreakpoints;
+        CoProcessor = Mapper.CoProcessor;
+
+        GameName = Mapper.Name ?? "";
 
         MemRegions =
         [
-            new("Wram",snes.GetWram, 0x7e0000,6),
-            new("Sram",snes.GetSram,0x0000,4),
-            new("Vram",snes.GetVram,0x0000,4),
-            new("Cram",snes.GetCram,0x0000,3),
-            new("Oram",snes.GetOram, 0x0000,3),
+            new("Work",snes.GetWram, 0x7e0000,6),
+            new("Save",snes.GetSram,0x0000,4),
+            new("Video",snes.GetVram,0x0000,4),
+            new("Color",snes.GetCram,0x0000,3),
+            new("Sprites",snes.GetOram, 0x0000,3),
             new("Spc",snes.GetSpc,0x0000,4),
-            new("Rom",snes.GetRom, 0x0000,6),
-            new("Iram",snes.GetIram, 0x0000,3),
+            new("Sa1",snes.GetIram, 0x0000,3),
+            new("Rom",snes.GetRom, 0x0000,6)
+        ];
+
+        RamNames =
+        [
+            "Work", "Save", "Video", "Sprites",
+            "Main Rom", "Color", "Spc Ram", "Spc Rom",
+            "Gsu Rom", "Register"
         ];
 
         OnTrace =
         [
-            snes.Logger.Disassemble,
-            snes.SpcLogger.Disassemble,
+            logger.Disassemble,
+            spclogger.Disassemble,
+            null
         ];
 
-        ScrollY = [0, 0];
-        JumpAddr = [-1, -1];
+        ScrollY = new int[CpuNumbers];
+        JumpAddr = new int[CpuNumbers];
+    }
+
+    public override void SetCpu(Snes snes)
+    {
+        OnTrace[2] = null;
     }
 
     public override void Draw()
@@ -39,7 +87,6 @@ internal class SnesDebugWindow : DebugWindow
         DrawCpuInfo();
         if (ImGui.BeginChild("##disasmcpu", new(0, 310), ImGuiChildFlags.FrameStyle))
         {
-            var Cpu = Snes.Cpu;
             var bank = Cpu.PB << 16;
             var pc = Scroll(bank | Cpu.PC, 0);
 
@@ -47,7 +94,7 @@ internal class SnesDebugWindow : DebugWindow
             {
                 foreach (var v in ButtonNames.Select((e, i) => new { e, i }))
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && Snes.Logger.Logging ? GREEN : WHITE);
+                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && Logger.Logging ? GREEN : WHITE);
                     if (ImGui.Button(v.e.Key, ButtonSize))
                         v.e.Value(MainCpu);
                     ImGui.PopStyleColor();
@@ -61,13 +108,13 @@ internal class SnesDebugWindow : DebugWindow
                 JumpTo(0);
 
             if (ImGui.IsKeyPressed(ImGuiKey.F5))
-                Snes.SetState(Running);
+                SetState(DebugState.Running);
 
             ImGui.Separator();
 
             for (int i = 0; i < DisasmMaxLines; i++)
             {
-                var e = Snes.Logger.Disassemble(bank, pc, false, false);
+                var (disasm, op, size) = Logger.Disassemble(pc, false, false);
 
                 ImGui.PushID(pc);
 
@@ -81,32 +128,58 @@ internal class SnesDebugWindow : DebugWindow
 
                 ImGui.PopID();
                 ImGui.SameLine();
-                ImGui.Text($"{e.disasm}");
-                pc += (byte)e.size;
+                ImGui.Text($"{op:x2}  {disasm}");
+                pc += size;
             }
             ImGui.EndChild();
         }
 
-        if (ShowSa1 == true)
-            RenderSa1();
-
-        if (ShowSpc == true)
-            DrawSpc();
-
-        DrawCartInfo(Snes.Mapper.GetCartInfo());
+        DrawCartInfo(Mapper.GetCartInfo());
 
         //DrawStackInfo(Snes.Ram.AsSpan(0, 0x2000), Snes.Cpu.SP, 0x1fff, "cpu");
 
         DrawRegisters(null);
+
+#if DEBUG || DECKDEBUG
+        DrawTestAddr([Cpu.TestAddr, Spc.TestAddr], testcpu);
+#endif
     }
 
-    public override void RenderSa1()
+    public override void DrawCoProcessors()
     {
-        ImGui.SetNextWindowPos(new(550, 30));
-        ImGui.SetNextWindowSize(new(220, 615));
-        if (ImGui.Begin("Sa1"))
+        ImGui.SetNextWindowPos(new(555, 30));
+        ImGui.SetNextWindowSize(new(280, 615));
+        if (ImGui.Begin("CoProcessors"))
         {
-            var Cpu = Snes.Sa1;
+            if (ImGui.BeginTabBar("##coprocessors"))
+            {
+                if (CoProcessor == BaseMapper.CoprocessorSa1)
+                {
+                    if (ImGui.BeginTabItem("Sa1"))
+                    {
+                        DrawSa1();
+                        ImGui.EndTabItem();
+                    }
+                }
+
+                if (ImGui.BeginTabItem("Spc"))
+                {
+                    DrawSpc();
+                    ImGui.EndTabItem();
+                }
+                ImGui.EndTabBar();
+            }
+        }
+        ImGui.End();
+    }
+
+    public void DrawSa1()
+    {
+        //ImGui.SetNextWindowPos(new(550, 30));
+        //ImGui.SetNextWindowSize(new(220, 615));
+        if (ImGui.BeginChild("Sa1"))
+        {
+            var Cpu = Sa1;
             var bank = Cpu.PB << 16;
             var Pc = Cpu.PC;
             var pc = Scroll(bank | Pc, 0);
@@ -115,7 +188,7 @@ internal class SnesDebugWindow : DebugWindow
             {
                 foreach (var v in ButtonNames.Select((e, i) => new { e, i }))
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && Snes.Logger.Logging ? GREEN : WHITE);
+                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && Logger.Logging ? GREEN : WHITE);
                     if (ImGui.Button(v.e.Key, ButtonSize))
                         v.e.Value(Sa1Cpu);
                     ImGui.PopStyleColor();
@@ -130,24 +203,24 @@ internal class SnesDebugWindow : DebugWindow
 
             for (int i = 0; i < DisasmMaxLines; i++)
             {
-                var e = Snes.Logger.Disassemble(bank, pc, false, false);
+                var (disasm, op, size) = Logger.Disassemble(pc, false, false);
 
                 ImGui.PushID(pc);
 
                 if (ImGui.Selectable($"{pc:X6} ", false, ImGuiSelectableFlags.AllowDoubleClick))
                 {
                     if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                        AddBreakpoint(e.pc, BPType.Exec, -1, false, RamType.Rom);
+                        AddBreakpoint(pc, BPType.Exec, -1, false, RamType.Rom);
                 }
 
-                if (Breakpoints.TryGetValue(e.pc, out var bp))
+                if (Breakpoints.TryGetValue(pc, out var bp))
                 {
                     if (bp.Enabled && (bp.Type & BPType.Exec) != 0)
                         DrawRect(0x4000ff00, 0xff00ff00);
                     else
                         DrawRect(0x000000ff, 0xff0000ff);
                 }
-                if (e.pc == (bank | Pc))
+                if (pc == (bank | Pc))
                 {
                     DrawRect(0x6000ffff, 0xff00ffff);
                     ImGui.SetScrollHereY(0.25f);
@@ -155,24 +228,23 @@ internal class SnesDebugWindow : DebugWindow
 
                 ImGui.PopID();
                 ImGui.SameLine();
-                ImGui.Text($"{e.disasm}");
-                pc += (byte)e.size;
+                ImGui.Text($"{op}  {disasm}");
+                pc += size;
             }
+            ImGui.EndChild();
         }
-        ImGui.End();
     }
 
     private void DrawSpc()
     {
-        ImGui.SetNextWindowPos(new(550 + (ShowSa1 == true ? 220 : 0), 30));
-        ImGui.SetNextWindowSize(new(220, 615));
-        if (ImGui.Begin("Spc"))
+        //ImGui.SetNextWindowPos(new(550 + (ShowSa1 == true ? 220 : 0), 30));
+        //ImGui.SetNextWindowSize(new(220, 615));
+        if (ImGui.BeginChild("Spc"))
         {
             RenderSpcInfo();
 
-            var Spc = Snes.Spc;
             var Pc = Spc.PC;
-            var pc = (ushort)Scroll(Pc, 1);
+            int pc = Scroll(Pc, 1) & 0xffff;
 
             if (ImGui.BeginPopupContextWindow("gotomenu"))
                 JumpTo(1);
@@ -181,7 +253,7 @@ internal class SnesDebugWindow : DebugWindow
             {
                 foreach (var v in ButtonNames.Select((e, i) => new { e, i }))
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && Snes.SpcLogger.Logging ? GREEN : WHITE);
+                    ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && SpcLogger.Logging ? GREEN : WHITE);
                     if (ImGui.Button(v.e.Key, ButtonSize))
                         v.e.Value(SpcCpu);
                     ImGui.PopStyleColor();
@@ -193,29 +265,29 @@ internal class SnesDebugWindow : DebugWindow
 
             for (int i = 0; i < DisasmMaxLines; i++)
             {
-                var e = Snes.SpcLogger.Disassemble(0, pc, false, false);
+                var (disasm, op, size) = SpcLogger.Disassemble(pc, false, false);
 
                 ImGui.PushID(pc);
-                if (ImGui.Selectable($"{e.pc:X4} ", false, ImGuiSelectableFlags.AllowDoubleClick))
+                if (ImGui.Selectable($"{pc:X4} ", false, ImGuiSelectableFlags.AllowDoubleClick))
                 {
                     if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                        AddBreakpoint(e.pc, BPType.SpcExec, -1, false, RamType.SpcRom);
+                        AddBreakpoint(pc, BPType.SpcExec, -1, false, RamType.SpcRom);
                 }
 
-                if (Breakpoints.TryGetValue(e.pc, out var bp))
+                if (Breakpoints.TryGetValue(pc, out var bp))
                 {
                     if (bp.Enabled && (bp.Type & BPType.SpcExec) != 0)
                         DrawRect(0x4000ff00, 0xff00ff00);
                     else
                         DrawRect(0x000000ff, 0xff0000ff);
                 }
-                else if (e.pc == Pc)
+                else if (pc == Pc)
                     DrawRect(0x6000ffff, 0xff00ffff);
 
                 ImGui.PopID();
                 ImGui.SameLine();
-                ImGui.Text($"{e.disasm}");
-                pc += (byte)e.size;
+                ImGui.Text($"{disasm}");
+                pc += size;
             }
 
             ImGui.BeginChild("##spcportsports", new(0, 150));
@@ -223,13 +295,13 @@ internal class SnesDebugWindow : DebugWindow
             {
                 ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed);
                 ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed);
-                foreach (var c in Snes.Apu.GetIO())
+                foreach (var c in Apu.GetIO())
                     TableRow(c.Key, $"{c.Value}");
                 ImGui.EndTable();
             }
             ImGui.EndChild();
+            ImGui.EndChild();
         }
-        ImGui.End();
     }
 
     public override void DrawBreakpoints() => base.DrawBreakpoints();
@@ -238,7 +310,7 @@ internal class SnesDebugWindow : DebugWindow
     {
         ImGui.BeginChild("##cpuwindow", new(0, 65));
         {
-            var v = Snes.Cpu.GetRegs();
+            var v = Cpu.GetRegisters();
             for (int i = 0; i < v.Count; i++)
             {
                 if (i == 0)
@@ -248,14 +320,14 @@ internal class SnesDebugWindow : DebugWindow
                 if ((i + 1) % 3 != 0 && (i < v.Count - 1))
                     ImGui.SameLine();
             }
-            ImGui.Text($"Cycles: {Snes.Ppu.HPos:D3}"); ImGui.SameLine();
-            ImGui.Text($"Scanline: {Snes.Ppu.VPos}");
+            ImGui.Text($"Cycles: {Ppu.HPos:D3}"); ImGui.SameLine();
+            ImGui.Text($"Scanline: {Ppu.VPos}");
         }
         ImGui.EndChild();
 
         ImGui.BeginChild("##cpuflags", new(0, 55));
         {
-            var v = Snes.Cpu.GetFlags();
+            var v = Cpu.GetFlags();
             for (int i = 0; i < v.Count; i++)
             {
                 Checkbox(v.ElementAt(i).Key, v.ElementAt(i).Value);
@@ -270,7 +342,7 @@ internal class SnesDebugWindow : DebugWindow
     {
         ImGui.BeginChild("##spcinfowin", new(0, 55));
         {
-            var v = Snes.Spc.GetRegs();
+            var v = Spc.GetRegs();
             for (int i = 0; i < v.Count; i++)
             {
                 ImGui.Text($"{v.ElementAt(i).Key} {v.ElementAt(i).Value}");
@@ -281,7 +353,7 @@ internal class SnesDebugWindow : DebugWindow
 
         ImGui.BeginChild("##spcflags", new(0, 55));
         {
-            var v = Snes.Spc.GetFlags();
+            var v = Spc.GetFlags();
             for (int i = 0; i < v.Count; i++)
             {
                 Checkbox(v.ElementAt(i).Key, v.ElementAt(i).Value);
@@ -298,18 +370,18 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void DrawDmaInfo()
     {
-        for (int c = 0; c < Snes.Dma.Count; c++)
+        for (int c = 0; c < 8; c++)
         {
             if (ImGui.BeginTabBar("##dmatab"))
             {
                 if (ImGui.BeginTabItem($"{c:X2}"))
                 {
-                    if (ImGui.BeginTable("##dmainfo", 2, ImGuiTableFlags.RowBg))
+                    if (ImGui.BeginTable("##dmainfo", 3, ImGuiTableFlags.RowBg))
                     {
-                        var v = Snes.Dma[c].GetIoRegs();
+                        var v = Dma.GetIoRegs(c);
                         for (int i = 0; i < v.Count; i++)
                         {
-                            TableRow(v.ElementAt(i).Key, $"{v.ElementAt(i).Value}");
+                            TableRowCol3(v[i].Address, v[i].Name, v[i].Value);
                         }
                         ImGui.EndTable();
                     }
@@ -322,37 +394,43 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void DrawStackInfo(Span<byte> data, int addr, int start, string name)
     {
-        base.DrawStackInfo(data, addr, !Snes.Cpu.E ? start : 0x1ff, name);
+        base.DrawStackInfo(data, addr, !Cpu.E ? start : 0x1ff, name);
     }
 
     public override void DrawRegisters(List<RegistersInfo> ioregisters)
     {
-        base.DrawRegisters(Snes.Ppu.GetRegs());
+        base.DrawRegisters(Ppu.GetRegs());
     }
 
-    public override void AddBreakpoint(int a, int type, int condition, bool write, int index = 0)
+    public override void AddBreakpoint(int a, int type, int condition, bool write, RamType index = 0)
     {
         if (index == RamType.Sram)
             a += 0x6000;
         base.AddBreakpoint(a, type, condition, write, index);
-        Snes.SaveBreakpoints(Snes.Mapper.Name);
-    }
-
-    public override void AddFreezeValue(int a, byte v)
-    {
-        base.AddFreezeValue(a, v);
     }
 
     public override void Continue(int type)
     {
-        Snes.Run = true;
+        SetRun(true);
         if (type == SpcCpu)
         {
-            Snes.SpcLogger.Log(Snes.Spc.PC);
-            Snes.Spc.Step();
+            SpcLogger.Log(Spc.PC);
+            Spc.Step();
         }
-        Snes.SetState(Running);
+        else if (type == GsuCpu)
+        {
+            //Snes.SpcLogger.Log(Snes.Spc.PC);
+            //SetState(DebugState.StepGsu);
+            //Snes.Gsu.Exec(Snes.State,Snes.Debug);
+        }
+        SetState(DebugState.Running);
         base.Continue(type);
+    }
+
+    public override void Reset(int type)
+    {
+        Snes.Reset("", true);
+        base.Reset(type);
     }
 
     public override void StepInto(int type)
@@ -360,15 +438,19 @@ internal class SnesDebugWindow : DebugWindow
         switch (type)
         {
             case MainCpu:
-                Snes.SetState(StepMain);
+                SetState(DebugState.StepMain);
                 break;
             case Sa1Cpu:
-                Snes.Sa1.Step();
+                Sa1.Step();
                 break;
             case SpcCpu:
-                var spc = Snes.Spc.PC;
-                Snes.Spc.Step();
-                Snes.SpcLogger.Log(spc);
+                Spc.Step();
+                SpcLogger.Log(Spc.PC);
+                SetState(DebugState.StepSpc);
+                break;
+            case GsuCpu:
+                //SetState(DebugState.StepGsu);
+                //Snes.Gsu.Exec(Snes.State, Snes.Debug);
                 break;
         }
         base.StepInto(type);
@@ -380,46 +462,40 @@ internal class SnesDebugWindow : DebugWindow
         {
             case MainCpu:
             {
-                var pc = Snes.Cpu.PB << 16 | Snes.Cpu.PC;
-                var inst = Snes.Cpu.Disasm[Snes.ReadOp(pc)];
+                var pc = Cpu.PB << 16 | Cpu.PC;
+                var inst = Cpu.Disasm[ReadOp(pc)];
                 if (inst.Name == "jsr" || inst.Name == "jsl")
                 {
-                    Snes.Cpu.StepOverAddr = pc + inst.Size;
-                    Snes.Cpu.Step();
-                    Snes.State = Running;
+                    Cpu.StepOverAddr = pc + inst.Size;
+                    Cpu.Step();
+                    SetState(DebugState.Running);
                 }
                 else
                     StepInto(MainCpu);
-                Snes.Logger.Log(Snes.Cpu.PB << 16, pc);
+                Logger.Log(Ppu.HPos);
                 break;
             }
             case Sa1Cpu:
             {
-                var pc = Snes.Sa1.PB << 16 | Snes.Sa1.PC;
-                var inst = Snes.Sa1.Disasm[Snes.ReadOp(pc)];
+                var pc = Sa1.PB << 16 | Sa1.PC;
+                var inst = Sa1.Disasm[ReadOp(pc)];
                 if (inst.Name == "jsr" || inst.Name == "jsl")
                 {
-                    Snes.Sa1.StepOverAddr = pc + inst.Size;
-                    Snes.Sa1.Step();
-                    Snes.State = Running;
+                    Sa1.StepOverAddr = pc + inst.Size;
+                    Sa1.Step();
+                    SetState(DebugState.Running);
                 }
                 else
                     StepInto(MainCpu);
-                Snes.Logger.Log(Snes.Sa1.PB << 16, pc);
+                Logger.Log(Ppu.HPos);
                 break;
             }
             case SpcCpu:
                 StepInto(MainCpu);
-                Snes.SpcLogger.Log(Snes.Spc.PC);
+                SpcLogger.Log(Spc.PC);
                 break;
         }
         base.StepOver(MainCpu);
-    }
-
-    public override void Reset(int type)
-    {
-        Snes.Reset("", "", true);
-        base.Reset(type);
     }
 
     public override void StepScanline(int type)
@@ -428,10 +504,10 @@ internal class SnesDebugWindow : DebugWindow
         {
             case MainCpu:
             {
-                var oldline = Snes.Ppu.VPos;
-                while (oldline == Snes.Ppu.VPos)
-                    Snes.Cpu.Step();
-                Snes.State = Break;
+                var oldline = Ppu.VPos;
+                while (oldline == Ppu.VPos)
+                    Cpu.Step();
+                SetState(DebugState.Break);
                 break;
             }
         }
@@ -445,8 +521,8 @@ internal class SnesDebugWindow : DebugWindow
         switch (type)
         {
             case MainCpu:
-            case Sa1Cpu: Snes.Logger.Toggle(); break;
-            case SpcCpu: Snes.SpcLogger.Toggle(); break;
+            case Sa1Cpu: Logger.Toggle(); break;
+            case SpcCpu: SpcLogger.Toggle(); break;
         }
     }
 

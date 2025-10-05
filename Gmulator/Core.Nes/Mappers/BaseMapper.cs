@@ -7,17 +7,44 @@ public class BaseMapper(Header Header) : EmuState
     public byte[] LChr { get; set; } = [];
     public byte[] Prom { get; set; }
     public byte[] Vrom { get; set; }
+    public byte[] Sram { get; set; }
     public int PrgMode { get; set; }
     public int ChrMode { get; set; }
     public int PrgSize { get; set; }
     public int ChrSize { get; set; }
-    public bool Sram { get; set; }
+    public bool SramEnabled { get; set; }
     public static bool Fire { get; set; }
     public int Counter { get; set; }
     public bool SpriteSize { get; set; }
     public string Name { get; set; } = Header.Name;
+    private Timer Timer;
 
     public Header Header { get; set; } = Header;
+
+    public int ReadSram(int a)
+    {
+        return Sram[a - 0x6000];
+    }
+
+    public void WriteSram(int a, int v)
+    {
+        Sram[a - 0x6000] = (byte)v;
+        Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+    }
+
+    private void SaveSram(object state)
+    {
+        try
+        {
+            var name = Path.GetFileNameWithoutExtension($"{Name}");
+            File.WriteAllBytes($"{SaveDirectory}/{name}.sav", Sram);
+        }
+        catch (IOException)
+        {
+            Timer?.Dispose();
+            Timer = null;
+        }
+    }
 
     public virtual byte ReadPrg(int a) => Prom[a % Prom.Length];
 
@@ -46,9 +73,9 @@ public class BaseMapper(Header Header) : EmuState
         PrgMode = 0;
         ChrMode = 0;
         Counter = 0;
-        Sram = false;
+        SramEnabled = false;
         Fire = false;
-        Sram = true;
+        SramEnabled = true;
     }
 
     public virtual void Scanline()
@@ -67,7 +94,7 @@ public class BaseMapper(Header Header) : EmuState
         bw.Write(ChrMode);
         bw.Write(PrgSize);
         bw.Write(ChrSize);
-        bw.Write(Sram);
+        bw.Write(SramEnabled);
         bw.Write(Fire);
         bw.Write(Counter);
     }
@@ -81,7 +108,7 @@ public class BaseMapper(Header Header) : EmuState
         ChrMode = br.ReadInt32();
         PrgSize = br.ReadInt32();
         ChrSize = br.ReadInt32();
-        Sram = br.ReadBoolean();
+        SramEnabled = br.ReadBoolean();
         Fire = br.ReadBoolean();
         Counter = br.ReadInt32();
     }

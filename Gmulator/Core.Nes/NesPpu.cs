@@ -6,16 +6,16 @@ using Gmulator.Core.Snes;
 
 namespace Gmulator.Core.Nes
 {
-    public class NesPpu(NesMmu mmu) : EmuState
+    public class NesPpu(NesMmu mmu, NesApu apu) : EmuState
     {
-        public int[] MirrorHor = [0, 0, 1, 1];
-        public int[] MirrorVer = [0, 1, 0, 1];
-        public int[] MirrorNt0 = [0, 0, 0, 0];
-        public int[] MirrorNt1 = [1, 1, 1, 1];
-        public int[] MirrorFsc = [0, 1, 2, 3];
+        private readonly int[] MirrorHor = [0, 0, 1, 1];
+        private readonly int[] MirrorVer = [0, 1, 0, 1];
+        private readonly int[] MirrorNt0 = [0, 0, 0, 0];
+        private readonly int[] MirrorNt1 = [1, 1, 1, 1];
+        private readonly int[] MirrorFsc = [0, 1, 2, 3];
 
         private int Dummy2007;
-        public int OamDma;
+        private int OamDma;
         private int NtAddr;
         private int AtAddr;
         private int BgAddr;
@@ -29,41 +29,39 @@ namespace Gmulator.Core.Nes
         private int AtShiftHi;
         private int AtLo;
         private int AtHi;
-        public int Scanline;
-        public int Cycle { get; private set; }
-        public int FrameCycles { get; private set; }
-        public int Cycles { get; set; }
-        public uint FrameCounter { get; private set; }
-        public ulong Totalcycles { get; set; }
-
-        private bool NoNmi;
+        public int Scanline { get => scanline; private set => scanline = value; }
+        public int Cycle { get => cycle; private set => cycle = value; }
+        public int Cycles { get => cycles; set => cycles = value; }
+        public uint FrameCounter { get => frameCounter; private set => frameCounter = value; }
+        public ulong Totalcycles { get => totalcycles; private set => totalcycles = value; }
+        public bool NoNmi { get; private set; }
 
         private List<SpriteData> SpriteScan;
         private int A12;
         private byte OamData;
         private int OamAddr;
 
-        public int Nametable { get; private set; }
-        public int Vaddr { get; private set; }
-        public bool Spraddr { get; private set; }
-        public int Bgaddr { get; private set; }
-        public bool Spritesize { get; private set; }
-        public int Master { get; private set; }
-        public bool Nmi { get; private set; }
+        private int Nametable;
+        private int Vaddr;
+        private bool Spraddr;
+        private int Bgaddr;
+        private bool Spritesize;
+        private int Master;
+        private bool Nmi;
 
-        public int Greyscale { get; private set; }
-        public bool Backgroundleft { get; private set; }
-        public bool Spriteleft { get; private set; }
-        public bool Background { get; private set; }
-        public bool Sprite { get; private set; }
-        public int Red { get; private set; }
-        public int Green { get; private set; }
-        public int Blue { get; private set; }
+        private int Greyscale;
+        private bool Backgroundleft;
+        private bool Spriteleft;
+        private bool Background;
+        private bool Sprite;
+        private int Red;
+        private int Green;
+        private int Blue;
 
-        public int Lsb { get; private set; }
-        public int SprOverflow { get; private set; }
-        public bool Sprite0hit { get; private set; }
-        public int Vblank { get; private set; } = 0;
+        private int Lsb;
+        private int SprOverflow;
+        private bool Sprite0hit;
+        private int Vblank;
 
         private const int CycleStart = 1;
         private const int CycleEnd = 257;
@@ -76,9 +74,10 @@ namespace Gmulator.Core.Nes
         private int ScanlineFrameEnd;
 
         public bool IsRendering => Background || Sprite;
-        public int FineY => (Lp.V & 0x7000) >> 12;
+        public int FineY => ((Lp.V & 0x7000) >> 12) & 0xff;
 
-        public NesMmu Mmu { get; private set; } = mmu;
+        private NesMmu Mmu = mmu;
+        private NesApu Apu = apu;
         public uint[] NametableBuffer { get; private set; } = new uint[NesWidth * NesWidth * 4];
         private uint[] ScreenBuffer;
 
@@ -136,8 +135,7 @@ namespace Gmulator.Core.Nes
 
         public void Step(int c)
         {
-            FrameCycles += c;
-            Nes.Apu.Step(1);
+            Apu.Step(1);
 
             //if (Cart.Region == 1)
             //    c = 2;
@@ -207,19 +205,18 @@ namespace Gmulator.Core.Nes
                     }
 
                     if (Cycle == 339)
-                        Cycle += IsRendering && OddFrame() && Scanline == -1 ? 1 : 0;
+                        Cycle += IsRendering && (FrameCounter & 1) == 1 && Scanline == -1 ? 1 : 0;
                 }
 
                 //cycle++;
-                if (Cycle++ > 339)
+                if (cycle++ > 339)
                 {
-                    Cycle = 0;
-                    Scanline++;
-                    if (Scanline >= ScanlineFrameEnd)
+                    cycle = 0;
+                    scanline++;
+                    if (scanline >= ScanlineFrameEnd)
                     {
                         Scanline = -1;
                         Vblank = 0;
-                        FrameCycles = 0;
                         Sprite0hit = false;
                         SprOverflow = 0;
                         NoNmi = false;
@@ -230,33 +227,33 @@ namespace Gmulator.Core.Nes
             Cycles++;
         }
 
-        public void ControlW(byte v) //2000
+        public void ControlW(int v) //2000
         {
             Lp.T = Lp.T & ~0xc00 | (v & 3) << 10;
             Nametable = v >> 1 & 3;
             Vaddr = v >> 2 & 1;
-            Spraddr = (v >> 3 & 1) > 0;
+            Spraddr = (v >> 3 & 1) != 0;
             Bgaddr = v >> 4 & 1;
-            Spritesize = (v >> 5 & 1) > 0;
-            Nmi = v >> 7 > 0;
+            Spritesize = (v >> 5 & 1) != 0;
+            Nmi = v >> 7 != 0;
 
             if (Header.MapperId == 5)
                 Mmu.Mapper.SpriteSize = Spritesize;
 
-            Mmu.Ram[0x2000 & 0x2007] = v;
+            Mmu.Ram[0x2000 & 0x2007] = (byte)v;
         }
 
-        public void MaskW(byte v)
+        public void MaskW(int v)
         {
-            Backgroundleft = v.GetBit(1);
-            Spriteleft = v.GetBit(2);
-            Background = v.GetBit(3);
-            Sprite = v.GetBit(4);
+            Backgroundleft = (v & 0x02) != 0;
+            Spriteleft = (v & 0x04) != 0;
+            Background = (v & 0x08) != 0;
+            Sprite = (v & 0x10) != 0;
         }
 
-        public byte StatusR()
+        public int StatusR()
         {
-            byte v = (byte)((Vblank << 7 | (Sprite0hit ? 1 : 0) << 6 | SprOverflow << 5) & 0xe0
+            int v = ((Vblank << 7 | (Sprite0hit ? 1 : 0) << 6 | SprOverflow << 5) & 0xe0
                 | Dummy2007 & 0x1f);
 
             if (Scanline == 241)
@@ -274,7 +271,7 @@ namespace Gmulator.Core.Nes
                     NoNmi = false;
                     Vblank = 0;
                     //p2002 &= 0x7f;
-                    return (byte)(v & 0x7f);
+                    return (v & 0x7f);
                 }
             }
             Vblank = 0;
@@ -283,15 +280,15 @@ namespace Gmulator.Core.Nes
             return v;
         }
 
-        public void OamAddressW(byte v) => OamAddr = v;
+        public void OamAddressW(int v) => OamAddr = v;
 
-        public void OamDataW(byte v)
+        public void OamDataW(int v)
         {
-            OamData = v;
+            OamData = (byte)v;
             OamAddr++;
         }
 
-        public void ScrollW(byte v) //2005
+        public void ScrollW(int v) //2005
         {
             if (!Lp.W)
             {
@@ -304,7 +301,7 @@ namespace Gmulator.Core.Nes
             Lp.W ^= true;
         }
 
-        public void AddressDataW(byte v) //2006
+        public void AddressDataW(int v) //2006
         {
             if (!Lp.W)
             {
@@ -319,36 +316,36 @@ namespace Gmulator.Core.Nes
             Lp.W ^= true;
         }
 
-        public void DataW(byte v) //2007
+        public void DataW(int v) //2007
         {
             Write(Lp.V, v);
-            Lp.V += Vaddr > 0 ? 32 : 1;
+            Lp.V += Vaddr != 0 ? 32 : 1;
 
-            if (((Lp.V ^ A12) & 0x1000) > 0)
+            if (((Lp.V ^ A12) & 0x1000) != 0)
             {
-                if ((Lp.V & 0x1000) > 0)
+                if ((Lp.V & 0x1000) != 0)
                     Mmu.Mapper.Scanline();
                 A12 = Lp.V;
             }
         }
 
-        public byte DataR()
+        public int DataR()
         {
-            byte v;
+            int v;
             if (Lp.V <= 0x3eff)
             {
-                v = (byte)Dummy2007;
+                v = Dummy2007;
                 Dummy2007 = Read(Lp.V);
             }
             else
-                v = (byte)(Dummy2007 = Read(Lp.V));
+                v = (Dummy2007 = Read(Lp.V));
 
 
-            Lp.V += Vaddr > 0 ? 32 : 1;
-            return v;
+            Lp.V += Vaddr != 0 ? 32 : 1;
+            return v & 0xff;
         }
 
-        public void OamDamyCopy(byte v) //4014
+        public void OamDamyCopy(int v) //4014
         {
             for (int i = 0; i < 256; i++)
             {
@@ -374,79 +371,88 @@ namespace Gmulator.Core.Nes
         {
             if (Nes.FastForward && FrameCounter % Nes.Config.FrameSkip == 0) return;
 
-            int x = Cycle - 1;
-            int y = Scanline;
+            int x = cycle - 1;
+            int y = scanline;
             int bg_pixel = 0;
             int bg_pal = 0;
             int spr_pixel = 0;
             int spr_pal = 0;
             int attrib = 0;
-            if (Background)
+
+            // Cache Lp.Fx for repeated use
+            int fx_shift = 15 - Lp.Fx;
+            int at_shift = 7 - Lp.Fx;
+
+            if (Background && (x >= 8 || Backgroundleft))
             {
-                if (x >= 8 || Backgroundleft)
-                {
-                    bg_pixel = ((BgShiftLo >> (15 - Lp.Fx)) & 1) | (BgShiftHi >> (15 - Lp.Fx) & 1) * 2;
-                    bg_pal = (AtShiftLo >> (7 - Lp.Fx) & 1 | (AtShiftHi >> (7 - Lp.Fx) & 1) * 2) & 3;
-                }
+                bg_pixel = ((BgShiftLo >> fx_shift) & 1) | (((BgShiftHi >> fx_shift) & 1) << 1);
+                bg_pal = ((AtShiftLo >> at_shift) & 1) | (((AtShiftHi >> at_shift) & 1) << 1);
+                bg_pal &= 3;
             }
 
-            if (Sprite)
+            if (Sprite && !(x < 8 && !Spriteleft))
             {
-                if (!(x < 8 && !Spriteleft))
+                int bgaddr = Spraddr ? 0x1000 : 0x0000;
+                // Use for loop for better performance than != 0
+                int spriteCount = SpriteScan.Count;
+                for (int i = 0; i < spriteCount; i++)
                 {
-                    int bgaddr = Spraddr ? 0x1000 : 0x0000;
-                    foreach (var spr in SpriteScan)
-                    {
-                        int tile = spr.Tile;
-                        attrib = spr.Attrib;
-                        byte spx = (byte)spr.X;
-                        int fx = x - spr.X;
-                        int fy = (y - (spr.Y + 1)) & (Spritesize ? 15 : 7);
-                        if (spr.X == 255) continue;
-                        if (spr.Y > 238) continue;
-                        if (fx < 0 || fx > 7) continue;
-                        if ((attrib & 0x40) == 0) fx = (byte)(7 - fx);
-                        if ((attrib & 0x80) > 0) fy = (byte)((Spritesize ? 15 : 7) - fy);
+                    var spr = SpriteScan[i];
+                    int tile = spr.Tile;
+                    attrib = spr.Attrib;
+                    int fx = x - spr.X;
+                    int fy = (y - (spr.Y + 1)) & (Spritesize ? 15 : 7);
 
-                        int spraddr;
-                        if (Spritesize)
-                            spraddr = ((tile & 1) * 0x1000) + (tile & 0xfe) * 16 + fy + (fy & 8);
-                        else
-                            spraddr = bgaddr + tile * 16 + fy;
+                    // Fast path: skip invisible sprites
+                    if (spr.X == 255 || spr.Y > 238 || fx < 0 || fx > 7)
+                        continue;
 
-                        spr_pixel = (Read(spraddr) >> fx & 1) | (Read(spraddr + 8) >> fx & 1) * 2;
-                        if (spr_pixel == 0) continue;
+                    if ((attrib & 0x40) == 0) fx = 7 - fx;
+                    if ((attrib & 0x80) != 0) fy = (Spritesize ? 15 : 7) - fy;
 
-                        if (spr.Id == 0 && Sprite && Background)
-                        {
-                            if (bg_pixel > 0)
-                            {
-                                if (x != 255 && !Sprite0hit)
-                                    Sprite0hit = true;
-                            }
-                        }
-                        spr_pal = attrib & 3;
-                        break;
-                    }
+                    int spraddr;
+                    if (Spritesize)
+                        spraddr = ((tile & 1) * 0x1000) + ((tile & 0xfe) * 16) + fy + (fy & 8);
+                    else
+                        spraddr = bgaddr + tile * 16 + fy;
+
+                    // Cache Read(spraddr) and Read(spraddr+8)
+                    byte spr_lo = Read(spraddr);
+                    byte spr_hi = Read(spraddr + 8);
+                    spr_pixel = (spr_lo >> fx & 1) | ((spr_hi >> fx & 1) << 1);
+
+                    if (spr_pixel == 0) continue;
+
+                    if (spr.Id == 0 && Sprite && Background && bg_pixel != 0 && x != 255 && !Sprite0hit)
+                        Sprite0hit = true;
+
+                    spr_pal = attrib & 3;
+                    break;
                 }
             }
 
             int offset = 0;
-            if (bg_pixel > 0 && spr_pixel > 0)
+            if (bg_pixel != 0 && spr_pixel != 0)
             {
-                if ((attrib & 0x20) == 0)
-                    offset = spr_pixel + spr_pal * 4 + 0x10;
-                else
-                    offset = bg_pixel + bg_pal * 4;
+                offset = ((attrib & 0x20) == 0)
+                    ? spr_pixel + spr_pal * 4 + 0x10
+                    : bg_pixel + bg_pal * 4;
             }
-            else if (bg_pixel > 0)
+            else if (bg_pixel != 0)
+            {
                 offset = bg_pixel + bg_pal * 4;
-            else if (spr_pixel > 0)
+            }
+            else if (spr_pixel != 0)
+            {
                 offset = spr_pixel + spr_pal * 4 + 0x10;
+            }
 
+            // Avoid modulo if offset is always in range (0..63)
+            int paletteIndex = Read(0x3f00 + offset);
+            if ((uint)paletteIndex >= (uint)pixPalettes.Length)
+                paletteIndex %= pixPalettes.Length;
 
-            //if (y > 7 && y < 232)
-            ScreenBuffer[y * 256 + x] = pixPalettes[Read(0x3f00 + offset) % pixPalettes.Length];
+            ScreenBuffer[y * 256 + x] = pixPalettes[paletteIndex];
 
             UpdateRegisters();
         }
@@ -480,26 +486,26 @@ namespace Gmulator.Core.Nes
 
         private void GetTiles()
         {
-            switch (Cycle & 7)
+            switch (cycle & 7)
             {
                 case 1:
-                    NtAddr = GetNtAddr();
+                    NtAddr = 0x2000 | Lp.V & 0xfff;
                     LoadRegisters();
                     break;
-                case 2: NtNyte = GetNtByte(NtAddr); break;
-                case 3: AtAddr = GetAtAddr(); break;
+                case 2: NtNyte = Read(NtAddr); break;
+                case 3: AtAddr = 0x23c0 | Lp.V & 0xc00 | Lp.V >> 4 & 0x38 | Lp.V >> 2 & 0x07; break;
                 case 4:
-                    AtByte = GetAtByte(AtAddr);
-                    if ((Lp.V >> 5 & 2) > 0)
+                    AtByte = Read(AtAddr);
+                    if ((Lp.V >> 5 & 2) != 0)
                         AtByte >>= 4;
-                    if ((Lp.V & 2) > 0)
+                    if ((Lp.V & 2) != 0)
                         AtByte >>= 2;
                     break;
-                case 5: BgAddr = GetBgAddr((byte)FineY); break;
-                case 6: BgLo = GetBgLo(BgAddr); break;
+                case 5: BgAddr = Bgaddr * 0x1000 + NtNyte * 16 + FineY; break;
+                case 6: BgLo = Read(BgAddr); break;
                 case 7: BgAddr += 8; break;
                 case 0:
-                    BgHi = GetBgHi(BgAddr);
+                    BgHi = Read(BgAddr);
                     XIncrease();
                     break;
             }
@@ -536,21 +542,12 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        private bool OddFrame() => (FrameCounter & 1) == 1;
-        private int GetNtAddr() => 0x2000 | Lp.V & 0xfff;
-        private byte GetNtByte(int a) => Read(a);
-        private int GetAtAddr() => 0x23c0 | Lp.V & 0xc00 | Lp.V >> 4 & 0x38 | Lp.V >> 2 & 0x07;
-        private byte GetAtByte(int a) => Read(a);
-        private int GetBgAddr(byte fy) => Bgaddr * 0x1000 + NtNyte * 16 + fy;
-        private byte GetBgLo(int addr) => Read(addr);
-        private byte GetBgHi(int addr) => Read(addr);
-
         private void LoadRegisters()
         {
             BgShiftLo = BgShiftLo & 0xff00 | BgLo;
             BgShiftHi = BgShiftHi & 0xff00 | BgHi;
             AtLo = AtByte & 1;
-            AtHi = (AtByte & 2) > 0 ? 1 : 0;
+            AtHi = (AtByte & 2) != 0 ? 1 : 0;
         }
 
         private void UpdateRegisters()
@@ -571,7 +568,7 @@ namespace Gmulator.Core.Nes
             {
                 if (Header.MapperId == 15)
                     Mmu.Mapper.SetLatch(addr, v);
-                if (Mmu.Mapper.Header.ChrBanks > 0)
+                if (Mmu.Mapper.Header.ChrBanks != 0)
                     return Mmu.Mapper.ReadChr(addr);
                 else
                     return Vram[addr];
@@ -610,7 +607,7 @@ namespace Gmulator.Core.Nes
             return v;
         }
 
-        public void Write(int addr, byte v)
+        public void Write(int addr, int v)
         {
             addr &= 0x3fff;
             var vram = Mmu.Vram;
@@ -618,38 +615,38 @@ namespace Gmulator.Core.Nes
             //Mmu.CheckForBeakpoint(addr, v, BPType.VWrite);
 
             if (addr < 0x2000 || addr >= 0x3f00)
-                vram[addr] = v;
+                vram[addr] = (byte)v;
             else
             {
                 var a = addr % 0x400;
                 if (Header.Mirror == SingleNt0)
                 {
                     var b = MirrorNt0[(addr >> 10) & 3];
-                    vram[0x2000 + a + b * 0x400] = v;
+                    vram[0x2000 + a + b * 0x400] = (byte)v;
                 }
                 else if (Header.Mirror == SingleNt1)
                 {
                     var b = MirrorNt1[((a >> 10) & 3)];
-                    vram[0x2000 + a + b * 0x400] = v;
+                    vram[0x2000 + a + b * 0x400] = (byte)v;
                 }
                 else if (Header.Mirror == Horizontal)
                 {
                     switch ((addr >> 10) & 3)
                     {
-                        case 0: vram[0x2000 + a] = v; break;
-                        case 1: vram[0x2000 + a] = v; break;
-                        case 2: vram[0x2400 + a] = v; break;
-                        case 3: vram[0x2400 + a] = v; break;
+                        case 0: vram[0x2000 + a] = (byte)v; break;
+                        case 1: vram[0x2000 + a] = (byte)v; break;
+                        case 2: vram[0x2400 + a] = (byte)v; break;
+                        case 3: vram[0x2400 + a] = (byte)v; break;
                     }
                 }
                 else if (Header.Mirror == Vertical)
                 {
                     switch ((addr >> 10) & 3)
                     {
-                        case 0: vram[0x2000 + a] = v; break;
-                        case 1: vram[0x2400 + a] = v; break;
-                        case 2: vram[0x2000 + a] = v; break;
-                        case 3: vram[0x2400 + a] = v; break;
+                        case 0: vram[0x2000 + a] = (byte)v; break;
+                        case 1: vram[0x2400 + a] = (byte)v; break;
+                        case 2: vram[0x2000 + a] = (byte)v; break;
+                        case 3: vram[0x2400 + a] = (byte)v; break;
                     }
                 }
             }
@@ -661,9 +658,9 @@ namespace Gmulator.Core.Nes
                 Array.Copy(vram, 0x3f10, vram, 0x3f04 + i * 0x4, 0x01);
 
             if (addr == 0x3f10)
-                vram[0x3f00] = v;
+                vram[0x3f00] = (byte)v;
             else if (addr == 0x3f00)
-                vram[0x3f10] = v;
+                vram[0x3f10] = (byte)v;
         }
 
         public void RenderNametable(ref uint[] buffer)
@@ -807,8 +804,13 @@ namespace Gmulator.Core.Nes
             public bool W;
         };
         public PpuRegisters Lp;
+        private int cycle;
+        private int scanline;
+        private int cycles;
+        private uint frameCounter;
+        private ulong totalcycles;
 
-        private struct SpriteData(int y, int tile, int attrib, int x, int id)
+        public struct SpriteData(int y, int tile, int attrib, int x, int id)
         {
             public int Y = y;
             public int Tile = tile;

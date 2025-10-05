@@ -12,12 +12,12 @@ public class Breakpoint
     public int Type { get; set; }
     public bool IsDebug { get; set; }
     public int CpuType { get; set; }
-    public int RamType { get; set; }
+    public RamType RamType { get; set; }
     public bool Write { get; set; }
     public bool Enabled { get; set; }
 
     public Breakpoint() { }
-    public Breakpoint(int addr, int condition, int type, bool write, bool enabled, int index = 0)
+    public Breakpoint(int addr, int condition, int type, bool write, bool enabled, RamType index = 0)
     {
         Addr = addr;
         Condition = condition;
@@ -33,7 +33,7 @@ public static class AccessTypes
     public const int Reads = BPType.Read | BPType.VideoRead | BPType.RegRead | BPType.SpcRead;
     public const int Writes = BPType.Write | BPType.VideoWrite | BPType.RegWrite | BPType.SpcWrite;
     public const int RamReads = 0xff;
-    public const int RamWrites = RamReads & ~RamType.Rom;
+    public const int RamWrites = RamReads & ~(int)RamType.Rom;
 }
 
 public static class CpuType
@@ -54,17 +54,11 @@ public static class BPType
     public const int SpcWrite = 128;
     public const int SpcRead = 256;
     public const int SpcExec = 512;
+    public const int GsuExec = 1024;
 };
 
-public static class RamType
+public enum RamType : int
 {
-    public const int Wram = 0;
-    public const int Sram = 1;
-    public const int Vram = 2;
-    public const int Oram = 3;
-    public const int Rom = 4;
-    public const int Cram = 5;
-    public const int SpcRam = 6;
-    public const int SpcRom = 7;
-    public const int Register = 8;
-};
+    Wram, Sram, Vram, Oram, Rom, Cram,
+    SpcRam, SpcRom, GsuRom, Register,
+}

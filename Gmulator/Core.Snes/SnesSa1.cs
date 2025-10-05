@@ -35,7 +35,7 @@ public class SnesSa1(Snes snes) : SnesCpu
         }
     }
 
-    public new byte Read(int a)
+    public new int Read(int a)
     {
         return base.Read(a);
     }
@@ -82,14 +82,14 @@ public class SnesSa1(Snes snes) : SnesCpu
 
     public void WriteReg(int a, byte b)
     {
-        var v = (byte)b;
+        var v = b;
         switch (a & 0xff)
         {
             case 0x00:
-                Irq = v.GetBit(7);
-                Ready = v.GetBit(6);
-                Reseta1 = v.GetBit(5);
-                Nmia1 = v.GetBit(4);
+                Irq = (v & 0x80) != 0;
+                Ready = (v & 0x40) != 0;
+                Reseta1 = (v & 0x20) != 0;
+                Nmia1 = (v & 0x10) != 0;
                 Reset();
                 break;
             case 0x01:

@@ -24,7 +24,7 @@
 
             Reset();
 
-            Sram = true;
+            SramEnabled = true;
         }
 
         public override byte ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[(a & 0x4000) >> 14] + a % 0x4000);

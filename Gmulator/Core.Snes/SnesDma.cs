@@ -1,111 +1,304 @@
-﻿
+﻿using Gmulator.Core.Gbc;
+using Gmulator.Shared;
+using System.Runtime.InteropServices;
+
 namespace Gmulator.Core.Snes;
 public class SnesDma : EmuState
 {
-    public bool Enabled { get; set; } = false;
-    public bool HdmaEnabled { get; set; } = false;
-    public bool Direction { get; set; } = true;
-    public int Step { get; set; }
-    public int Mode { get; set; } = 7;
-    public int Port { get; set; }
-    public int ABank { get; set; }
-    public int AAddress { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
-    public int Size { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
-    public int BAddress { get => (byte)field; set => field = (byte)value; } = 0xff;
-    public int RamAddress { get; set; }
-    public int HBank { get => (byte)field; set => field = (byte)value; } = 0xff;
-    public int HAddress { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
-    public int HCounter { get => (byte)field; set => field = (byte)value; } = 0xff;
-    public bool Completed { get; set; }
-    public bool Indirect { get; set; }
-    public bool Repeat { get; set; }
-    public bool TransferEnabled { get; set; }
-    private readonly List<SnesDma> Dma;
+    private const int MaxChannels = 8;
+    private bool[] Enabled = new bool[MaxChannels];
+    private bool[] HdmaEnabled = new bool[MaxChannels];
+    private bool[] Direction = new bool[MaxChannels];// = true;
+    private int[] Step = new int[MaxChannels];
+    private int[] Mode = new int[MaxChannels];// 7;
+    private int[] Port = new int[MaxChannels];
+    private int[] ABank = new int[MaxChannels];
+    private int[] AAddress = new int[MaxChannels];// = 0xffff;
+    private int[] Size = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private int[] BAddress = new int[MaxChannels];// { get => (byte)field; set => field = (byte)value; } = 0xff;
+    private int[] RamAddress = new int[MaxChannels];// { get; set; }
+    private int[] HBank = new int[MaxChannels];// = 0xff;
+    private int[] HAddress = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private int[] HCounter = new int[MaxChannels];//= 0xff;
+    private bool[] Completed = new bool[MaxChannels];
+    private bool[] Indirect = new bool[MaxChannels];
+    private bool[] Repeat = new bool[MaxChannels];
+    private bool[] TransferEnabled = new bool[MaxChannels];
 
-    public SnesDma() { }
-    public SnesDma(List<SnesDma> dma) => Dma = dma;
+    private Action Idle8;
 
-    public void SetSnes(Snes snes) => Snes = snes;
+    public SnesDma(Snes snes, SnesCpu cpu)
+    {
+        Idle8 = cpu.Idle8;
+        ReadCpu = snes.ReadMemory;
+        WriteCpu = snes.WriteMemory;
+    }
 
-    public Func<int, byte> Read;
-    public Action<int, int> Write;
+    public void Reset()
+    {
+        Array.Fill(Enabled, false);
+        Array.Fill(HdmaEnabled, false);
+        Array.Fill(Direction, true);
+        Array.Fill(Step, 0);
+        Array.Fill(Mode, 7);
+        Array.Fill(Port, 0);
+        Array.Fill(ABank, 0);
+        Array.Fill(AAddress, 0xffff);
+        Array.Fill(Size, 0xffff);
+        Array.Fill(BAddress, 0xff);
+        Array.Fill(RamAddress, 0);
+        Array.Fill(HBank, 0xff);
+        Array.Fill(HAddress, 0xffff);
+        Array.Fill(HCounter, 0xff);
+        Array.Fill(Completed, false);
+        Array.Fill(Indirect, false);
+        Array.Fill(Repeat, false);
+        Array.Fill(TransferEnabled, false);
+    }
+
+    public Func<int, int> ReadCpu;
+    public Action<int, int> WriteCpu;
     private Snes Snes;
+    private bool DmaEnabled;
+    private int DmaState;
     public readonly byte[] Max = [1, 2, 2, 4, 4, 4, 2, 4];
-    public readonly byte[][] Offsets =
+    private readonly byte[][] Offsets =
     [
         [0,0,0,0],[0,1,0,1],[0,0,0,0],[0,0,1,1],
         [0,1,2,3],[0,1,0,1],[0,0,0,0],[0,0,1,1]
     ];
 
-    public bool Transfer(int src, int mode, int i)
+    public bool Transfer(int src, int mode, int count, int c)
     {
-        var isfixed = Step == 1 || Step == 3;
-        if (!Direction)
-            Write(0x2100 | BAddress + Offsets[mode & 7][i], Read(src));
+        var isfixed = Step[c] == 1 || Step[c] == 3;
+        int offset = Offsets[mode & 7][count];
+
+        if (!Direction[c])
+        {
+            WriteCpu(0x2100 | (BAddress[c] + offset), ReadCpu(src));
+        }
         else
-            Write((src), Read(0x2100 | BAddress + Offsets[Mode][i]));
+        {
+            int offset2 = Offsets[Mode[c] & 7][count];
+            WriteCpu(src, ReadCpu(0x2100 | (BAddress[c] + offset2)));
+        }
 
         return isfixed;
     }
 
-    public static void Set(int a, byte v, ref List<SnesDma> Dma, int ramaddr)
+    public void HandleDma()
+    {
+        if (!DmaEnabled) return;
+        if (DmaState == 1)
+        {
+            DmaState = 2;
+            return;
+        }
+
+        Idle8();
+        for (int i = 0; i < MaxChannels; i++)
+        {
+            if (Enabled[i])
+            {
+                var src = ABank[i] << 16 | AAddress[i];
+                int count = 0;
+                do
+                {
+                    if (!Transfer(src, Mode[i], count, i))
+                    {
+                        if (Step[i] == 0)
+                            src++;
+                        else if (Step[i] == 2)
+                            src--;
+                    }
+                    Size[i]--;
+                    count = (count + 1) & 3;
+                } while (Size[i] != 0);
+                AAddress[i] = (ushort)src;
+                Enabled[i] = false;
+            }
+        }
+        DmaEnabled = false;
+        DmaState = 0;
+    }
+
+    public void HandleHdma()
+    {
+        for (int i = 0; i < MaxChannels; i++)
+        {
+            if (HdmaEnabled[i] && !Completed[i])
+            {
+                if (TransferEnabled[i])
+                {
+                    int max = Max[Mode[i] & 7];
+                    if (Indirect[i])
+                    {
+                        int size = Size[i];
+                        for (int count = 0; count < max; count++)
+                        {
+                            Transfer(HBank[i] << 16 | size, Mode[i], count, i);
+                            size++;
+                        }
+                        Size[i] = size & 0xffff;
+                    }
+                    else
+                    {
+                        int hAddress = HAddress[i];
+                        for (int count = 0; count < max; count++)
+                        {
+                            Transfer(ABank[i] << 16 | hAddress, Mode[i], count, i);
+                            hAddress++;
+                        }
+                        HAddress[i] = hAddress;
+                    }
+                }
+
+                HCounter[i]--;
+                TransferEnabled[i] = (HCounter[i] & 0x80) != 0;
+                if ((HCounter[i] & 0x7f) == 0)
+                {
+                    int v = ReadCpu(ABank[i] << 16 | HAddress[i]++);
+                    HCounter[i] = v;
+                    Repeat[i] = (v & 0x80) != 0;
+                    var bank = ABank[i] << 16;
+                    if (Indirect[i])
+                    {
+                        int low = ReadCpu(bank | HAddress[i]++);
+                        int high = ReadCpu(bank | HAddress[i]++);
+                        Size[i] = (ushort)(low | (high << 8));
+                    }
+
+                    TransferEnabled[i] = true;
+                    if (HCounter[i] == 0)
+                        Completed[i] = true;
+                }
+            }
+        }
+    }
+
+    public void InitHdma()
+    {
+        for (int i = 0; i < MaxChannels; i++)
+        {
+            if (HdmaEnabled[i])
+            {
+                Completed[i] = false;
+                HAddress[i] = AAddress[i];
+                int v = ReadCpu(ABank[i] << 16 | HAddress[i]);
+                HAddress[i]++;
+                HCounter[i] = v;
+                Repeat[i] = (v & 0x80) != 0;
+                if (Indirect[i])
+                {
+                    int addr = ABank[i] << 16 | HAddress[i];
+                    int low = ReadCpu(addr);
+                    int high = ReadCpu(addr + 1);
+                    Size[i] = (ushort)(low | (high << 8));
+                    HAddress[i] += 2;
+                }
+                TransferEnabled[i] = true;
+            }
+            else
+            {
+                TransferEnabled[i] = false;
+            }
+        }
+    }
+
+    public int Read(int a)
     {
         var i = (a & 0xf0) / 0x10;
-        if (i > 6)
-        { }
         switch (a & 0x0f)
         {
             case 0x00:
-                Dma[i].Direction = v.GetBit(7);
-                Dma[i].Indirect = v.GetBit(6);
-                Dma[i].Step = (v >> 3) & 3;
-                Dma[i].Mode = v & 7;
-                Dma[i].RamAddress = ramaddr; break;
-            case 0x01: Dma[i].BAddress = v; break;
-            case 0x02: Dma[i].AAddress = (Dma[i].AAddress & 0xff00) | v; break;
-            case 0x03: Dma[i].AAddress = (Dma[i].AAddress & 0x00ff) | v << 8; break;
-            case 0x04: Dma[i].ABank = v; break;
-            case 0x05: Dma[i].Size = (ushort)((Dma[i].Size & 0xff00) | v); break;
-            case 0x06: Dma[i].Size = (ushort)((Dma[i].Size & 0x00ff) | v << 8); break;
-            case 0x07: Dma[i].HBank = v; break;
-            case 0x08: Dma[i].HAddress = (Dma[i].HAddress & 0xff00) | v; break;
-            case 0x09: Dma[i].HAddress = (Dma[i].HAddress & 0x00ff) | v << 8; break;
+                return ((Direction[i] ? 0x80 : 0x00) |
+                Step[i] << 3 |
+                Mode[i] & 7 |
+                RamAddress[i]) & 0xff;
+            case 0x01: return BAddress[i] & 0xff;
+            case 0x02: return AAddress[i] & 0xff;
+            case 0x03: return (AAddress[i] >> 8) & 0xff;
+            case 0x04: return (AAddress[i] >> 16) & 0xff;
+            case 0x05: return Size[i] & 0xff;
+            case 0x06: return (Size[i] >> 8) & 0xff;
+            case 0x07: break;
+        }
+        return 0;
+    }
+
+    public void Write(int a, byte v, int ramaddr)
+    {
+        var i = (a & 0xf0) / 0x10;
+
+        switch (a & 0x0f)
+        {
+            case 0x00:
+                Direction[i] = (v & 0x80) != 0;
+                Indirect[i] = (v & 0x40) != 0;
+                Step[i] = (v >> 3) & 3;
+                Mode[i] = v & 7;
+                RamAddress[i] = ramaddr; break;
+            case 0x01: BAddress[i] = v; break;
+            case 0x02: AAddress[i] = (AAddress[i] & 0xff00) | v; break;
+            case 0x03: AAddress[i] = (AAddress[i] & 0x00ff) | v << 8; break;
+            case 0x04: ABank[i] = v; break;
+            case 0x05: Size[i] = (ushort)((Size[i] & 0xff00) | v); break;
+            case 0x06: Size[i] = (ushort)((Size[i] & 0x00ff) | v << 8); break;
+            case 0x07: HBank[i] = v; break;
+            case 0x08: HAddress[i] = (HAddress[i] & 0xff00) | v; break;
+            case 0x09: HAddress[i] = (HAddress[i] & 0x00ff) | v << 8; break;
             case 0x0a:
-                Dma[i].HCounter = v;
-                Dma[i].Repeat = v.GetBit(7);
+                HCounter[i] = v;
+                Repeat[i] = (v & 0x80) != 0;
                 break;
         }
     }
 
-    public Dictionary<string, object> GetIoRegs() => new()
+    public void StatusDma(int v)
     {
-        ["DMA Enabled"] = Enabled,
-        ["HDMA Enabled"] = HdmaEnabled,
-        ["Mode"] = $"{Mode:X2}",
-        ["ABank"] = $"{ABank:X2}",
-        ["AAddress"] = $"{AAddress:X4}",
-        ["BAddress"] = $"{BAddress:X2}",
-        ["Size"] = $"{Size:X4}",
-        ["RamAddress"] = $"{RamAddress:X4}",
-        ["Bank"] = $"{HBank:X2}",
-        ["HAddress"] = $"{HAddress:X4}",
-        ["LineCounter"] = $"{HCounter:X2}",
-    };
+        DmaEnabled = v != 0;
+        DmaState = DmaEnabled ? 1 : 0;
+        for (int i = 0; i < 8; i++)
+            Enabled[i] = ((v >> i) & 1) != 0;
+    }
+
+    public void StatusHdma(int v)
+    {
+        for (int i = 0; i < MaxChannels; i++)
+            HdmaEnabled[i] = ((v >> i) & 1) != 0;
+    }
+
+    public List<RegistersInfo> GetIoRegs(int i) =>
+    [
+        new($"420B.{i}","DMA Enabled",$"{Enabled[i]}"),
+        new($"420C.{i}","HDMA Enabled",$"{HdmaEnabled[i]}"),
+        new($"43{i * 16:X2}.0-2","Mode",$"{Mode[i]:X2}"),
+        new($"43{i * 16:X2}.3","Fixed",$"{Step[i] == 1 || Step[i] == 3:X2}"),
+        new($"43{i * 16:X2}.6","Indirect",$"{Indirect[i]}"),
+        new($"43{i * 16:X2}.7","Direction",$"{Direction[i]}"),
+        new($"43{i * 16 + 1:X2}","BAddress",$"{BAddress[i]:X2}"),
+        new($"43{i * 16 + 2:X2}/3","AAddress",$"{AAddress[i]:X4}"),
+        new($"43{i * 16 + 4:X2}","ABank",$"{ABank[i]}"),
+        new($"43{i * 16 + 5:X2}/6","Size",$"{Size[i]:X4}"),
+        new($"43{i * 16 + 7:X2}","Bank",$"{HBank[i]:X2}"),
+        new($"43{i * 16 + 8:X2}/9","HAddress",$"{HAddress[i]:X4}"),
+        new($"43{i * 16 + 10:X2}","LineCounter",$"{HCounter[i]:X2}"),
+        new($"","RamAddress",$"{RamAddress[i]:X4}"),
+    ];
 
     public override void Save(BinaryWriter bw)
     {
         for (int i = 0; i < 8; i++)
         {
-            var d = Dma[i];
-            bw.Write(Enabled); bw.Write(d.HdmaEnabled);
-            bw.Write(d.Direction); bw.Write(d.Step);
-            bw.Write(d.Mode); bw.Write(d.Port);
-            bw.Write(d.ABank); bw.Write(d.AAddress);
-            bw.Write(d.Size); bw.Write(d.BAddress);
-            bw.Write(d.RamAddress); bw.Write(d.HBank);
-            bw.Write(d.HAddress); bw.Write(d.HCounter);
-            bw.Write(d.Completed); bw.Write(d.Indirect);
-            bw.Write(d.Repeat); bw.Write(d.TransferEnabled);
+            bw.Write(Enabled[i]); bw.Write(HdmaEnabled[i]);
+            bw.Write(Direction[i]); bw.Write(Step[i]);
+            bw.Write(Mode[i]); bw.Write(Port[i]);
+            bw.Write(ABank[i]); bw.Write(AAddress[i]);
+            bw.Write(Size[i]); bw.Write(BAddress[i]);
+            bw.Write(RamAddress[i]); bw.Write(HBank[i]);
+            bw.Write(HAddress[i]); bw.Write(HCounter[i]);
+            bw.Write(Completed[i]); bw.Write(Indirect[i]);
+            bw.Write(Repeat[i]); bw.Write(TransferEnabled[i]);
         }
     }
 
@@ -113,16 +306,15 @@ public class SnesDma : EmuState
     {
         for (int i = 0; i < 8; i++)
         {
-            var d = Dma[i];
-            Enabled = br.ReadBoolean(); d.HdmaEnabled = br.ReadBoolean();
-            d.Direction = br.ReadBoolean(); d.Step = br.ReadInt32();
-            d.Mode = br.ReadInt32(); d.Port = br.ReadInt32();
-            d.ABank = br.ReadInt32(); d.AAddress = br.ReadInt32();
-            d.Size = br.ReadInt32(); d.BAddress = br.ReadInt32();
-            d.RamAddress = br.ReadInt32(); d.HBank = br.ReadInt32();
-            d.HAddress = br.ReadInt32(); d.HCounter = br.ReadInt32();
-            d.Completed = br.ReadBoolean(); d.Indirect = br.ReadBoolean();
-            d.Repeat = br.ReadBoolean(); d.TransferEnabled = br.ReadBoolean();
+            Enabled[i] = br.ReadBoolean(); HdmaEnabled[i] = br.ReadBoolean();
+            Direction[i] = br.ReadBoolean(); Step[i] = br.ReadInt32();
+            Mode[i] = br.ReadInt32(); Port[i] = br.ReadInt32();
+            ABank[i] = br.ReadInt32(); AAddress[i] = br.ReadInt32();
+            Size[i] = br.ReadInt32(); BAddress[i] = br.ReadInt32();
+            RamAddress[i] = br.ReadInt32(); HBank[i] = br.ReadInt32();
+            HAddress[i] = br.ReadInt32(); HCounter[i] = br.ReadInt32();
+            Completed[i] = br.ReadBoolean(); Indirect[i] = br.ReadBoolean();
+            Repeat[i] = br.ReadBoolean(); TransferEnabled[i] = br.ReadBoolean();
         }
     }
 }

@@ -24,8 +24,8 @@ internal class GuiDeck : Gui
         base.Init(isdeck);
     }
 
-    public override void Reset(string name, string lastname)
+    public override void Reset(string name)
     {
-        base.Reset(name, lastname);
+        base.Reset(name);
     }
 }

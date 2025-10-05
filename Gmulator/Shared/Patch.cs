@@ -1,4 +1,5 @@
-﻿using System.Text;
+﻿using System.Data;
+using System.Text;
 
 namespace Gmulator;
 public class Patch
@@ -58,19 +59,19 @@ public class Patch
                     break;
                 case 2:
                     var off = Decode(br);
-                    if ((ulong)(off & 1) > 0)
-                        sourceRelOff -= (ulong)(off >> 1);
+                    if ((off & 1) > 0)
+                        sourceRelOff -= off >> 1;
                     else
-                        sourceRelOff += (ulong)(off >> 1);
+                        sourceRelOff += off >> 1;
                     while (length-- > 0)
                         target[outputOff++] = source[sourceRelOff++];
                     break;
                 case 3:
                     off = Decode(br);
-                    if ((ulong)(off & 1) > 0)
-                        targetRelOff -= (ulong)(off >> 1);
+                    if ((off & 1) > 0)
+                        targetRelOff -= off >> 1;
                     else
-                        targetRelOff += (ulong)(off >> 1);
+                        targetRelOff += off >> 1;
                     while (length-- > 0)
                         target[outputOff++] = target[targetRelOff++];
                     break;
@@ -82,9 +83,17 @@ public class Patch
     private byte[] RunIPS(byte[] rom, string filename)
     {
         var name = Path.GetFullPath($"Roms/{filename}.ips");
-        if (!File.Exists(name)) return rom;
+        if (!File.Exists(name))
+        {
+            name = $"{filename}.ips";
+            if (!File.Exists(name))
+                return rom;
+        }
+
         using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
         Header = Encoding.Default.GetString(br.ReadBytes(5));
+        byte[] romnew = (byte[])rom.Clone();
+        int romsize = romnew.Length;
         while (br.BaseStream.Position < br.BaseStream.Length - 3)
         {
             var offset = br.ReadBytes(3).Int24();
@@ -93,7 +102,12 @@ public class Patch
             {
                 size = br.ReadBytes(2).Int16();
                 var b = br.ReadByte();
-                Array.Fill(rom, b, offset, size);
+                if (offset >= romnew.Length)
+                {
+                    romsize += size;
+                    Array.Resize(ref romnew, romsize);
+                }
+                Array.Fill(romnew, b, offset, size);
                 continue;
             }
             var data = br.ReadBytes(size);
@@ -102,9 +116,16 @@ public class Patch
                 Notifications.Init("Patch Error");
                 break;
             }
-            Array.Copy(data, 0, rom, offset, data.Length);
+
+            if (offset >= romnew.Length)
+            {
+                romsize += size;
+                Array.Resize(ref romnew, romsize);
+            }
+
+            Array.Copy(data, 0, romnew, offset, data.Length);
         }
-        return rom;
+        return romnew;
     }
 
     private static ulong Decode(BinaryReader br)

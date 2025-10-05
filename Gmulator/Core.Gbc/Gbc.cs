@@ -1,5 +1,6 @@
 ﻿
 using Gmulator.Core.Gbc.Mappers;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Gmulator.Core.Gbc
@@ -21,16 +22,15 @@ namespace Gmulator.Core.Gbc
             Timer = new();
             IO = new(Timer);
             Mmu = new(IO, Cheats);
-            Cpu = new(Mmu, IO);
+            Cpu = new(this);
             Ppu = new(this);
             Apu = new(Mmu, GbcCpuClock);
-            Logger = new();
+            Logger = new(Cpu);
 
             Mmu.Init(this);
             IO?.Init(Mmu, Ppu, Apu);
             Input.Init(GbcJoypad.GetButtons());
 
-            Cpu.SetState = SetState;
             Cpu.Tick = Tick;
 
             Logger.GetFlags += Cpu.GetFlags;
@@ -38,37 +38,41 @@ namespace Gmulator.Core.Gbc
             Logger.ReadByte += Mmu.Read;
         }
 
-        public override void Execute(bool opened, int times)
+        public void LuaMemoryCallbacks()
         {
-            if (Mapper != null && State == Running && !opened)
+            LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
+        }
+
+        public override void Execute(bool opened)
+        {
+            DebugState state = State;
+            if (Mapper != null && state == DebugState.Running && !opened)
             {
                 var cyclesframe = GbcCycles;
-                while (times-- > 0)
-                {
-                    while (Cpu?.Cycles < cyclesframe)
-                    {
-                        ushort pc = Cpu.PC;
-                        if (Debug)
-                        {
-                            if (Breakpoints?.Count > 0)
-                            {
-                                if (DebugWindow.ExecuteCheck(pc))
-                                {
-                                    State = Break;
-                                    return;
-                                }
-                            }
 
-                            if (Logger?.Logging == true)
-                                Logger?.LogToFile(pc);
+                while (Cpu?.Cycles < cyclesframe)
+                {
+                    int pc = Cpu.PC;
+                    if (Debug)
+                    {
+                        if (Breakpoints?.Count > 0)
+                        {
+                            if (DebugWindow.ExecuteCheck(pc))
+                            {
+                                State = DebugState.Break;
+                                return;
+                            }
                         }
 
-                        Cpu?.Step();
-                        if (State == Break)
-                            return;
+                        if (Logger?.Logging == true)
+                            Logger?.Log(pc);
                     }
-                    Cpu.Cycles -= cyclesframe;
+
+                    Cpu?.Step();
+                    if (State == DebugState.Break)
+                        return;
                 }
+                Cpu.Cycles -= cyclesframe;
                 Mmu.ApplyParCheats();
             }
         }
@@ -86,26 +90,25 @@ namespace Gmulator.Core.Gbc
             Apu?.Step(c);
         }
 
-        public override void Reset(string name, string lastname, bool reset)
+        public override void Reset(string name, bool reset)
         {
             if (name != "")
                 Mapper = Mmu?.LoadRom(name);
-
-            if (reset)
-                SaveBreakpoints(lastname);
 
             if (Mapper != null)
             {
                 GameName = name;
                 DebugWindow ??= new GbcDebugWindow(this);
+                Cpu.SetAccess(this);
                 Cpu?.Reset(Mmu.IsBios, Mapper.CGB);
                 Ppu?.Reset(Mapper.CGB);
                 Apu?.Reset();
                 IO?.Reset();
+                Mapper.Reset();
                 Logger?.Reset();
                 LoadBreakpoints(Mapper.Name);
                 Cheat?.Load(this);
-                base.Reset(name, lastname, true);
+                base.Reset(name, true);
             }
         }
 
@@ -120,11 +123,12 @@ namespace Gmulator.Core.Gbc
                 {
                     using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-                    bw.Write(Encoding.ASCII.GetBytes(SaveStateVersion));
+                    bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
                     Mmu?.Save(bw);
                     Cpu?.Save(bw);
                     Ppu?.Save(bw);
                     Apu?.Save(bw);
+                    IO?.Save(bw);
                     Mapper?.Save(bw);
                     base.SaveState(slot, StateResult.Success);
                 }
@@ -145,12 +149,13 @@ namespace Gmulator.Core.Gbc
                     using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
 
                     var version = Encoding.ASCII.GetString(br.ReadBytes(4));
-                    if (version == SaveStateVersion)
+                    if (version == EmuState.Version)
                     {
                         Mmu?.Load(br);
                         Cpu?.Load(br);
                         Ppu?.Load(br);
                         Apu?.Load(br);
+                        IO?.Load(br);
                         Mapper?.Load(br);
                         base.LoadState(slot, StateResult.Success);
                     }
@@ -168,11 +173,11 @@ namespace Gmulator.Core.Gbc
 
         public override void Close()
         {
-            Mmu?.SaveRam();
+            //Mmu?.SaveRam();
             //Cheat.Save(GameName);
             SaveBreakpoints(GameName);
         }
 
-        public override void SetState(int v) => base.SetState(v);
+        public override void SetState(DebugState v) => base.SetState(v);
     }
 }

@@ -26,12 +26,12 @@ public class GbcPpu : EmuState
     public byte[] CGBObjPal { get; private set; }
     private bool CGB;
 
-    private bool BackgroundOn => IO.LCDC.GetBit(0);
-    private bool SpriteOn => IO.LCDC.GetBit(1);
-    private bool WindowOn => IO.LCDC.GetBit(5);
-    public int WindowAddr { get => IO.LCDC.GetBit(6) ? 0x9c00 : 0x9800; }
-    public int TileAddr { get => IO.LCDC.GetBit(4) ? 0x8000 : 0x8800; }
-    public int MapAddr { get => IO.LCDC.GetBit(3) ? 0x9c00 : 0x9800; }
+    private bool BackgroundOn => (IO.LCDC & 0x01) != 0;
+    private bool SpriteOn => (IO.LCDC & 0x02) != 0;
+    private bool WindowOn => (IO.LCDC & 0x20) != 0;
+    public int WindowAddr { get => (IO.LCDC & 0x40) != 0 ? 0x9c00 : 0x9800; }
+    public int TileAddr { get => (IO.LCDC & 0x10) != 0 ? 0x8000 : 0x8800; }
+    public int MapAddr { get => (IO.LCDC & 0x08) != 0 ? 0x9c00 : 0x9800; }
 
     private uint[] ScreenBuffer;
 
@@ -60,7 +60,7 @@ public class GbcPpu : EmuState
 
     public void Step(int cyc)
     {
-        if (!IO.LCDC.GetBit(7))
+        if ((IO.LCDC & 0x80) == 0)
         {
             IO.LY = 0;
             WLY = 0;
@@ -139,7 +139,7 @@ public class GbcPpu : EmuState
         if (IO.LY == IO.LYC)
         {
             IO.STAT |= 4;
-            if (IO.STAT.GetBit(6))
+            if ((IO.STAT & 0x40) != 0)
                 IO.IF |= IntLcd;
         }
         else
@@ -188,15 +188,15 @@ public class GbcPpu : EmuState
                     var attaddr = (ushort)(MapAddr - 0x8000 + sy / 8 * 32) + sx / 8 + 0x2000;
                     att = Mmu.Vram[attaddr];
                     var bank = ((att >> 3) & 1) * 0x2000;
-                    int bgaddr = GetBgAddr(TileAddr, MapAddr, sx, sy, att.GetBit(6)) + bank;
-                    color = GetColor(bgaddr, sx, att.GetBit(5));
+                    int bgaddr = GetBgAddr(TileAddr, MapAddr, sx, sy, (att & 0x40) != 0) + bank;
+                    color = GetColor(bgaddr, sx, (att & 0x20) != 0);
                     var n = (((att & 7) << 2) + color) << 1;
                     var pal = (ushort)(CGBBkgPal[n] | CGBBkgPal[n + 1] << 8);
                     rgb = GetRGB555(pal);
                 }
             }
             ScreenBuffer[IO.LY * GbWidth + x] = rgb;
-            LineBGColors[x] = (byte)(color | att & 0x80);
+            LineBGColors[x] = (byte)(color | (att & 0x80));
         }
     }
 
@@ -231,8 +231,8 @@ public class GbcPpu : EmuState
             {
                 var att = Mmu.Vram[(ushort)(WindowAddr - 0x8000 + row / 8 * 32) + x / 8 + 0x2000];
                 var bank = ((att >> 3) & 1) * 0x2000;
-                int bgaddr = GetBgAddr(TileAddr, WindowAddr, x, row, att.GetBit(6)) + bank;
-                color = GetColor(bgaddr, x, att.GetBit(5));
+                int bgaddr = GetBgAddr(TileAddr, WindowAddr, x, row, (att & 0x40) != 0) + bank;
+                color = GetColor(bgaddr, x, (att & 0x20) != 0);
                 var n = (((att & 7) << 2) + color) << 1;
                 var pal = (ushort)(CGBBkgPal[n] | CGBBkgPal[n + 1] << 8);
                 rgb = GetRGB555(pal);
@@ -246,7 +246,7 @@ public class GbcPpu : EmuState
     public void DrawSprites()
     {
         int numsprites = 0;
-        int size = IO.LCDC.GetBit(2) ? 16 : 8;
+        int size = (IO.LCDC & 0x04) != 0 ? 16 : 8;
         bool[] sprites = new bool[40];
 
         for (int i = 0; i < 40; i++)
@@ -267,8 +267,8 @@ public class GbcPpu : EmuState
             int sx = Mmu.Ram[0xfe01 + i * 4] - 8;
             byte ti = Mmu.Ram[0xfe02 + i * 4];
             byte at = Mmu.Ram[0xfe03 + i * 4];
-            bool flipX = at.GetBit(5);
-            bool flipY = at.GetBit(6);
+            bool flipX = (at & 0x20) != 0;
+            bool flipY = (at & 0x40) != 0;
 
             if (!sprites[i])
                 continue;
@@ -283,7 +283,7 @@ public class GbcPpu : EmuState
                     continue;
 
                 int pos = IO.LY * GbWidth + sx + xx;
-                bool priority = !at.GetBit(7);
+                bool priority = (at & 0x80) == 0;
                 int color;
                 var fx = flipX ? xx : xx ^ 7;
                 var bank = CGB ? ((at >> 3) & 1) * 0x2000 : 0;
@@ -293,7 +293,7 @@ public class GbcPpu : EmuState
                 {
                     color = (Mmu.Ram[(ushort)bgaddr] >> (fx & 7) & 1) |
                         (Mmu.Ram[(ushort)bgaddr + 1] >> (fx & 7) & 1) * 2;
-                    var spPixel = at.GetBit(4) ? IO.OBP1 >> (color << 1) & 3 : IO.OBP0 >> (color << 1) & 3;
+                    var spPixel = (at & 0x10) != 0 ? IO.OBP1 >> (color << 1) & 3 : IO.OBP0 >> (color << 1) & 3;
                     rgb = GbColors[1][spPixel];
                 }
                 else
@@ -306,7 +306,7 @@ public class GbcPpu : EmuState
                 }
 
                 var bgcolor = LineBGColors[sx + xx] & 3;
-                if (color > 0)
+                if (color != 0)
                 {
                     if (!CGB)
                     {
@@ -315,7 +315,7 @@ public class GbcPpu : EmuState
                     }
                     else
                     {
-                        var bgpriority = LineBGColors[sx + xx].GetBit(7);
+                        var bgpriority = (LineBGColors[sx + xx] & 0x80) != 0;
                         if (bgcolor == 0)
                             ScreenBuffer[pos] = rgb;
                         else if (!BackgroundOn)
@@ -367,10 +367,10 @@ public class GbcPpu : EmuState
     public void SetMode(int n, byte bit)
     {
         IO.STAT = (byte)(IO.STAT & 0xfc | n);
-        if (bit > 0)
+        if (bit != 0)
         {
-            if (PrevMode != n && IO.STAT.GetBit(bit))
-                IO.IF |= IntLcd;
+            //if (PrevMode != n && (IO.STAT & bit) != 0)
+            //    IO.IF |= IntLcd;
             PrevMode = n;
         }
     }
@@ -382,7 +382,7 @@ public class GbcPpu : EmuState
         {
             <= 0x07 => Mmu.Mapper.ReadRomBlock(a, 0xa0),
             <= 0x09 => CGB ? new Span<byte>(Mmu.Vram, a, 0xa0) : new(Mmu.Ram, a, 0xa0),
-            <= 0x0b => new Span<byte>(Mmu.Sram, a - 0xa000 + (Mmu.Mapper.Rambank * 0x2000), 0xa0),
+            <= 0x0b => new Span<byte>(Gbc.Mapper.Sram, a - 0xa000 + (Mmu.Mapper.Rambank * 0x2000), 0xa0),
             <= 0x0c => CGB ? new Span<byte>(Mmu.Ram, a, 0xa0) : new(Mmu.Ram, a, 0xa0),
             <= 0x0d => CGB ? new Span<byte>(Mmu.Wram, (a - 0xd000) + IO.SVBK * 0x1000, 0xa0) : new(Mmu.Ram, a, 0xa0),
             _ => null,

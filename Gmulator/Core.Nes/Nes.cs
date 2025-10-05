@@ -11,32 +11,29 @@ using System.Threading.Tasks;
 namespace Gmulator.Core.Nes;
 public class Nes : Emulator
 {
-    public NesCpu Cpu { get; private set; }
-    public NesPpu Ppu { get; private set; }
-    public NesApu Apu { get; private set; }
-    public NesMmu Mmu { get; private set; }
-    public BaseMapper Mapper { get; private set; }
-    public Header Cart { get; private set; }
-    public Timer Timer { get; private set; }
-    public NesLogger Logger { get; private set; }
-    public Audio Audio { get; }
-    public NesJoypad Joypad1 { get; private set; } = new();
-    public NesJoypad Joypad2 { get; private set; } = new();
+    private NesCpu Cpu;
+    private NesPpu Ppu;
+    private NesApu Apu;
+    private NesMmu Mmu;
+    private BaseMapper Mapper;
+    private NesLogger Logger;
+    private NesJoypad Joypad1 = new();
+    private NesJoypad Joypad2 = new();
 
     public Nes()
     {
         CheatConverter = new(this);
         Mmu = new(Cheats);
         Cpu = new();
-        Ppu = new(Mmu);
         Apu = new();
+        Ppu = new(Mmu, Apu);
         Logger = new(Cpu);
         Ppu.Init(this);
         Mmu.Init(Joypad1, Joypad2);
         Input.Init(NesJoypad.GetButtons());
 
         Logger.OnGetFlags += Cpu.GetFlags;
-        Logger.OnGetRegs += Cpu.GetRegs;
+        Logger.OnGetRegs += Cpu.GetRegisters;
         Logger.ReadByte += Mmu.Read;
 
         Mmu.StatusR = Ppu.StatusR;
@@ -58,45 +55,48 @@ public class Nes : Emulator
         Apu.Dmc.Read = Cpu.ReadDmc;
     }
 
-    public override void Execute(bool opened, int times)
+    public void LuaMemoryCallbacks()
     {
-        if (Mapper != null && State == Running && !opened)
+        LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
+    }
+
+    public override void Execute(bool opened)
+    {
+        if (Mapper != null && State == DebugState.Running && !opened)
         {
             var cyclesframe = Header.Region == 0 ? NesNtscCycles : NesPalCycles;
-            while (times-- > 0)
+            while (Ppu.Cycles < cyclesframe)
             {
-                while (Ppu.Cycles < cyclesframe)
+                ushort pc = (ushort)Cpu.PC;
+                Cpu.Step();
+
+                if (Debug)
                 {
-                    ushort pc = (ushort)Cpu.PC;
-                    Cpu.Step();
-
-                    if (Debug)
+                    if (Cpu.StepOverAddr == Cpu.PC)
                     {
-                        if (Cpu.StepOverAddr == Cpu.PC)
-                        {
-                            State = Break;
-                            Cpu.StepOverAddr = -1;
-                            return;
-                        }
-
-                        if (Breakpoints.Count > 0)
-                        {
-                            if (DebugWindow.ExecuteCheck(pc))
-                            {
-                                State = Break;
-                                return;
-                            }
-                        }
-
-                        if (Logger.Logging)
-                            Logger.Log(pc);
+                        State = DebugState.Break;
+                        Cpu.StepOverAddr = -1;
+                        return;
                     }
 
-                    if (State == Break)
-                        return;
+                    if (Breakpoints.Count > 0)
+                    {
+                        if (DebugWindow.ExecuteCheck(pc))
+                        {
+                            State = DebugState.Break;
+                            return;
+                        }
+                    }
+
+                    if (Logger.Logging)
+                        Logger.Log(pc);
                 }
-                Ppu.Cycles -= cyclesframe;
+
+                if (State == DebugState.Break)
+                    return;
             }
+            Ppu.Cycles -= cyclesframe;
+
             if (Cheats.Count > 0)
                 Mmu.ApplyRawCheats();
         }
@@ -106,7 +106,7 @@ public class Nes : Emulator
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
-    public override void Reset(string name, string lastname, bool reset)
+    public override void Reset(string name, bool reset)
     {
         if (name != "")
             Mapper = Mmu.LoadRom(name);
@@ -114,7 +114,7 @@ public class Nes : Emulator
         if (Mapper != null)
         {
             GameName = name;
-            DebugWindow ??= new NesDebugWindow(this);
+            LastName = GameName;
             Mmu.Ram.AsSpan(0x6000, 0x2000).ToArray();
             Cpu.Reset();
             Ppu.Reset();
@@ -122,7 +122,12 @@ public class Nes : Emulator
             Mmu.Reset();
             Logger.Reset();
             Cheat.Load(this);
-            base.Reset(name, lastname, true);
+            LoadBreakpoints(Mapper.Name);
+            base.Reset(name, true);
+
+#if DEBUG || RELEASE
+            DebugWindow ??= new NesDebugWindow(this, Cpu, Mmu, Logger);
+#endif
         }
     }
 
@@ -137,7 +142,7 @@ public class Nes : Emulator
             {
                 using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-                bw.Write(Encoding.ASCII.GetBytes(SaveStateVersion));
+                bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
                 Mmu.Save(bw);
                 Cpu.Save(bw);
                 Ppu.Save(bw);
@@ -161,7 +166,7 @@ public class Nes : Emulator
             {
                 using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
 
-                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == SaveStateVersion)
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == EmuState.Version)
                 {
                     Mmu.Load(br);
                     Cpu.Load(br);
@@ -182,12 +187,7 @@ public class Nes : Emulator
 
     public override void LoadBreakpoints(string name) => base.LoadBreakpoints(name);
 
-    public override void Close()
-    {
-        Mmu?.SaveRam();
-        //Cheat.Save(Mapper.Name);
-        SaveBreakpoints(Mapper.Name);
-    }
+    public override void Close() => SaveBreakpoints(Mapper.Name);
 
-    public override void SetState(int v) => base.SetState(v);
+    public override void SetState(DebugState v) => base.SetState(v);
 }

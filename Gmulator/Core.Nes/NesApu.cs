@@ -102,7 +102,7 @@ public class NesApu : EmuState
                         HalfFrame();
                         break;
                     case 29830:
-                        if (!FrameCounter.GetBit(7))
+                        if ((FrameCounter & 0x80) == 0)
                             Cycles = 0;
                         break;
                     case 37281:
@@ -127,7 +127,7 @@ public class NesApu : EmuState
                         QuarterFrame();
                         break;
                     case 33252:
-                        if (!FrameCounter.GetBit(7))
+                        if ((FrameCounter & 0x80) == 0)
                             Cycles = 0;
                         break;
                     case 41565:
@@ -208,7 +208,7 @@ public class NesApu : EmuState
         Noise.Length();
     }
 
-    public byte Read(int a)
+    public int Read(int a)
     {
         if (a == 0x4015)
         {
@@ -227,13 +227,13 @@ public class NesApu : EmuState
             if (IrqEnabled)
                 res |= 0x40;
             IrqEnabled = false;
-            return (byte)res;
+            return res&0xff;
         }
 
         return 0xff;
     }
 
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         if (a <= 0x4003)
             Square1.Write(a, v);
@@ -248,11 +248,11 @@ public class NesApu : EmuState
 
         else if (a == 0x4015)
         {
-            Square1.Enabled = v.GetBit(0);
-            Square2.Enabled = v.GetBit(1);
-            Triangle.Enabled = v.GetBit(2);
-            Noise.Enabled = v.GetBit(3);
-            Dmc.Enabled = v.GetBit(4);
+            Square1.Enabled = (v & 0x01) != 0;
+            Square2.Enabled = (v & 0x02) != 0;
+            Triangle.Enabled = (v & 0x04) != 0;
+            Noise.Enabled = (v & 0x08) != 0;
+            Dmc.Enabled = (v & 0x10) != 0;
 
             if (!Square1.Enabled)
                 Square1.LengthCounter = 0;
@@ -277,9 +277,9 @@ public class NesApu : EmuState
         {
             FrameCounter = v;
 
-            IrqEnabled = v == 0 && !v.GetBit(6) && !v.GetBit(7);
+            IrqEnabled = v == 0 && !((v & 0x40) == 0) && !((v & 0x80) == 0);
 
-            if (v.GetBit(7))
+            if ((v & 0x80) != 0)
             {
                 QuarterFrame();
                 HalfFrame();

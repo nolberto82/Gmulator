@@ -25,13 +25,13 @@ public class Menu
     private readonly string[] TabNames = ["Games", "Cheats", "Lua", "Options"];
 
     private List<Option> Options;
-    public string LastName { get; private set; } = "";
-    private string GameName;
+    private string CurrentName;
+    private string PreviousName;
     private string CheatName;
     private string CheatCodes;
     private string CheatsOut;
     public Action<Emulator> ReloadCheats { get; set; }
-    public Action<string, string> Reset { get; set; }
+    public Action<string> Reset { get; set; }
     public bool Opened { get => opened; private set => opened = value; }
     private bool OpenDialog;
     private bool CheatDialog;
@@ -46,7 +46,7 @@ public class Menu
 
     public Menu()
     {
-        GameName = CheatName = CheatCodes = CheatsOut = "";
+        CurrentName = PreviousName = CheatName = CheatCodes = CheatsOut = "";
     }
 
     public void Init(bool isdeck, string[] exts)
@@ -78,7 +78,7 @@ public class Menu
 
         Options =
         [
-            new("Frameskip", [Config.FrameSkip, 1, 2, 9], null, false, ChangeOption, null),
+            new("Frameskip", [Config.FrameSkip, 1, 1, 10], null, false, ChangeOption, null),
             new("Volume", [Config.Volume, 0.1f, 0, 1],null, false, ChangeOption, null),
             new("Rotate AB Buttons", [Config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
             new("Copy Hacks", [0, 0, 0, 0], [""], true, null, CopyHacks),
@@ -112,7 +112,7 @@ public class Menu
 
         io.NativePtr->KeysData_121.Down = 0;
 
-        if (!Initial[(int)TabIndex] && io.NativePtr->KeysData_127.Down == 1)
+        if (!Initial[TabIndex] && io.NativePtr->KeysData_127.Down == 1)
         {
             io.NativePtr->KeysData_127.Down = 0;
             if ((TabIndex == 0 && GameFiles.Count > 0 || TabIndex == 1 && Emu.Cheats.Count > 0 || TabIndex == 2 && LuaFiles.Count > 0) || TabIndex == 3 || CheatDialog)
@@ -279,7 +279,15 @@ public class Menu
                                 if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                 {
                                     if (file.IsFile)
+                                    {
                                         File.Delete(file.Name);
+                                        var filename = Path.GetFileNameWithoutExtension(file.Name);
+                                        if (File.Exists($"{CheatDirectory}/{filename}.cht"))
+                                            File.Delete($"{CheatDirectory}/{filename}.cht");
+                                        if (File.Exists($"{CheatDirectory}/{filename}.lua"))
+                                            File.Delete($"{CheatDirectory}/{filename}.lua");
+                                    }
+
                                 }
                                 else
                                 {
@@ -290,8 +298,7 @@ public class Menu
                                             ImGui.CloseCurrentPopup();
                                             Config.Save();
                                             Opened = false;
-                                            Reset(GameName = file.Name, LastName);
-                                            LastName = file.Name;
+                                            Reset(CurrentName = file.Name);
                                         }
                                         else
                                         {
@@ -300,6 +307,7 @@ public class Menu
                                             GameFiles.Clear();
                                             Enumerate("");
                                             ImGui.PopStyleColor();
+                                            ImGui.PopID();
                                             break;
                                         }
                                     }
@@ -367,7 +375,7 @@ public class Menu
                                         var r = res.Where(c => c.Description == res[ItemSelected[TabCheats]].Description).ToList();
                                         if (r.Count > 0)
                                             r[0].Enabled = !r[0].Enabled;
-                                        CheatConverter.Save(GameName);
+                                        CheatConverter.Save(CurrentName);
                                     }
 
                                     ImGui.Text(cht[0].Enabled ? "ON" : "OFF");
@@ -384,7 +392,7 @@ public class Menu
                                             {
                                                 Emu.Cheats.Remove(c.Address);
                                             }
-                                            CheatConverter.Save(GameName);
+                                            CheatConverter.Save(CurrentName);
                                         }
                                     }
 
@@ -415,7 +423,7 @@ public class Menu
                                 if (ImGui.Button("OK", new(80, 0)))
                                 {
                                     CheatConverter.ConvertCodes(CheatName, CheatCodes, ref CheatsOut, true, Emu);
-                                    CheatConverter.Save(GameName);
+                                    CheatConverter.Save(CurrentName);
                                     ImGui.CloseCurrentPopup();
                                 }
                                 ImGui.SameLine(235);
@@ -523,6 +531,8 @@ public class Menu
     private void Enumerate(string path)
     {
         DirectoryInfo di;
+        if (!Directory.Exists(WorkingDir))
+            WorkingDir = "C:";
         if (path == "")
         {
             foreach (var file in DriveInfo.GetDrives())

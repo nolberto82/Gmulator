@@ -1,4 +1,5 @@
-﻿using Raylib_cs;
+﻿using Gmulator.Core.Gbc;
+using Raylib_cs;
 using System;
 using System.ComponentModel.Design;
 using System.Runtime.InteropServices;
@@ -6,20 +7,18 @@ using System.Runtime.InteropServices;
 namespace Gmulator.Core.Snes;
 public class SnesPpu : EmuState
 {
-    private Snes Snes;
-
     public int VPos { get; private set; }
     public int HPos { get; private set; }
     public ulong Cycles { get; private set; }
     public uint FrameCounter { get; private set; }
-    public bool CgRamToggle { get; private set; }
+    public bool FrameReady { get; set; }
+    private bool CgRamToggle;
     private int PrevScrollX;
     private int CurrScrollX;
-    public bool FrameReady { get; set; }
-    public bool Vblank { get; private set; }
-    public bool Hblank { get; private set; }
-    public int AutoJoyCounter { get; private set; }
-    public int MosaicSize { get; private set; }
+    private bool Vblank;
+    private bool Hblank;
+    private int AutoJoyCounter;
+    private int MosaicSize;
     private int ScrollXMode7;
     private int ScrollYMode7;
     private int W1Left;
@@ -33,32 +32,32 @@ public class SnesPpu : EmuState
     private int SpritesScanline;
     private readonly int[] ObjSizeWidth = [8, 8, 8, 16, 16, 32, 16, 16, 16, 32, 64, 32, 64, 64, 32, 32];
     private readonly int[] ObjSizeHeight = [8, 8, 8, 16, 16, 32, 32, 32, 16, 32, 64, 32, 64, 64, 64, 32];
-    public int ObjTable1 { get; private set; }
-    public int ObjTable2 { get; private set; }
-    public int ObjSize { get; private set; }
-    public bool ObjPrioRotation { get; private set; }
-    public int ObjPrioIndex { get; private set; }
-    public int OamAddr { get; private set; }
-    public int InterOamAddr { get; private set; }
-    public int Brightness { get; private set; }
-    public bool ForcedBlank { get; private set; }
-    public int BgMode { get; private set; }
-    public bool Mode1Bg3Prio { get; private set; }
-    public int RamAddrLow { get; private set; }
-    public int RamAddrMedium { get; private set; }
-    public int RamAddrHigh { get; private set; }
-    public int MultiplyA { get; set; }
-    public int MultiplyB { get; set; }
-    public int Dividend { get; set; }
-    public int Divisor { get; set; }
-    public int VramAddrInc { get; private set; }
-    public int VramAddrRemap { get; private set; }
-    public bool VramAddrMode { get; private set; }
-    public int VramAddr { get; private set; }
-    public int VramLatch { get; private set; }
-    public bool OverscanMode { get; private set; }
-    public bool HiResMode { get; private set; }
-    public bool ExtBgMode { get; private set; }
+    private int ObjTable1;
+    private int ObjTable2;
+    private int ObjSize;
+    private bool ObjPrioRotation;
+    private int ObjPrioIndex;
+    private int OamAddr;
+    private int InterOamAddr;
+    private int Brightness;
+    private bool ForcedBlank;
+    private int BgMode;
+    private bool Mode1Bg3Prio;
+    private int RamAddrLow;
+    private int RamAddrMedium;
+    private int RamAddrHigh;
+    private int MultiplyA;
+    private int MultiplyB;
+    private int Dividend;
+    private int Divisor;
+    private int VramAddrInc;
+    private int VramAddrRemap;
+    private bool VramAddrMode;
+    private int VramAddr;
+    private int VramLatch;
+    private bool OverscanMode;
+    private bool HiResMode;
+    private bool ExtBgMode;
 
     private int M7A; //211B
     private int M7B; //211C
@@ -113,41 +112,43 @@ public class SnesPpu : EmuState
     private int[] BgScrollY = [0, 0, 0, 0];
     private int[] BgSizeX = [255, 255, 255, 255];
     private int[] BgSizeY = [255, 255, 255, 255];
-    public bool[] ColorMath { get; private set; } = new bool[8];
-    public bool[] Win1Enabled { get; private set; } = new bool[6];
-    public bool[] Win1Inverted { get; private set; } = new bool[6];
-    public bool[] Win2Enabled { get; private set; } = new bool[6];
-    public bool[] Win2Inverted { get; private set; } = new bool[6];
-    public int[] WinLogic { get; private set; } = [0, 0, 0, 0, 0, 0];
-    public bool[] MainBgs { get; private set; } = new bool[5];
-    public bool[] SubBgs { get; private set; } = new bool[5];
-    public bool[] WinMainBgs { get; private set; } = new bool[5];
-    public bool[] WinSubBgs { get; private set; } = new bool[5];
-    public bool[] MosaicEnabled { get; private set; } = new bool[4];
-    public bool[] Mode7Settings { get; private set; } = new bool[4];
-    public bool[] BgCharSize { get; private set; } = new bool[4];
+    private bool[] ColorMath = new bool[8];
+    private bool[] Win1Enabled = new bool[6];
+    private bool[] Win1Inverted = new bool[6];
+    private bool[] Win2Enabled = new bool[6];
+    private bool[] Win2Inverted = new bool[6];
+    private int[] WinLogic = [0, 0, 0, 0, 0, 0];
+    private bool[] MainBgs = new bool[5];
+    private bool[] SubBgs = new bool[5];
+    private bool[] WinMainBgs = new bool[5];
+    private bool[] WinSubBgs = new bool[5];
+    private bool[] MosaicEnabled = new bool[4];
+    private bool[] Mode7Settings = new bool[4];
+    private bool[] BgCharSize = new bool[4];
 
-    public ushort[] Vram { get; private set; }
-    public ushort[] Cram { get; private set; }
-    public byte[] Oam { get; private set; }
+    private ushort[] Vram;
+    private ushort[] Cram;
+    private byte[] Oam;
     private uint[] ScreenBuffer;
 
     private GfxColor Main = new();
     private GfxColor Sub = new();
 
-    public int MulDivResult { get => (ushort)field; private set => field = (ushort)value; }
-    public int MulDivRemainder { get => (ushort)field; set => field = (ushort)value; }
+    public int MulDivResult { get => field & 0xffff; private set => field = value & 0xffff; }
+    public int MulDivRemainder { get => field & 0xffff; private set => field = value & 0xffff; }
     private int Overscan { get => OverscanMode ? 240 : 225; }
-    private bool GetHIrq { get => NMITIMEN.GetBit(4); }
-    private bool GetVIrq { get => NMITIMEN.GetBit(5); }
-    private ushort GetHTime { get => (ushort)(HTIMEL | HTIMEH << 8); }
-    private ushort GetVTime { get => (ushort)(VTIMEL | VTIMEH << 8); }
+    private bool GetHIrq { get => (NMITIMEN & 0x10) != 0; }
+    private bool GetVIrq { get => (NMITIMEN & 0x20) != 0; }
+    private int GetHTime { get => (HTIMEL | HTIMEH << 8) & 0xffff; }
+    private int GetVTime { get => (VTIMEL | VTIMEH << 8) & 0xffff; }
 
-    public bool DramRefresh { get; private set; }
+    private bool DramRefresh;
+
+    private GfxColor Tranparent;
 
     public void Division(int v)
     {
-        if (v > 0)
+        if (v != 0)
         {
             MulDivResult = (ushort)(Dividend / v);
             MulDivRemainder = (ushort)(Dividend % v);
@@ -171,6 +172,10 @@ public class SnesPpu : EmuState
     public Func<int> ApuStep;
     public Action AutoJoyRead;
     public Action<int, byte> SetDma;
+    private Snes Snes;
+    private SnesCpu Cpu;
+    private SnesApu Apu;
+    private SnesDma Dma;
 
     public SnesPpu()
     {
@@ -180,9 +185,16 @@ public class SnesPpu : EmuState
             SpriteScan[i] = new();
     }
 
-    public void SetSnes(Snes snes) => Snes = snes;
-    public void SetJoy1L(int v) => JOY1L = (byte)v;
-    public void SetJoy1H(int v) => JOY1H = (byte)v;
+    public void SetSnes(Snes snes, SnesCpu cpu, SnesApu apu, SnesDma dma)
+    {
+        Snes = snes;
+        Cpu = cpu;
+        Apu = apu;
+        Dma = dma;
+    }
+
+    public void SetJoy1L(int v) => JOY1L = v & 0xff;
+    public void SetJoy1H(int v) => JOY1H = v & 0xff;
 
     public void Step(int c)
     {
@@ -245,15 +257,15 @@ public class SnesPpu : EmuState
             {
                 if (VPos == Overscan && HPos == 0)
                 {
-                    Snes.Apu.Step();
+                    Apu.Step();
                     Hblank = true;
                     Vblank = true;
                     HVBJOY |= 0xc0;
                     RDNMI |= 0x80;
-                    if (NMITIMEN.GetBit(7))
+                    if ((NMITIMEN & 0x80) != 0)
                         SetNmi();
 
-                    if (NMITIMEN.GetBit(0))
+                    if ((NMITIMEN & 0x01) != 0)
                     {
                         AutoJoyRead();
                         HVBJOY |= 0x41;
@@ -291,102 +303,18 @@ public class SnesPpu : EmuState
         }
     }
 
-    public void ProcessHdma()
-    {
-        Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
-        for (int i = 0; i < Dma.Length; i++)
-        {
-            ref var dma = ref Dma[i];
-            if (dma.HdmaEnabled && !dma.Completed)
-            {
-                if (dma.TransferEnabled)
-                {
-                    int max = dma.Max[dma.Mode & 7];
-                    if (dma.Indirect)
-                    {
-                        int size = dma.Size;
-                        for (int count = 0; count < max; count++)
-                        {
-                            dma.Transfer(dma.HBank << 16 | size, dma.Mode, count);
-                            size++;
-                        }
-                        dma.Size = (ushort)size;
-                    }
-                    else
-                    {
-                        int hAddress = dma.HAddress;
-                        for (int count = 0; count < max; count++)
-                        {
-                            dma.Transfer(dma.ABank << 16 | hAddress, dma.Mode, count);
-                            hAddress++;
-                        }
-                        dma.HAddress = hAddress;
-                    }
-                }
+    public void ProcessHdma() => Dma.HandleHdma();
 
-                dma.HCounter--;
-                dma.TransferEnabled = dma.HCounter.GetBit(7);
-                if ((dma.HCounter & 0x7f) == 0)
-                {
-                    var v = dma.Read(dma.ABank << 16 | dma.HAddress++);
-                    dma.HCounter = v;
-                    dma.Repeat = v.GetBit(7);
-                    var bank = dma.ABank << 16;
-                    if (dma.Indirect)
-                    {
-                        int low = dma.Read(bank | dma.HAddress++);
-                        int high = dma.Read(bank | dma.HAddress++);
-                        dma.Size = (ushort)(low | (high << 8));
-                    }
-
-                    dma.TransferEnabled = true;
-                    if (dma.HCounter == 0)
-                        dma.Completed = true;
-                }
-            }
-        }
-    }
-
-    private void InitHdma()
-    {
-        Span<SnesDma> Dma = CollectionsMarshal.AsSpan(Snes.Dma);
-        for (int i = 0; i < Dma.Length; i++)
-        {
-            ref var dma = ref Dma[i];
-            if (dma.HdmaEnabled)
-            {
-                dma.Completed = false;
-                dma.HAddress = dma.AAddress;
-                int v = dma.Read(dma.ABank << 16 | dma.HAddress);
-                dma.HAddress++;
-                dma.HCounter = v;
-                dma.Repeat = v.GetBit(7);
-                if (dma.Indirect)
-                {
-                    int addr = dma.ABank << 16 | dma.HAddress;
-                    int low = dma.Read(addr);
-                    int high = dma.Read(addr + 1);
-                    dma.Size = (ushort)(low | (high << 8));
-                    dma.HAddress += 2;
-                }
-                dma.TransferEnabled = true;
-            }
-            else
-            {
-                dma.TransferEnabled = false;
-            }
-        }
-    }
+    private void InitHdma() => Dma.InitHdma();
 
     private void Render(int y)
     {
-
         Sub = new(0, 0, 5);
         Span<int> bpp = new(Layers[BgMode][BgMode == 1 || BgMode == 7 ? 4 : 2]);
         int mapaddr, sx, sy, half = 0;
         bool main, sub, math = false;
 
-        if (VPos > 0 && VPos < Overscan && !Snes.FastForward || Snes.FastForward && FrameCounter % Snes.Config.FrameSkip == 0)
+        if (VPos != 0 && VPos < Overscan && !Snes.FastForward || Snes.FastForward && FrameCounter % Snes.Config.FrameSkip == 0)
         {
             EvaluateSprites(VPos);
 
@@ -412,8 +340,8 @@ public class SnesPpu : EmuState
                         {
                             if (MosaicEnabled[i])
                             {
-                                mx = MosaicSize > 0 ? (x % MosaicSize) : 0;
-                                my = MosaicSize > 0 ? (y % MosaicSize) : 0;
+                                mx = MosaicSize != 0 ? (x % MosaicSize) : 0;
+                                my = MosaicSize != 0 ? (y % MosaicSize) : 0;
                             }
 
                             sx = (x - mx + BgScrollX[i]);
@@ -426,13 +354,13 @@ public class SnesPpu : EmuState
                                     int h = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2], BgMapbase[2]);
                                     int v = GetMode2Tile(BgScrollX[2] + (x - 8) & 0xf8, BgScrollY[2] + 8, BgMapbase[2]);
                                     var bit = i == 0 ? 13 : 14;
-                                    if (h.GetBit(bit))
+                                    if ((h & (1 << bit)) != 0)
                                         sx = (sx & 7) + (x & ~7) + (h + BgScrollX[i]) & 0x1fff;
-                                    if (v.GetBit(bit))
+                                    if ((v & (1 << bit)) != 0)
                                         sy += (v & 0x1fff);
                                 }
 
-                                mapaddr = BgMapbase[i] + (byte)sy / 8 * 32 + (byte)sx / 8;
+                                mapaddr = BgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
                                 mapaddr += BgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
                                 mapaddr += (BgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
                             }
@@ -444,16 +372,16 @@ public class SnesPpu : EmuState
                                 {
                                     sx &= BgSizeX[i];
                                     sy &= BgSizeY[i];
-                                    mapaddr = (BgMapbase[i] + ((byte)sy / 8) * 32) + (byte)sx / 8;
+                                    mapaddr = (BgMapbase[i] + (sy & 0xff) / 8 * 32) + (sx & 0xff) / 8;
                                     mapaddr += (sx & 0x100) * 4;
                                 }
-                                mapaddr += (((BgSizeY[i] == 0x1ff) && (sy & 0x100) > 0 ? BgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0));
+                                mapaddr += (((BgSizeY[i] == 0x1ff) && (sy & 0x100) != 0 ? BgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0));
                                 mapaddr &= 0x7fff;
                             }
 
                             (var color, var pixel, var pal) = GetColor(sx, sy, mapaddr, BgTilebase[i], BgCharSize[i], bpp[i], paloff);
 
-                            if (main && pixel > 0)
+                            if (main && pixel != 0)
                             {
                                 MBgs[i].Color = color;
                                 MBgs[i].Palette = pal;
@@ -464,7 +392,7 @@ public class SnesPpu : EmuState
                                     MBgs[i].Color = 0;
                             }
 
-                            if (sub && pixel > 0)
+                            if (sub && pixel != 0)
                             {
                                 SBgs[i].Color = color;
                                 SBgs[i].Palette = pal;
@@ -481,8 +409,8 @@ public class SnesPpu : EmuState
                             int ry = Mode7Settings[1] ? 255 - y : y;
                             var cx = ScrollXMode7 - M7X;
                             var cy = ScrollYMode7 - M7Y;
-                            int ch = cx.GetBit(13) ? cx | ~0x3ff : cx & 0x3ff;
-                            int cv = cy.GetBit(13) ? cy | ~0x3ff : cy & 0x3ff;
+                            int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
+                            int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
                             sx = ((short)M7A * ch & ~63) + (((short)M7B * cv) & ~63) + ((short)M7B * ry & ~63) + (M7X << 8);
                             sy = (((short)M7C * ch) & ~63) + (((short)M7D * cv) & ~63) + ((short)M7D * ry & ~63) + (M7Y << 8);
                             var ox = (sx + (short)M7A * x);
@@ -528,47 +456,44 @@ public class SnesPpu : EmuState
 
                             if (fx < 0 || fx >= s.Width) continue;
 
-                            if (s.Attrib.GetBit(6))
+                            if ((s.Attrib & 0x40) != 0)
                                 fx = s.Width - fx - 1;
 
-                            if (s.Attrib.GetBit(7))
+                            if ((s.Attrib & 0x80) != 0)
                                 fy = s.Height - fy - 1;
 
-                            var baseaddr = ObjTable1 + ((s.Attrib & 1) > 0 ? ObjTable2 : 0);
-                            var spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + ((byte)fy / 8) * (s.Width * s.Height);
-                            var colorid = GetPixel(spraddr, 7 - fx & 7, 4);
-                            var palid = (s.Attrib & 0x0e) >> 1;
-                            var pal = (0x80 + palid * 16 + colorid) & 0xff;
-                            var color = (ushort)(Cram[pal]);
-                            if (colorid > 0)
+                            int baseaddr = ObjTable1 + ((s.Attrib & 1) != 0 ? ObjTable2 : 0);
+                            int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + (fy & 0xff) / 8 * (s.Width * s.Height);
+                            int colorid = GetPixel(spraddr, 7 - fx & 7, 4);
+                            int palid = (s.Attrib & 0x0e) >> 1;
+                            int pal = (0x80 + palid * 16 + colorid) & 0xff;
+                            int color = Cram[pal];
+                            if (colorid != 0)
                             {
                                 if (WinMainBgs[4] && GetWindow(4, x))
                                     continue;
 
-                                if (colorid > 0)
+                                if (main)
                                 {
-                                    if (main)
-                                    {
-                                        MBgs[4].Color = color | 1;
-                                        MBgs[4].Palette = pal;
-                                        MBgs[4].Layer = 4;
-                                        MBgs[4].Priority = s.Priority;
-                                    }
-
-                                    if (sub)
-                                    {
-                                        SBgs[4].Color = color | 1;
-                                        SBgs[4].Palette = pal;
-                                        SBgs[4].Layer = 4;
-                                        SBgs[4].Priority = s.Priority;
-                                    }
-                                    break;
+                                    MBgs[4].Color = color | 1;
+                                    MBgs[4].Palette = pal;
+                                    MBgs[4].Layer = 4;
+                                    MBgs[4].Priority = s.Priority;
                                 }
+
+                                if (sub)
+                                {
+                                    SBgs[4].Color = color | 1;
+                                    SBgs[4].Palette = pal;
+                                    SBgs[4].Layer = 4;
+                                    SBgs[4].Priority = s.Priority;
+                                }
+                                break;
                             }
                         }
                     }
 
-                    var clip = Clip switch
+                    bool clip = Clip switch
                     {
                         1 => !GetWindow(5, x),
                         2 or 3 => GetWindow(5, x),
@@ -581,7 +506,7 @@ public class SnesPpu : EmuState
                         Main.Color = 0;
 
                     half = ColorMath[6] ? 1 : 0;
-                    math = GetMathEnabled(Main.Layer, x);
+                    math = BgMode != 7 && GetMathEnabled(Main.Layer, x);
 
                     if (!ColorMath[7] && AddSub)
                     {
@@ -594,18 +519,18 @@ public class SnesPpu : EmuState
                     }
                 }
 
-                var brightness = Brightness / 15f;
-                var mr = (Main.Color & 0x1f);
-                var mg = (Main.Color >> 5) & 0x1f;
-                var mb = (Main.Color >> 10) & 0x1f;
+                float brightness = (float)(Brightness / 15f);
+                int mr = (Main.Color & 0x1f);
+                int mg = (Main.Color >> 5) & 0x1f;
+                int mb = (Main.Color >> 10) & 0x1f;
 
                 int r = mr, g = mg, b = mb;
 
                 if (math)
                 {
-                    var sr = Sub.Color & 0x1f;
-                    var sg = (Sub.Color >> 5) & 0x1f;
-                    var sb = (Sub.Color >> 10) & 0x1f;
+                    int sr = Sub.Color & 0x1f;
+                    int sg = (Sub.Color >> 5) & 0x1f;
+                    int sb = (Sub.Color >> 10) & 0x1f;
                     if (!ColorMath[7])
                     {
                         r += sr; g += sg; b += sb;
@@ -623,7 +548,7 @@ public class SnesPpu : EmuState
                 }
 
                 r = (int)(r * brightness); g = (int)(g * brightness); b = (int)(b * brightness);
-                var rgb = (uint)((byte)(r << 3 | r >> 2) | (byte)(g << 3 | g >> 2) << 8 | (byte)(b << 3 | b >> 2) << 16);
+                uint rgb = (uint)((r << 3 | r >> 2) & 0xff | ((g << 3 | g >> 2) & 0xff) << 8 | ((b << 3 | b >> 2) & 0xff) << 16);
 
                 ScreenBuffer[VPos * 256 + x] = 0xff000000 | rgb;// GetRGB555((ushort)Main.Color, (ushort)Sub.Color, Brightness, math, !ColorMath[7], half);
             }
@@ -668,15 +593,19 @@ public class SnesPpu : EmuState
     private bool GetWindow(int i, int x)
     {
         if (!Win1Enabled[i] && !Win2Enabled[i]) return false;
-        var w1 = x >= W1Left && x <= W1Right;
-        var w2 = x >= W2Left && x <= W2Right;
+
+        bool w1 = x >= W1Left && x <= W1Right;
+        bool w2 = x >= W2Left && x <= W2Right;
+
         if (Win1Enabled[i] && !Win2Enabled[i])
             return Win1Inverted[i] ? !w1 : w1;
-        else if (!Win1Enabled[i] && Win2Enabled[i])
+        if (!Win1Enabled[i] && Win2Enabled[i])
             return Win2Inverted[i] ? !w2 : w2;
-        w1 = Win1Inverted[i] ? !w1 : w1;
-        w2 = Win2Inverted[i] ? !w2 : w2;
-        var log = (WinLogic[i]) switch
+
+        if (Win1Inverted[i]) w1 = !w1;
+        if (Win2Inverted[i]) w2 = !w2;
+
+        return WinLogic[i] switch
         {
             0 => w1 || w2,
             1 => w1 && w2,
@@ -684,69 +613,85 @@ public class SnesPpu : EmuState
             3 => w1 == w2,
             _ => false
         };
-        return log;
     }
 
     private bool GetMathEnabled(int i, int x)
     {
-        var prev = Prevent switch
-        {
-            1 => !GetWindow(5, x),
-            2 or 3 => GetWindow(5, x),
-            _ => false
-        };
+        int prevent = Prevent;
+        bool prev = false;
+        if (prevent == 1)
+            prev = !GetWindow(5, x);
+        else if (prevent == 2 || prevent == 3)
+            prev = GetWindow(5, x);
+
         if (prev)
             return false;
-        return ColorMath[i] && (Main.Layer != 4 || Main.Palette >= 0xc0);
+
+        bool colorMathEnabled = ColorMath[i];
+        int mainLayer = Main.Layer;
+        int mainPalette = Main.Palette;
+
+        if (!colorMathEnabled)
+            return false;
+
+        return mainLayer != 4 || mainPalette >= 0xc0;
     }
 
     private GfxColor GetPriority(int mode, GfxColor[] Colors)
     {
-        Span<int[]> layer = new(Layers[mode]);
+        // Use local variables to avoid repeated dictionary lookups
+        int[][] layerArr = Layers[mode];
+        int[] layer0 = layerArr[0];
+        int[] layer1 = layerArr[1];
+
         switch (mode)
         {
             case 0 or 2 or 3 or 4 or 5 or 6:
-            {
-                for (int i = 0; i < layer[0].Length; i++)
+                for (int i = 0, len = layer0.Length; i < len; i++)
                 {
-                    int l = layer[0][i];
-                    int p = layer[1][i];
-                    if (Colors[l].Priority == p && (Colors[l].Color & 1) > 0)
+                    int l = layer0[i];
+                    int p = layer1[i];
+                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
                         return Colors[l];
                 }
                 break;
-            }
+
             case 1:
             {
-                var n = Mode1Bg3Prio ? 1 : 0;
-                for (int i = 0; i < layer[0].Length; i++)
+                int n = Mode1Bg3Prio ? 1 : 0;
+                int[] layerN0 = layerArr[n + 0];
+                int[] layerN2 = layerArr[n + 2];
+                for (int i = 0, len = layerN0.Length; i < len; i++)
                 {
-                    int l = layer[n + 0][i];
-                    int p = layer[n + 2][i];
-                    if (l == 2 && n == 1 && Colors[l].Priority == p && (Colors[l].Color & 1) > 0)
+                    int l = layerN0[i];
+                    int p = layerN2[i];
+                    if (l == 2 && n == 1 && Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
                         return Colors[2];
-                    else if (Colors[l].Priority == p && (Colors[l].Color & 1) > 0)
+                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
                         return Colors[l];
-                    else if (l == 2 && n == 0 && Colors[l].Priority == p && (Colors[l].Color & 1) > 0)
+                    if (l == 2 && n == 0 && Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
                         return Colors[2];
                 }
-                break;
             }
+            break;
+
             case 7:
             {
-                var n = ExtBgMode ? 1 : 0;
-                for (int i = 0; i < layer[0].Length; i++)
+                int n = ExtBgMode ? 1 : 0;
+                int[] layerN0 = layerArr[n + 0];
+                int[] layerN2 = layerArr[n + 2];
+                for (int i = 0, len = layerN0.Length; i < len; i++)
                 {
-                    int l = layer[n + 0][i];
-                    int p = layer[n + 2][i];
-                    if (Colors[l].Priority == p && (Colors[l].Color & 1) > 0)
+                    int l = layerN0[i];
+                    int p = layerN2[i];
+                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
                         return Colors[l];
                 }
-                break;
             }
+            break;
         }
-        ;
-        return new(Cram[0], 0, 5);
+        // Return default color (avoid allocation by using static readonly if possible)
+        return new(Cram[0], 0, 5); ;
     }
 
     private (int, int, int) GetColor(int sx, int sy, int mapaddr, int tilebase, bool bigchar, int bpp, int paloff)
@@ -778,7 +723,7 @@ public class SnesPpu : EmuState
             int paletteSize = bpp switch { 4 => 16, 8 => 256, _ => 4 };
             p = paloff + palid * paletteSize + pixel;
             ushort cramVal = Cram[p & 0xff];
-            return ((cramVal | (pixel > 0 ? 1 : 0)), pixel, p);
+            return ((cramVal | (pixel != 0 ? 1 : 0)), pixel, p);
         }
         else
         {
@@ -807,8 +752,8 @@ public class SnesPpu : EmuState
             int ry = Mode7Settings[1] ? 255 - y : y;
             var cx = ScrollXMode7 - M7X;
             var cy = ScrollYMode7 - M7Y;
-            int ch = cx.GetBit(13) ? cx | ~0x3ff : cx & 0x3ff;
-            int cv = cy.GetBit(13) ? cy | ~0x3ff : cy & 0x3ff;
+            int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
+            int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
             int sx = ((short)M7A * ch & ~63) + (((short)M7B * cv) & ~63) + ((short)M7B * ry & ~63) + (M7X << 8);
             int sy = (((short)M7C * ch) & ~63) + (((short)M7D * cv) & ~63) + ((short)M7D * ry & ~63) + (M7Y << 8);
             var ox = (sx + (short)M7A * x);
@@ -820,10 +765,10 @@ public class SnesPpu : EmuState
             var tileid = Vram[mapaddr] & 0xff;
             ushort ta = (ushort)((tileid * 64 + (oy & 7) * 8 + (ox & 7)) & 0x3fff);
             var colorid = Vram[ta] >> 8;
-            var opaque = (colorid > 0 ? 1 : 0);
+            var opaque = (colorid != 0 ? 1 : 0);
             if (main)
             {
-                MBgs[i].Color = opaque == 1 ? (ushort)(Cram[colorid & 0xff] | 1) : (ushort)Cram[0];
+                MBgs[i].Color = opaque == 1 ? (ushort)(Cram[colorid & 0xff] | 1) : Cram[0];
                 MBgs[i].Priority = (Vram[mapaddr] >> 13);
             }
         }
@@ -846,7 +791,7 @@ public class SnesPpu : EmuState
             int width = ObjSizeWidth[((ObjSize | t) / 2) << 3 & 0xf];
             int height = ObjSizeHeight[((ObjSize | t) / 2) << 3 & 0xf];
 
-            if (yp >= 0 && yp < height || sy + height > 255 && VPos < (byte)(sy + height))
+            if (yp >= 0 && yp < height || sy + height > 255 && y < ((sy + height) & 0xff))
             {
                 SpriteScan[c].X = highbit * -256 + Oam[n * 4 + 0];
                 SpriteScan[c].Y = Oam[n * 4 + 1] + 1;
@@ -907,22 +852,26 @@ public class SnesPpu : EmuState
     }
 
     public ushort ReadVram(int a) => (ushort)(Vram[a] | Vram[a + 1] << 8);
+    public int ReadCram(int a) => Cram[a] & 0xff;
+    public ushort[] GetVram() => Vram;
+    public ushort[] GetCram() => Cram;
+    public byte[] GetOam() => Oam;
 
-    public byte Read(int a)
+    public int Read(int a)
     {
-        switch (a)
+        switch (a & 0xff)
         {
-            case 0x34: return (byte)MultiplyRes;
-            case 0x35: return (byte)(MultiplyRes >> 8);
-            case 0x36: return (byte)(MultiplyRes >> 16);
+            case 0x34: return MultiplyRes & 0xff;
+            case 0x35: return (MultiplyRes >> 8) & 0xff;
+            case 0x36: return (MultiplyRes >> 16) & 0xff;
             case 0x37:
-                if (WRIO.GetBit(7))
+                if ((WRIO & 0x80) != 0)
                 {
                     OPHCT = HPos >> 2;
                     OPVCT = VPos;
                     CounterLatch = true;
                 }
-                return Snes.Cpu.OpenBus;
+                return Cpu.OpenBus & 0xff;
             case 0x38:
             {
                 var v = 0;
@@ -933,27 +882,27 @@ public class SnesPpu : EmuState
                 else if (OamAddr > 0x1ff)
                     v = Oam[OamAddr % Oam.Length];
                 OamAddr++;
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x39:
             {
-                var v = (byte)VramLatch;
+                var v = VramLatch & 0xff;
                 if (!VramAddrMode)
                 {
                     VramLatch = Vram[GetVramRemap()];
                     VramAddr += ppuaddrinc[VramAddrInc];
                 }
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x3a:
             {
-                var v = (byte)(VramLatch >> 8);
+                var v = (VramLatch >> 8) & 0xff;
                 if (VramAddrMode)
                 {
                     VramLatch = Vram[GetVramRemap()];
                     VramAddr += ppuaddrinc[VramAddrInc];
                 }
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x3c:
             {
@@ -963,7 +912,7 @@ public class SnesPpu : EmuState
                 else
                     v = OPHCT >> 8;
                 OphctLatch = !OphctLatch;
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x3d:
             {
@@ -973,13 +922,13 @@ public class SnesPpu : EmuState
                 else
                     v = OPVCT >> 8;
                 OpvctLatch = !OpvctLatch;
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x3f:
                 CounterLatch = false;
                 OphctLatch = false;
                 OpvctLatch = false;
-                return (byte)STAT78;
+                return STAT78 & 0xff;
         }
         return 0x00;
     }
@@ -990,7 +939,7 @@ public class SnesPpu : EmuState
         switch (a & 0xff)
         {
             case 0x00:
-                ForcedBlank = v.GetBit(7);
+                ForcedBlank = (v & 0x80) != 0;
                 Brightness = v & 0x0f;
                 break;
             case 0x01:
@@ -1006,7 +955,7 @@ public class SnesPpu : EmuState
             case 0x03:
                 OamAddr |= v << 8;
                 OamAddr = (OamAddr & 0x1ff) << 1;
-                ObjPrioRotation = v.GetBit(7);
+                ObjPrioRotation = (v & 0x80) != 0;
                 break;
             case 0x04:
                 if ((OamAddr & 1) == 0)
@@ -1023,11 +972,11 @@ public class SnesPpu : EmuState
                 break;
             case 0x05:
                 BgMode = v & 7;
-                Mode1Bg3Prio = v.GetBit(3);
-                BgCharSize = [v.GetBit(4), v.GetBit(5), v.GetBit(6), v.GetBit(7)];
+                Mode1Bg3Prio = (v & 0x08) != 0;
+                BgCharSize = [(v & 0x10) != 0, (v & 0x20) != 0, (v & 0x40) != 0, (v & 0x80) != 0];
                 break;
             case 0x06:
-                MosaicEnabled = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3),];
+                MosaicEnabled = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0];
                 MosaicSize = (v & 0xc0) >> 4;
                 break;
             case 0x07 or 0x08 or 0x09 or 0x0a:
@@ -1051,12 +1000,12 @@ public class SnesPpu : EmuState
                 }
                 break;
             case 0x0b:
-                BgTilebase[(byte)a - 0xb] = (v & 0xf) << 12;
-                BgTilebase[(byte)a - 0xb + 1] = (v >> 4) << 12;
+                BgTilebase[a - 0xb & 0xff] = (v & 0xf) << 12;
+                BgTilebase[a - 0xb + 1 & 0xff] = (v >> 4) << 12;
                 break;
             case 0x0c:
-                BgTilebase[(byte)a - 0xb + 1] = (v & 0xf) << 12;
-                BgTilebase[(byte)a - 0xb + 2] = (v >> 4) << 12;
+                BgTilebase[a - 0xb + 1 & 0xff] = (v & 0xf) << 12;
+                BgTilebase[a - 0xb + 2 & 0xff] = (v >> 4) << 12;
                 break;
             case 0x0d:
                 ScrollXMode7 = ((v << 8) | Mode7Latch) & 0xffff;
@@ -1065,7 +1014,7 @@ public class SnesPpu : EmuState
             case 0x0f:
             case 0x11:
             case 0x13:
-                BgScrollX[((a & 0xff) - 0xd) / 2] = (ushort)(((v << 8) | (PrevScrollX & ~7) | (CurrScrollX & 7)));
+                BgScrollX[((a & 0xff) - 0xd) / 2] = (((v << 8) | (PrevScrollX & ~7) | (CurrScrollX & 7)) & 0xffff);
                 PrevScrollX = v;
                 CurrScrollX = v;
                 break;
@@ -1076,13 +1025,13 @@ public class SnesPpu : EmuState
             case 0x10:
             case 0x12:
             case 0x14:
-                BgScrollY[((a & 0xff) - 0xe) / 2] = (ushort)(((v << 8) | PrevScrollX & 0xff));
+                BgScrollY[((a & 0xff) - 0xe) / 2] = (((v << 8) | (PrevScrollX & 0xff)) & 0xffff);
                 PrevScrollX = v;
                 break;
             case 0x15:
                 VramAddrInc = v & 3;
                 VramAddrRemap = (v >> 2) & 3;
-                VramAddrMode = v.GetBit(7);
+                VramAddrMode = (v & 0x80) != 0;
                 break;
             case 0x16:
                 VramAddr = VramAddr & 0xff00 | v;
@@ -1098,8 +1047,8 @@ public class SnesPpu : EmuState
                 Vram[va] = (ushort)(Vram[va] & 0xff00 | v);
                 if (!VramAddrMode)
                     VramAddr += ppuaddrinc[VramAddrInc];
-                if (Snes.Debug && Snes.DebugWindow.AccessCheck((ushort)(VramAddr * 2), v, RamType.Vram, true))
-                    Snes.State = Break;
+                if (Snes.Debug && Snes.DebugWindow.AccessCheck((VramAddr * 2) & 0xffff, v, RamType.Vram, true))
+                    Snes.State = DebugState.Break;
                 break;
             }
             case 0x19:
@@ -1108,13 +1057,13 @@ public class SnesPpu : EmuState
                 Vram[va] = (ushort)(Vram[va] & 0xff | v << 8);
                 if (VramAddrMode)
                     VramAddr += ppuaddrinc[VramAddrInc];
-                if (Snes.Debug && Snes.DebugWindow.AccessCheck((ushort)(VramAddr * 2), v, RamType.Vram, true))
-                    Snes.State = Break;
+                if (Snes.Debug && Snes.DebugWindow.AccessCheck((VramAddr * 2) & 0xffff, v, RamType.Vram, true))
+                    Snes.State = DebugState.Break;
                 break;
             }
 
             case 0x1a:
-                Mode7Settings = [v.GetBit(0), v.GetBit(1), v.GetBit(6), v.GetBit(7)];
+                Mode7Settings = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x40) != 0, (v & 0x80) != 0];
                 break;
             case 0x1b:
                 M7A = (v << 8) | Mode7Latch;
@@ -1153,22 +1102,22 @@ public class SnesPpu : EmuState
                 CgRamToggle = !CgRamToggle;
                 break;
             case 0x23:
-                Win1Inverted[0] = v.GetBit(0); Win1Enabled[0] = v.GetBit(1);
-                Win2Inverted[0] = v.GetBit(2); Win2Enabled[0] = v.GetBit(3);
-                Win1Inverted[1] = v.GetBit(4); Win1Enabled[1] = v.GetBit(5);
-                Win2Inverted[1] = v.GetBit(6); Win2Enabled[1] = v.GetBit(7);
+                Win1Inverted[0] = (v & 0x01) != 0; Win1Enabled[0] = (v & 0x02) != 0;
+                Win2Inverted[0] = (v & 0x04) != 0; Win2Enabled[0] = (v & 0x08) != 0;
+                Win1Inverted[1] = (v & 0x10) != 0; Win1Enabled[1] = (v & 0x20) != 0;
+                Win2Inverted[1] = (v & 0x40) != 0; Win2Enabled[1] = (v & 0x80) != 0;
                 break;
             case 0x24:
-                Win1Inverted[2] = v.GetBit(0); Win1Enabled[2] = v.GetBit(1);
-                Win2Inverted[2] = v.GetBit(2); Win2Enabled[2] = v.GetBit(3);
-                Win1Inverted[3] = v.GetBit(4); Win1Enabled[3] = v.GetBit(5);
-                Win2Inverted[3] = v.GetBit(6); Win2Enabled[3] = v.GetBit(7);
+                Win1Inverted[2] = (v & 0x01) != 0; Win1Enabled[2] = (v & 0x02) != 0;
+                Win2Inverted[2] = (v & 0x04) != 0; Win2Enabled[2] = (v & 0x08) != 0;
+                Win1Inverted[3] = (v & 0x10) != 0; Win1Enabled[3] = (v & 0x20) != 0;
+                Win2Inverted[3] = (v & 0x40) != 0; Win2Enabled[3] = (v & 0x80) != 0;
                 break;
             case 0x25:
-                Win1Inverted[4] = v.GetBit(0); Win1Enabled[4] = v.GetBit(1);
-                Win2Inverted[4] = v.GetBit(2); Win2Enabled[4] = v.GetBit(3);
-                Win1Inverted[5] = v.GetBit(4); Win1Enabled[5] = v.GetBit(5);
-                Win2Inverted[5] = v.GetBit(6); Win2Enabled[5] = v.GetBit(7);
+                Win1Inverted[4] = (v & 0x01) != 0; Win1Enabled[4] = (v & 0x02) != 0;
+                Win2Inverted[4] = (v & 0x04) != 0; Win2Enabled[4] = (v & 0x08) != 0;
+                Win1Inverted[5] = (v & 0x10) != 0; Win1Enabled[5] = (v & 0x20) != 0;
+                Win2Inverted[5] = (v & 0x40) != 0; Win2Enabled[5] = (v & 0x80) != 0;
                 break;
             case 0x26: W1Left = v; break;
             case 0x27: W1Right = v; break;
@@ -1181,33 +1130,33 @@ public class SnesPpu : EmuState
             case 0x2b:
                 WinLogic[4] = v & 3; WinLogic[5] = (v >> 2) & 3;
                 break;
-            case 0x2c: MainBgs = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3), v.GetBit(4)]; break;
-            case 0x2d: SubBgs = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3), v.GetBit(4)]; break;
-            case 0x2e: WinMainBgs = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3), v.GetBit(4)]; break; ;
-            case 0x2f: WinSubBgs = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3), v.GetBit(4)]; break;
+            case 0x2c: MainBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
+            case 0x2d: SubBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
+            case 0x2e: WinMainBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break; ;
+            case 0x2f: WinSubBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
             case 0x30:
-                DirColor = v.GetBit(0);
-                AddSub = v.GetBit(1);
+                DirColor = (v & 0x01) != 0;
+                AddSub = (v & 0x02) != 0;
                 Prevent = (v >> 4) & 3;
                 Clip = (v >> 6) & 3;
                 break;
             case 0x31:
-                ColorMath = [v.GetBit(0), v.GetBit(1), v.GetBit(2), v.GetBit(3),
-                    v.GetBit(4), v.GetBit(5), v.GetBit(6), v.GetBit(7)];
+                ColorMath = [(v&0x01)!=0, (v&0x02)!=0, (v&0x04)!=0, (v&0x08)!=0,
+                    (v&0x10)!=0, (v&0x20)!=0, (v&0x40)!=0, (v&0x80)!=0];
                 break;
             case 0x32:
                 var c = v & 0x1f;
-                if (v.GetBit(5))
-                    Fixed.Color = (ushort)(Fixed.Color & 0x7fe0 | c);
-                if (v.GetBit(6))
-                    Fixed.Color = (ushort)(Fixed.Color & 0x7c1f | c << 5);
-                if (v.GetBit(7))
-                    Fixed.Color = (ushort)(Fixed.Color & 0x3ff | c << 10);
+                if ((v & 0x20) != 0)
+                    Fixed.Color = (Fixed.Color & 0x7fe0 | c) & 0xffff;
+                if ((v & 0x40) != 0)
+                    Fixed.Color = (Fixed.Color & 0x7c1f | c << 5) & 0xffff;
+                if ((v & 0x80) != 0)
+                    Fixed.Color = (Fixed.Color & 0x3ff | c << 10) & 0xffff;
                 break;
             case 0x33:
-                OverscanMode = v.GetBit(2);
-                HiResMode = v.GetBit(3);
-                ExtBgMode = v.GetBit(4);
+                OverscanMode = (v & 0x04) != 0;
+                HiResMode = (v & 0x08) != 0;
+                ExtBgMode = (v & 0x10) != 0;
                 break;
             case 0x81: RamAddrLow = v; break;
             case 0x82: RamAddrMedium = v; break;
@@ -1224,45 +1173,46 @@ public class SnesPpu : EmuState
             Vram[a / 2] = (ushort)((Vram[a / 2] & 0x00ff) | v << 8);
     }
 
-    public byte ReadIO(int a)
+    public int ReadIO(int a)
     {
-        switch (a)
+        switch (a & 0x1f)
         {
             case 0x10:
             {
                 var v = RDNMI;
-                v |= Snes.Cpu.OpenBus & 0x70;
+                v |= Cpu.OpenBus & 0x70;
                 RDNMI &= 0x7f;
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x11:
             {
                 var v = TIMEUP;
-                v |= Snes.Cpu.OpenBus & 0x7f;
+                v |= Cpu.OpenBus & 0x7f;
                 HVBJOY &= 0x3f;
                 TIMEUP &= 0x7f;
-                return (byte)v;
+                return v & 0xff;
             }
             case 0x12:
             {
                 var v = HVBJOY & 0x01;
                 v |= (HPos < 4 || HPos >= 1096) ? 0x40 : 0x00;
                 v |= HVBJOY & 0x80;
-                v |= Snes.Cpu.OpenBus & 0x3e;
-                return (byte)v;
+                v |= Cpu.OpenBus & 0x3e;
+                return v & 0xff;
             }
-            case 0x14: return (byte)MulDivResult;
-            case 0x15: return (byte)(MulDivResult >> 8);
-            case 0x16: return (byte)MulDivRemainder;
-            case 0x17: return (byte)(MulDivRemainder >> 8);
-            case 0x18: return (byte)JOY1L;
-            case 0x19: return (byte)JOY1H;
+            case 0x14: return MulDivResult & 0xff;
+            case 0x15: return (MulDivResult >> 8) & 0xff;
+            case 0x16: return MulDivRemainder & 0xff;
+            case 0x17: return (MulDivRemainder >> 8) & 0xff;
+            case 0x18: return JOY1L & 0xff;
+            case 0x19: return JOY1H & 0xff;
         }
         return 0x00;
     }
 
     public void WriteIO(int a, int v)
     {
+        v &= 0xff;
         switch (a & 0x1f)
         {
             case 0x00: NMITIMEN = v; break;
@@ -1291,6 +1241,20 @@ public class SnesPpu : EmuState
         };
     }
 
+    public void WriteVram(int a, int v)
+    {
+        if ((a & 1) == 0)
+        {
+            var s = Vram[a >> 1];
+            Vram[a >> 1] = (ushort)(s & 0xff00 | v);
+        }
+        else
+        {
+            var s = Vram[a >> 1];
+            Vram[a >> 1] = (ushort)(s & 0x00ff | v << 8);
+        }
+    }
+
     public void Reset()
     {
         VPos = 0;
@@ -1311,6 +1275,7 @@ public class SnesPpu : EmuState
         DramRefresh = false;
         Array.Fill<uint>(ScreenBuffer, 0xff000000);
         MBgs = [new(), new(), new(), new(), new(), new(),];
+        Tranparent = new(0, 0, 5);
     }
 
     private readonly Dictionary<int, int[][]> Layers = new()

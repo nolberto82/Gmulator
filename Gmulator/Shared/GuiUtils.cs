@@ -100,8 +100,8 @@ public static class GuiUtils
     public static bool TableRowSelect(string name, string v, bool selected)
     {
         var b = false;
-        ImGui.TableNextColumn(); 
-        ImGui.Selectable(name, selected,ImGuiSelectableFlags.SpanAllColumns);
+        ImGui.TableNextColumn();
+        ImGui.Selectable(name, selected, ImGuiSelectableFlags.SpanAllColumns);
         if (ImGui.IsItemHovered())
             b = true;
         ImGui.TableNextColumn();
@@ -117,6 +117,13 @@ public static class GuiUtils
         ImGui.TableNextColumn(); ImGui.Text(addr);
         ImGui.TableNextColumn(); ImGui.Text(name);
         ImGui.TableNextColumn(); ImGui.Text(v != null ? v : "");
+    }
+
+    public static void TableRowCol3(string addr, string name, bool v)
+    {
+        ImGui.TableNextColumn(); ImGui.Text(addr);
+        ImGui.TableNextColumn(); ImGui.Text(name);
+        ImGui.TableNextColumn(); ImGui.Checkbox("", ref v);
     }
 
     public static void TableRow(string name, string chkname, ref bool v)

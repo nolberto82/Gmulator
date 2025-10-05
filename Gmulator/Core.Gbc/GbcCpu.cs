@@ -1,4 +1,5 @@
 ﻿using Gmulator.Shared;
+using System.Diagnostics;
 
 namespace Gmulator.Core.Gbc;
 public partial class GbcCpu : EmuState
@@ -17,53 +18,59 @@ public partial class GbcCpu : EmuState
     public bool FlagH { get => (F & FH) == FZ; }
     public bool FlagC { get => (F & FC) == FC; }
 
-    public ushort PC { get; set; }
-    public ushort SP { get; set; }
-    public ushort PrevPC { get; set; }
+    public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
+    public int SP { get => sp & 0xffff; set => sp = value & 0xffff; }
+    public int PrevPC { get; set; }
     public int StepOverAddr { get; set; } = 1;
 
-    public byte A, F, B, C, D, E, H, L;
+    private int A, F, B, C, D, E, H, L, pc, sp;
 
     public int CyclesInstruction { get; private set; }
 
-    public static ushort GetWord(byte l, byte h) => (ushort)(l | h << 8);
-    public ushort AF
+    private Func<int, int, RamType, bool, bool> AccessCheck;
+    private Action<DebugState> SetState;
+
+    public static int GetWord(int low, int high) => (ushort)(high << 8 | low);
+    public int AF
     {
-        get { return (ushort)(A << 8 | F); }
-        set { A = (byte)(value >> 8); F = (byte)value; }
+        get { return (A << 8 | F) & 0xffff; }
+        set { A = (value >> 8) & 0xff; F = value & 0xff; }
     }
 
-    public ushort BC
+    public int BC
     {
-        get { return (ushort)(B << 8 | C); }
-        set { B = (byte)(value >> 8); C = (byte)value; }
+        get { return (B << 8 | C) & 0xffff; }
+        set { B = (value >> 8) & 0xff; C = value & 0xff; }
     }
 
-    public ushort DE
+    public int DE
     {
-        get { return (ushort)(D << 8 | E); }
-        set { D = (byte)(value >> 8); E = (byte)value; }
+        get { return (D << 8 | E) & 0xffff; }
+        set { D = (value >> 8) & 0xff; E = value & 0xff; }
     }
 
-    public ushort HL
+    public int HL
     {
-        get { return (ushort)(H << 8 | L); }
-        set { H = (byte)(value >> 8); L = (byte)value; }
+        get { return (H << 8 | L) & 0xffff; }
+        set { H = (value >> 8) & 0xff; L = value & 0xff; }
     }
 
     public GbcMmu Mmu { get; private set; }
     public GbcIO IO { get; private set; }
     public Action Tick { get; set; }
-    public Action<int> SetState { get; internal set; }
 
-    public GbcCpu(GbcMmu mmu, GbcIO io)
+    public GbcCpu(Gbc gbc)
     {
-        Mmu = mmu;
-        IO = io;
-
+        Mmu = gbc.Mmu;
+        IO = gbc.IO;
         GenerateOpInfo();
     }
-    public GbcCpu() { }
+
+    public void SetAccess(Gbc gbc)
+    {
+        AccessCheck = gbc.DebugWindow.AccessCheck;
+        SetState = gbc.SetState;
+    }
 
     public void Reset(bool isbios, bool cgb)
     {
@@ -97,42 +104,47 @@ public partial class GbcCpu : EmuState
             F = (byte)(F & ~v);
     }
 
-    public byte ReadCycle(int a)
+    public int ReadCycle(int a)
     {
         Tick();
         return Mmu.Read(a);
     }
 
-    public void WriteCycle(int a, byte v)
+    public void WriteCycle(int a, int v)
     {
         Tick();
         Mmu.Write(a, v);
+        if (AccessCheck(a, v & 0xff, RamType.Wram, true))
+            SetState(DebugState.Break);
     }
 
     public void CheckInterrupts()
     {
-        if ((IO.IE & IO.IF) > 0)
-        {
-            if (Halt)
-                PC++;
-            Halt = false;
+        byte ie = IO.IE;
+        byte @if = IO.IF;
+        if ((ie & @if) == 0)
+            return;
 
-            if (IME)
+        if (Halt)
+            PC++;
+        Halt = false;
+
+        if (!IME)
+            return;
+
+        IME = false;
+        for (byte i = 0; i < 5; i++)
+        {
+            byte mask = (byte)(1 << i);
+            if ((ie & mask) != 0 && (@if & mask) != 0)
             {
-                IME = false;
-                for (byte i = 0; i < 5; i++)
-                {
-                    if (IO.IE.GetBit(i) && IO.IF.GetBit(i))
-                    {
-                        IO.IF &= (byte)(~(1 << i));
-                        Tick();
-                        OpPush(PC);
-                        PC = (ushort)(0x40 + (i * 8));
-                        ReadCycle(PC);
-                        Tick();
-                        return;
-                    }
-                }
+                IO.IF &= (byte)~mask;
+                Tick();
+                OpPush(PC);
+                PC = 0x40 + (i * 8);
+                ReadCycle(PC);
+                Tick();
+                break;
             }
         }
     }
@@ -157,7 +169,7 @@ public partial class GbcCpu : EmuState
         if (SerialCounter >= maxcycles)
         {
             SerialCounter = 0;
-            if (IO.SC.GetBit(7))
+            if ((IO.SC & 0x80) != 0)
                 IO.IF |= IntSerial;
         }
     }
@@ -170,7 +182,7 @@ public partial class GbcCpu : EmuState
             if (!Halt)
                 PC++;
 
-            if (Stop > 0)
+            if (Stop != 0)
             {
                 Stop -= 4;
                 if (Stop == 0)
@@ -183,7 +195,7 @@ public partial class GbcCpu : EmuState
         }
         else
         {
-            byte op = ReadCycle(PC++);
+            int op = ReadCycle(PC++);
 
             if (op != 0xcb)
             {
@@ -196,7 +208,7 @@ public partial class GbcCpu : EmuState
             }
         }
 
-        if (IMEDelay > 0)
+        if (IMEDelay != 0)
             IMEDelay--;
         else
             CheckInterrupts();
@@ -204,13 +216,13 @@ public partial class GbcCpu : EmuState
 
     public Dictionary<string, bool> GetFlags() => new()
     {
-        ["C"] = F.GetBit(4),
-        ["N"] = F.GetBit(5),
-        ["H"] = F.GetBit(6),
-        ["Z"] = F.GetBit(7),
+        ["C"] = (F & FC) != 0,
+        ["N"] = (F & FN) != 0,
+        ["H"] = (F & FH) != 0,
+        ["Z"] = (F & FZ) != 0,
     };
 
-    public Dictionary<string, byte> GetRegs() => new()
+    public Dictionary<string, int> GetRegs() => new()
     {
         ["A:"] = A,
         ["B:"] = B,
@@ -220,6 +232,33 @@ public partial class GbcCpu : EmuState
         ["H:"] = H,
         ["L:"] = L,
     };
+
+    public int GetReg(string reg)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "af": return AF;
+            case "bc": return BC;
+            case "de": return DE;
+            case "hl": return HL;
+            case "sp":return SP;
+            case "pc": return PC;
+            default: return 0;
+        }
+    }
+
+    public void SetReg(string reg, int v)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "af": AF = v; break;
+            case "bc": BC = v; break;
+            case "de": DE = v; break;
+            case "hl": HL = v; break;
+            case "sp": SP = v; break;
+            case "pc": PC = v; break;
+        }
+    }
 
     public override void Save(BinaryWriter bw)
     {
@@ -237,12 +276,12 @@ public partial class GbcCpu : EmuState
 
     public override void Load(BinaryReader br)
     {
-        PC = br.ReadUInt16();
-        AF = br.ReadUInt16();
-        BC = br.ReadUInt16();
-        DE = br.ReadUInt16();
-        HL = br.ReadUInt16();
-        SP = br.ReadUInt16();
+        PC = br.ReadInt32();
+        AF = br.ReadInt32();
+        BC = br.ReadInt32();
+        DE = br.ReadInt32();
+        HL = br.ReadInt32();
+        SP = br.ReadInt32();
         Halt = br.ReadBoolean();
         IME = br.ReadBoolean();
         Cycles = br.ReadInt32();
@@ -255,7 +294,7 @@ public partial class GbcCpu : EmuState
         int c = (byte)(F & FC) >> 4;
         int v = A + r1 + c;
         SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-        SetF((((A & 0xf) + (r1 & 0xf) + c) & 0x10) > 0, FH);
+        SetF((((A & 0xf) + (r1 & 0xf) + c) & 0x10) != 0, FH);
         SetF(v > 0xff, FC);
         A = (byte)v;
     }
@@ -264,7 +303,7 @@ public partial class GbcCpu : EmuState
     {
         int v = A + r1;
         SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-        SetF(((A & 0xf) + (r1 & 0xf) & 0x10) > 0, FH);
+        SetF(((A & 0xf) + (r1 & 0xf) & 0x10) != 0, FH);
         SetF(v > 0xff, FC);
         A = (byte)v;
     }
@@ -273,7 +312,7 @@ public partial class GbcCpu : EmuState
     {
         int v = r1 + r2;
         SetF(false, FN); SetF(v > 0xffff, FC);
-        SetF((((r1 & 0xfff) + (r2 & 0xfff)) & 0x1000) > 0, FH);
+        SetF((((r1 & 0xfff) + (r2 & 0xfff)) & 0x1000) != 0, FH);
         Tick();
         return (ushort)v;
     }
@@ -289,7 +328,7 @@ public partial class GbcCpu : EmuState
             Tick();
 
         SetF(false, FZ); SetF(false, FN);
-        SetF(((r1 & 0xf) + (r2 & 0xf) & 0x10) > 0, FH);
+        SetF(((r1 & 0xf) + (r2 & 0xf) & 0x10) != 0, FH);
         SetF((byte)r1 + (byte)r2 > 0xff, FC);
         return (ushort)v;
     }
@@ -321,14 +360,14 @@ public partial class GbcCpu : EmuState
     private void OpCcf()
     {
         int c = (F ^ FC) & FC;
-        SetF(false, FN); SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FN); SetF(false, FH); SetF(c != 0, FC);
     }
 
     private void OpCp(int r1)
     {
         int v = A - r1;
         SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-        SetF(((A & 0xf) - (r1 & 0xf) & 0x10) > 0, FH);
+        SetF(((A & 0xf) - (r1 & 0xf) & 0x10) != 0, FH);
     }
 
     private void OpCpl()
@@ -341,18 +380,18 @@ public partial class GbcCpu : EmuState
     private void OpDaa()
     {
         int v = A;
-        if ((F & FN) > 0)
+        if ((F & FN) != 0)
         {
-            if ((F & FH) > 0)
+            if ((F & FH) != 0)
                 v -= 6;
-            if ((F & FC) > 0)
+            if ((F & FC) != 0)
                 v -= 0x60;
         }
         else
         {
-            if ((F & FH) > 0 || (A & 0xf) > 9)
+            if ((F & FH) != 0 || (A & 0xf) > 9)
                 v += 6;
-            if ((F & FC) > 0 || A > 0x99)
+            if ((F & FC) != 0 || A > 0x99)
             {
                 v += 0x60;
                 SetF(true, FC);
@@ -424,14 +463,14 @@ public partial class GbcCpu : EmuState
     }
 
     private ushort OpLdHLSP(int r1, int r2) => OpAddSP(r1, r2, true);
-    private byte OpLdReg(int a) => ReadCycle(a);
-    private byte OpLdImm8() => ReadCycle(PC++);
-    private ushort OpLdImm16() => (ushort)(ReadCycle(PC++) | ReadCycle(PC++) << 8);
+    private int OpLdReg(int a) => ReadCycle(a);
+    private int OpLdImm8() => ReadCycle(PC++);
+    private int OpLdImm16() => (ReadCycle(PC++) | ReadCycle(PC++) << 8) & 0xffff;
     private void OpLdWr(int a, int v) => WriteCycle(a, (byte)v);
 
     private void OpLdWr16(int v)
     {
-        ushort a = GetWord(OpLdImm8(), OpLdImm8());
+        int a = GetWord(OpLdImm8(), OpLdImm8());
         WriteCycle(a, (byte)v);
         WriteCycle(a + 1, (byte)(v >> 8));
     }
@@ -451,10 +490,10 @@ public partial class GbcCpu : EmuState
 
         if (af)
         {
-            SetF((l & FZ) > 0, FZ);
-            SetF((l & FN) > 0, FN);
-            SetF((l & FH) > 0, FH);
-            SetF((l & FC) > 0, FC);
+            SetF((l & FZ) != 0, FZ);
+            SetF((l & FN) != 0, FN);
+            SetF((l & FH) != 0, FH);
+            SetF((l & FC) != 0, FC);
             l = F;
         }
         return (ushort)(h << 8 | l);
@@ -491,7 +530,7 @@ public partial class GbcCpu : EmuState
         int v = r1 << 1 | c;
 
         SetF((byte)v == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF((r1 >> 7) > 0, FC);
+        SetF(false, FH); SetF((r1 >> 7) != 0, FC);
         return (byte)(v);
     }
 
@@ -502,7 +541,7 @@ public partial class GbcCpu : EmuState
         int c = (byte)(v >> 8);
 
         SetF(false, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         A = (byte)(v | oc);
     }
 
@@ -512,7 +551,7 @@ public partial class GbcCpu : EmuState
         int c = (byte)(v >> 8);
 
         SetF(false, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         A = (byte)(v | c);
     }
 
@@ -522,7 +561,7 @@ public partial class GbcCpu : EmuState
         int v = r1 >> 1 | (oc << 7);
 
         SetF(v == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF((r1 & 1) > 0, FC);
+        SetF(false, FH); SetF((r1 & 1) != 0, FC);
         return (byte)v;
     }
 
@@ -532,7 +571,7 @@ public partial class GbcCpu : EmuState
         int v = A >> 1;
 
         SetF(false, FZ); SetF(false, FN);
-        SetF(false, FH); SetF((A & 1) > 0, FC);
+        SetF(false, FH); SetF((A & 1) != 0, FC);
         A = (byte)(v | (oc << 7));
     }
 
@@ -542,7 +581,7 @@ public partial class GbcCpu : EmuState
         A = (byte)(A >> 1);
 
         SetF(false, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         A = (byte)(A | (c << 7));
     }
 
@@ -562,7 +601,7 @@ public partial class GbcCpu : EmuState
         int v = A - r1 - c;
 
         SetF((byte)v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-        SetF((((A & 0xf) - (r1 & 0xf) - c) & 0x10) > 0, FH);
+        SetF((((A & 0xf) - (r1 & 0xf) - c) & 0x10) != 0, FH);
         A = (byte)v;
     }
 
@@ -576,7 +615,7 @@ public partial class GbcCpu : EmuState
         int v = A - r1;
 
         SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-        SetF((((A & 0xf) - (r1 & 0xf)) & FH) > 0, FH);
+        SetF((((A & 0xf) - (r1 & 0xf)) & FH) != 0, FH);
         A = (byte)v;
     }
 
@@ -605,7 +644,7 @@ public partial class GbcCpu : EmuState
         v <<= 1;
 
         SetF(v == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         return (byte)(v | c);
     }
 
@@ -616,7 +655,7 @@ public partial class GbcCpu : EmuState
         v = (v >> 1) | (c << 7);
 
         SetF(v == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         return (byte)v;
     }
 
@@ -627,7 +666,7 @@ public partial class GbcCpu : EmuState
         v <<= 1;
 
         SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         return (byte)v;
     }
 
@@ -638,7 +677,7 @@ public partial class GbcCpu : EmuState
         v = (v >> 1) | (v & 0x80);
 
         SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-        SetF(false, FH); SetF(c > 0, FC);
+        SetF(false, FH); SetF(c != 0, FC);
         return (byte)v;
     }
 
@@ -664,13 +703,23 @@ public partial class GbcCpu : EmuState
         SetF((v & 0xff) == 0, FZ);
         SetF(false, FN);
         SetF(false, FH);
-        SetF(c > 0, FC);
+        SetF(c != 0, FC);
         return (byte)v;
     }
 
-    private static byte OpRes(int r1, byte r2) => (byte)(r2 & ~(1 << r1));
+    private static int OpRes(int r1, int r2) => (r2 & ~(1 << r1)) & 0xff;
     private void OpResHL(int r1) => OpLdWr(HL, (OpLdReg(HL) & ~(1 << r1)));
-    private static byte OpSet(int r1, byte r2) => (byte)(r2 | (1 << r1));
+    private static int OpSet(int r1, int r2) => (r2 | (1 << r1)) & 0xff;
     private void OpSetHL(int r1) => OpLdWr(HL, (OpLdReg(HL) | (1 << r1)));
     #endregion
+
+    public Dictionary<string, string> GetRegisters() => new()
+    {
+        { "AF", $"{AF:X4}" },
+        { "BC", $"{BC:X4}" },
+        { "DE", $"{DE:X4}" },
+        { "HL", $"{HL:X4}" },
+        { "PC", $"{pc:X4}" },
+        { "SP", $"{sp:X4}" }
+    };
 }

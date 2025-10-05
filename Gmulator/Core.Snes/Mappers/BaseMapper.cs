@@ -1,13 +1,14 @@
 ﻿using Timer = System.Threading.Timer;
 
 namespace Gmulator.Core.Snes.Mappers;
-public class BaseMapper
+public class BaseMapper : Emulator
 {
     public string Name { get; set; }
     public int Mode { get; set; }
     public int Map { get; set; }
     public bool Speed { get; set; }
     public bool SramEnabled { get; set; }
+    public int CoProcessor { get; set; }
     public byte[] Rom { get; set; }
     public int Banks { get; set; }
     public int Romsize { get; set; }
@@ -15,6 +16,9 @@ public class BaseMapper
     private Timer Timer;
 
     public byte[] Sram { get; set; }
+
+    public const int CoprocessorGsu = 1;
+    public const int CoprocessorSa1 = 2;
 
     public BaseMapper()
     {
@@ -32,6 +36,7 @@ public class BaseMapper
         Mode = header.Mode;
         Speed = header.Speed;
         SramEnabled = header.Sram;
+        CoProcessor = header.CoProcessor;
         Sram = new byte[header.Ramsize];
         Rom = header.Rom;
         Banks = header.Rom.Length / 0x8000;
@@ -48,6 +53,20 @@ public class BaseMapper
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
+    private void SaveSram(object state)
+    {
+        try
+        {
+            var name = Path.GetFileNameWithoutExtension($"{Name}");
+            File.WriteAllBytes($"{SaveDirectory}/{name}.srm", Sram);
+        }
+        catch (IOException)
+        {
+            Timer?.Dispose();
+            Timer = null;
+        }
+    }
+
     public byte ReadBwRam(int a)
     {
         return Sram[a % Sram.Length];
@@ -55,7 +74,7 @@ public class BaseMapper
 
     public void WriteBwRam(int a, byte v)
     {
-        Sram[a % Sram.Length] = (byte)v;
+        Sram[a % Sram.Length] = v;
     }
 
     public void LoadSram()
@@ -69,33 +88,11 @@ public class BaseMapper
         }
     }
 
-    private void SaveSram(object state)
-    {
-        var name = Path.GetFileNameWithoutExtension($"{Name}");
-        try
-        {
-            File.WriteAllBytes($"{SaveDirectory}/{name}.srm", Sram);
-        }
-        catch (IOException)
-        {
-
-            Timer?.Dispose();
-            Timer = null;
-        }
-    }
-
-    public void SaveSram()
-    {
-        var name = Path.GetFileNameWithoutExtension($"{Name}");
-        File.WriteAllBytes($"{SaveDirectory}/{name}.srm", Sram);
-    }
-
     private readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
 
     public BaseMapper LoadRom(string name)
     {
-        BaseMapper Mapper;
-        return Mapper = Set(File.ReadAllBytes(name), name);
+        return Set(File.ReadAllBytes(name), name);
     }
 
     public BaseMapper Set(byte[] rom, string name)
@@ -114,8 +111,9 @@ public class BaseMapper
                 Rom = [.. rom.Skip(rom.Length % 1024)],
                 Name = name,
                 Map = rom[o + 0x7fd5] & 0xef,
-                Speed = rom[o + 0x7fd5].GetBit(4),
-                Sram = rom[o + 0x7fd6] > 0,
+                Speed = (rom[o + 0x7fd5] & 0x10) != 0,
+                Sram = rom[o + 0x7fd6] != 0,
+                CoProcessor = (rom[o + 0x7fd6] & 0xf0) >> 4,
                 Romsize = 0x400 << rom[o + 0x7fd7],
                 Ramsize = 0x400 << rom[o + 0x7fd8]
             };
@@ -173,6 +171,7 @@ public class BaseMapper
         public int Mode { get; set; }
         public bool Speed { get; set; }
         public bool Sram { get; set; }
+        public int CoProcessor { get; set; }
         public int Romsize { get; set; }
         public int Ramsize { get; set; }
         public byte[] Rom { get; set; }

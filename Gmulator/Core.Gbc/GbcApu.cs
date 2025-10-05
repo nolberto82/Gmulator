@@ -33,7 +33,7 @@ public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
 
     public void Step(int cycles)
     {
-        if (!NR52.GetBit(7)) return;
+        if ((NR52 & 0x80) == 0) return;
         Square1.Step(1, cycles);
         Square2.Step(2, cycles);
         Wave.Step(3, cycles);
@@ -135,7 +135,7 @@ public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
 
     public void Write(int a, byte v)
     {
-        if (NR52 > 0)
+        if (NR52 != 0)
         {
             if (a >= 0x10 && a <= 0x14)
                 Square1.Write(a, v);
@@ -153,21 +153,21 @@ public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
             }
             else if (a == 0x25)
             {
-                Square1.RightOn = v.GetBit(0);
-                Square2.RightOn = v.GetBit(1);
-                Wave.RightOn = v.GetBit(2);
-                Noise.RightOn = v.GetBit(3);
-                Square1.LeftOn = v.GetBit(4);
-                Square2.LeftOn = v.GetBit(5);
-                Wave.LeftOn = v.GetBit(6);
-                Noise.LeftOn = v.GetBit(7);
+                Square1.RightOn = (v & 0x01) != 0;
+                Square2.RightOn = (v & 0x02) != 0;
+                Wave.RightOn = (v & 0x04) != 0;
+                Noise.RightOn = (v & 0x08) != 0;
+                Square1.LeftOn = (v & 0x10) != 0;
+                Square2.LeftOn = (v & 0x20) != 0;
+                Wave.LeftOn = (v & 0x40) != 0;
+                Noise.LeftOn = (v & 0x80) != 0;
                 NR51 = v;
             }
             else if (a == 0x26)
             {
                 NR52 = (byte)(v & 0x80);
 
-                if (!v.GetBit(7))
+                if ((v & 0x80) == 0)
                     Reset();
             }
         }

@@ -33,8 +33,8 @@ public class Square2 : BaseChannel
         else if (a == 0x19)
         {
             Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-            LengthEnabled = v.GetBit(6);
-            if (v.GetBit(7))
+            LengthEnabled = (v & 0x40) != 0;
+            if ((v & 0x80) != 0)
                 Trigger(64, 4);
             NR24 = v;
         }

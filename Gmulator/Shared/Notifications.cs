@@ -49,10 +49,10 @@ internal static class Notifications
     {
         var fontsize = debug ? 15 : 30;
         var wheight = Raylib.GetScreenHeight();
-        Raylib.DrawRectangle(x, (int)(wheight - y - fontsize), width, fontsize * text.Length, new(0, 0, 0, 120));
+        Raylib.DrawRectangle(x, wheight - y - fontsize, width, fontsize * text.Length, new(0, 0, 0, 120));
         foreach (var item in text)
         {
-            Raylib.DrawTextEx(GuiFont, item, new(x + 5, (int)(wheight - y - fontsize)), fontsize, 1f, c);
+            Raylib.DrawTextEx(GuiFont, item, new(x + 5, wheight - y - fontsize), fontsize, 1f, c);
             y += fontsize;
         }
     }

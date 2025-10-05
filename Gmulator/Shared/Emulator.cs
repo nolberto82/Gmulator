@@ -9,6 +9,9 @@ using System;
 using System.Dynamic;
 using System.Numerics;
 using System.Text.Json;
+using System.Timers;
+using System.Xml.Linq;
+using Timer = System.Timers.Timer;
 
 namespace Gmulator.Shared
 {
@@ -16,6 +19,7 @@ namespace Gmulator.Shared
     {
         public int Console { get; set; }
         public string GameName { get; set; }
+        public string LastName { get; set; }
         public Config Config { get; set; }
         public RenderTexture2D Screen { get; set; }
         public Dictionary<int, Cheat> Cheats { get; set; } = [];
@@ -24,7 +28,7 @@ namespace Gmulator.Shared
         public DebugWindow DebugWindow { get; set; }
         public CheatConverter CheatConverter { get; set; }
 
-        public int State { get; set; }
+        public DebugState State { get; set; }
         public bool FastForward { get; set; }
         public bool Debug { get; set; }
         public bool IsScreenWindow { get; set; }
@@ -38,11 +42,9 @@ namespace Gmulator.Shared
             Success, Failed, Mismatch
         }
 
-        public Emulator() { GameName = ""; }
-        public Emulator(DebugWindow debugwindow)
+        public Emulator()
         {
-            DebugWindow = debugwindow;
-            Breakpoints = [];
+            GameName = "";
         }
 
         public void Init(int width, int height, int console, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
@@ -53,20 +55,20 @@ namespace Gmulator.Shared
             LuaApi = new(Screen.Texture, imguifont, raylibfont, menuheight, Debug);
         }
 
-        public virtual void Reset(string name, string lastname, bool reset)
+        public virtual void Reset(string name, bool reset)
         {
             if (!Debug)
-                State = Running;
+                State = DebugState.Running;
             else
-                State = Break;
+                State = DebugState.Break;
             LuaApi?.SetDebug(Debug);
+            if (name != "")
+                GameName = name;
         }
 
-        public void SetLua() => LuaApi.SetDebug(Debug);
+        public virtual void SetState(DebugState v) => State = v;
 
-        public virtual void SetState(int v) => State = v;
-
-        public virtual void Execute(bool opened, int times) { }
+        public virtual void Execute(bool opened) { }
 
         public virtual void Render(float MenuHeight)
         {
@@ -74,7 +76,7 @@ namespace Gmulator.Shared
             var height = Raylib.GetScreenHeight();
             var texwidth = Dimensions.X;
             var texheight = Dimensions.Y;
-            var scale = Math.Min((float)width / texwidth, (float)height / texheight);
+            var scale = Math.Min(width / texwidth, height / texheight);
             var posx = (int)((width - texwidth * scale) / 2);
             var posy = (int)(((height - texheight * scale) / 2) + MenuHeight);
 
@@ -98,6 +100,7 @@ namespace Gmulator.Shared
                 if (ImGui.Begin("Debugger", NoScrollFlags))
                 {
                     DebugWindow?.Draw();
+                    DebugWindow?.DrawCoProcessors();
                 }
                 ImGui.End();
 
@@ -108,15 +111,15 @@ namespace Gmulator.Shared
                 ImGui.End();
 
                 ImGui.SetNextWindowPos(new(5 + 435, height - 300));
-                ImGui.SetNextWindowSize(new(275, 300));
+                ImGui.SetNextWindowSize(new(310, 300));
                 if (ImGui.Begin("Breakpoints", NoScrollFlags))
                     DebugWindow?.DrawBreakpoints();
                 ImGui.End();
 
                 if (Console == SnesConsole)
                 {
-                    ImGui.SetNextWindowPos(new(5 + 715, height - 300));
-                    ImGui.SetNextWindowSize(new(230, 300));
+                    ImGui.SetNextWindowPos(new(5 + 750, height - 300));
+                    ImGui.SetNextWindowSize(new(0, 300));
                     if (ImGui.Begin("DMA", NoScrollFlags))
                         DebugWindow?.DrawDmaInfo();
                     ImGui.End();
@@ -130,8 +133,8 @@ namespace Gmulator.Shared
                 Raylib.DrawTexturePro(
                     Screen.Texture,
                     new Rectangle(0, 0, texwidth, texheight),
-                    new Rectangle(0, posy,
-                    width - posx,
+                    new Rectangle(posx, posy,
+                    texwidth * scale,
                     texheight * scale + MenuHeight),
                     Vector2.Zero, 0, Color.White);
 
@@ -193,7 +196,7 @@ namespace Gmulator.Shared
         public virtual void SaveBreakpoints(string name)
         {
             if (!Directory.Exists(DebugDirectory)) return;
-            if (name == null || (name == "" && Breakpoints.Count == 0)) return;
+            if (name == null || name == "") return;
             var bps = Breakpoints.Values.DistinctBy(c => c.Addr).ToList();
             var file = @$"{DebugDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
             var json = JsonSerializer.Serialize(bps, GEmuJsonContext.Default.Options);

@@ -2,7 +2,7 @@
 public class Dmc : BaseChannel
 {
     public int OutputLevel { get; set; }
-    public ushort OutputShift { get; private set; }
+    public int OutputShift { get; private set; }
     public int RateIndex { get; private set; }
     public bool Irq { get; private set; }
     public bool Loop { get; private set; }
@@ -12,7 +12,7 @@ public class Dmc : BaseChannel
     public int LengthValue { get; set; }
     public int SampleBuffer { get; private set; }
     private int OutputBits;
-    public Func<int, byte> Read;
+    public Func<int, int> Read;
 
     private readonly int[] Rate =
     [
@@ -20,14 +20,14 @@ public class Dmc : BaseChannel
        190, 160, 142, 128, 106,  84,  72,  54
     ];
 
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         if (a == 0x4010)
         {
             RateIndex = v & 0x0f;
-            Irq = v.GetBit(7);
-            Loop = v.GetBit(6);
-            Frequency = (ushort)(Rate[v & 0x0f] / 2);
+            Irq = (v & 0x80) != 0;
+            Loop = (v & 0x40) != 0;
+            Frequency = (Rate[v & 0x0f] / 2) & 0xffff;
         }
         else if (a == 0x4011)
             OutputLevel = (byte)(v & 0x7f);

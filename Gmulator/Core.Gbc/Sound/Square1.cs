@@ -86,13 +86,13 @@ public class Square1 : BaseChannel
         {
             Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
             ShadowFrequency = Frequency;
-            LengthEnabled = v.GetBit(6);
+            LengthEnabled = (v & 0x40) != 0;
             SweepEnabled = SweepPeriod > 0 || SweepShift > 0;
 
             if (SweepShift > 0)
               UpdateFrequency();
 
-            if (v.GetBit(7))
+            if ((v & 0x80) != 0)
                 Trigger(64, 4);
             NR14 = v;
         }

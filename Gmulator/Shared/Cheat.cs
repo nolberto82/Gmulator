@@ -143,13 +143,15 @@ public class Cheat
     }
 
     public void ReloadCheats(Emulator Emu) => Load(Emu);
-    public void Load(Emulator Emu, string chtname = "")
+    public void Load(Emulator Emu, string filename = "")
     {
+        if (filename.Contains("alttpr - "))
+            filename = "alttpr";
+
         Emu.Cheats?.Clear();
-        var name = Filename = chtname == "" ? Emu.GameName : chtname;
+        var name = Filename = filename == "" ? Emu.GameName : filename;
         name = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}";
-        var libretrocht = File.Exists($"{name}_cheats.cht") ? $"{name}_cheats.cht" :
-            File.Exists($"{name}.cht") ? $"{name}.cht" : "";
+        var libretrocht = File.Exists($"{name}.cht") ? $"{name}.cht" : "";
 
         if (libretrocht != "")
         {
@@ -192,7 +194,7 @@ public class Cheat
             }
         }
 
-        if (Emu?.Cheats.Count > 0)
+        if (name != "Cheats/alttpr" && Emu?.Cheats.Count > 0)
             CheatConverter.Save(Emu.GameName);
         //    Save(, Emu?.Cheats);
     }

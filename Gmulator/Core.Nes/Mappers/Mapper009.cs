@@ -98,8 +98,8 @@ internal class Mapper009 : BaseMapper
 
         if (UpdateChr)
         {
-            Chr[0] = (byte)(Latch1 == 0xfd ? LChr[0] : LChr[1]);
-            Chr[1] = (byte)(Latch2 == 0xfd ? LChr[2] : LChr[3]);
+            Chr[0] = Latch1 == 0xfd ? LChr[0] : LChr[1];
+            Chr[1] = Latch2 == 0xfd ? LChr[2] : LChr[3];
 
             UpdateChr = false;
         }

@@ -35,7 +35,7 @@ internal class Sa1Rom(BaseMapper.Header header) : BaseMapper(header)
 
     public new void WriteBwRam(int a, byte v)
     {
-        Sram[a % Sram.Length] = (byte)v;
+        Sram[a % Sram.Length] = v;
     }
 
     public override void Init(Header header)
