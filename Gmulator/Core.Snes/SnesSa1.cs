@@ -1,11 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Gmulator.Core.Snes;
-
+﻿namespace Gmulator.Core.Snes;
 public class SnesSa1(Snes snes) : SnesCpu
 {
     public Snes Snes { get; } = snes;
@@ -120,7 +113,7 @@ public class SnesSa1(Snes snes) : SnesCpu
         }
     }
 
-    public new List<RegistersInfo> GetRegs() =>
+    public new List<RegisterInfo> GetRegs() =>
     [
         new("2200.0-3","Message",$"{Message}"),
         new("2200.4","Message",$"{Message}"),

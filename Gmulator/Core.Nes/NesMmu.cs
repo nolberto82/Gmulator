@@ -3,6 +3,7 @@ using System.Xml.Linq;
 using System.Runtime.Intrinsics.Arm;
 
 namespace Gmulator.Core.Nes;
+
 public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
 {
     private NesJoypad Joypad1;
@@ -63,14 +64,16 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
     }
 
     public byte[] ReadWram() => Ram;
+    public byte[] ReadSram() => Mapper.Sram;
     public byte[] ReadVram() => Vram;
     public byte[] ReadOram() => Oram;
-    public byte[] ReadPrg() => Mapper.Prg;
-    public byte[] ReadChr() => Mapper.Chr;
+    public byte[] ReadPrg() => Mapper.Prom;
+    public byte[] ReadChr() => Mapper.Vrom;
+    public void WriteWram(int a, int v) => Ram[a & 0xffff] = (byte)v;
 
     public int Read(int a)
     {
-        int v = 0;
+        byte v = 0;
         if (a < 0x2000)
             v = Ram[a & 0x7ff];
         else if (a >= 0x2000 && a <= 0x3fff)
@@ -89,20 +92,19 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         else if (a <= 0x5fff)
             v = 0xff;
         else if (a <= 0x7fff && Mapper.SramEnabled)
-            v = Mapper.ReadSram(a);
+            v = (byte)Mapper.ReadSram(a);
         else if (a >= 0x8000)
             v = Mapper.ReadPrg(a);
         else
             v = Ram[a & 0x7ff];
 
-        ApplyGameGenieCheats(a, (byte)v);
+        v = ApplyGameGenieCheats(a, v);
         return v & 0xff;
     }
 
     public void Write(int a, int val)
     {
         byte v = (byte)val;
-
         if (a >= 0x0000 && a <= 0x1fff)
             Ram[a & 0x7ff] = v;
         else if (a >= 0x2000 && a <= 0x3fff)

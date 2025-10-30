@@ -2,6 +2,7 @@
 using System.Text.Json;
 
 namespace Gmulator.Shared;
+
 public class Cheat
 {
     public string Description { get; set; }
@@ -28,17 +29,18 @@ public class Cheat
             Bank = compare;
     }
 
-    public class RawCode(int address, byte compare, byte value, int type)
+    public class RawCode(int address, byte compare, byte value, int type, bool enabled)
     {
         public int Address { get; set; } = address;
         public byte Compare { get; set; } = compare;
         public byte Value { get; set; } = value;
         public int Type { get; set; } = type;
+        public bool Enabled { get; set; } = enabled;
     }
 
     public static (int, byte, byte, int, int) DecryptCode(string c, Emulator Emu)
     {
-        switch (Emu?.Console)
+        switch (Emu?.System)
         {
             case GbcConsole:
             {
@@ -171,9 +173,14 @@ public class Cheat
                 for (int j = 0; j < lines.Length; j++)
                 {
                     var beg = lines[j].IndexOf("= ") + 2;
+                    if (beg == -1) break;
                     cht.Description = lines[j][beg..].Replace(@"""", "");
+                    beg = lines[j + 1].IndexOf("= ") + 2;
+                    if (beg == -1) break;
                     cht.Codes = lines[j + 1][beg..].Replace(@"""", "");
-                    cht.Enabled = true;
+                    beg = lines[j + 2].IndexOf("= ") + 2;
+                    if (beg == -1) break;
+                    cht.Enabled = Convert.ToBoolean(lines[j + 2][beg..].Replace(@"""", ""));
                     j += 2;
                 }
 
@@ -183,13 +190,13 @@ public class Cheat
                     if (c == "")
                         continue;
                     (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, Emu);
-                    rawcodes.Add(new(addr, cmp, val, type));
+                    rawcodes.Add(new(addr, cmp, val, type, cht.Enabled));
                 }
 
                 foreach (var r in rawcodes)
                 {
                     if (!Emu.Cheats.ContainsKey(r.Address))
-                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Value, r.Compare, r.Type, true, cht.Codes));
+                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Value, r.Compare, r.Type, r.Enabled, cht.Codes));
                 }
             }
         }

@@ -4,6 +4,7 @@ using Raylib_cs;
 using Wave = Gmulator.Core.Gbc.Sound.Wave;
 
 namespace Gmulator.Core.Gbc;
+
 public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
 {
     public byte NR50 { get; private set; }
@@ -215,5 +216,17 @@ public class GbcApu(GbcMmu mmu, int cpuclock) : EmuState
         NR52 = br.ReadByte();
         FrameSequencerCycles = br.ReadInt32();
         FrameSequencer = br.ReadInt32();
+    }
+
+    public List<RegisterInfo> GetState()
+    {
+        List<RegisterInfo> list =
+        [
+            .. Square1.GetState(),
+            .. Square2.GetState(),
+            .. Wave.GetState(),
+            .. Noise.GetState(),
+        ];
+        return list;
     }
 }

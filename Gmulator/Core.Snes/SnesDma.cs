@@ -1,8 +1,4 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Shared;
-using System.Runtime.InteropServices;
-
-namespace Gmulator.Core.Snes;
+﻿namespace Gmulator.Core.Snes;
 public class SnesDma : EmuState
 {
     private const int MaxChannels = 8;
@@ -27,9 +23,9 @@ public class SnesDma : EmuState
 
     private Action Idle8;
 
-    public SnesDma(Snes snes, SnesCpu cpu)
+    public SnesDma(Snes snes)
     {
-        Idle8 = cpu.Idle8;
+        Idle8 = snes.Cpu.Idle8;
         ReadCpu = snes.ReadMemory;
         WriteCpu = snes.WriteMemory;
     }
@@ -58,7 +54,6 @@ public class SnesDma : EmuState
 
     public Func<int, int> ReadCpu;
     public Action<int, int> WriteCpu;
-    private Snes Snes;
     private bool DmaEnabled;
     private int DmaState;
     public readonly byte[] Max = [1, 2, 2, 4, 4, 4, 2, 4];
@@ -111,7 +106,7 @@ public class SnesDma : EmuState
                         else if (Step[i] == 2)
                             src--;
                     }
-                    Size[i]--;
+                    Size[i] = (Size[i] - 1) & 0xffff;
                     count = (count + 1) & 3;
                 } while (Size[i] != 0);
                 AAddress[i] = (ushort)src;
@@ -268,7 +263,7 @@ public class SnesDma : EmuState
             HdmaEnabled[i] = ((v >> i) & 1) != 0;
     }
 
-    public List<RegistersInfo> GetIoRegs(int i) =>
+    public List<RegisterInfo> GetIoRegs(int i) =>
     [
         new($"420B.{i}","DMA Enabled",$"{Enabled[i]}"),
         new($"420C.{i}","HDMA Enabled",$"{HdmaEnabled[i]}"),

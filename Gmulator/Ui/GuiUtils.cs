@@ -1,8 +1,11 @@
 ﻿using ImGuiNET;
 using Raylib_cs;
 using System.Numerics;
+using System.Text;
+using System.Text.Unicode;
 
 namespace Gmulator;
+
 public static class GuiUtils
 {
     public static Vector2 DrawGrid(Texture2D texture, Vector2 pos, Vector2 region, Vector2 mp, Vector2 gridsize, ImDrawListPtr list)
@@ -116,7 +119,14 @@ public static class GuiUtils
     {
         ImGui.TableNextColumn(); ImGui.Text(addr);
         ImGui.TableNextColumn(); ImGui.Text(name);
-        ImGui.TableNextColumn(); ImGui.Text(v != null ? v : "");
+        ImGui.TableNextColumn();
+        if (bool.TryParse(v, out var bv))
+            ImGui.Text(v != null ? v.ToLowerInvariant() : "");
+        else
+            ImGui.Text(v != null ? v : "");
+
+        if (v == "")
+            ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg0, 0xff808080);
     }
 
     public static void TableRowCol3(string addr, string name, bool v)
@@ -136,7 +146,7 @@ public static class GuiUtils
 
     public static void DrawRect(uint filled, uint unfilled)
     {
-        Vector2 min = ImGui.GetItemRectMin();
+        Vector2 min = Vector2.Add(ImGui.GetItemRectMin(), new(0,1.51f));
         Vector2 max = ImGui.GetItemRectMax();
         ImGui.GetWindowDrawList().AddRectFilled(min, max, filled);
         ImGui.GetWindowDrawList().AddRect(min, max, unfilled);

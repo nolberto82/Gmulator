@@ -1,13 +1,4 @@
-﻿using Gmulator.Core.Nes;
-using Raylib_cs;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Gmulator.Core.Snes;
+﻿namespace Gmulator.Core.Snes;
 public class SnesApu : EmuState
 {
     public Timer[] Timers = new Timer[3];
@@ -43,13 +34,13 @@ public class SnesApu : EmuState
         CpuIO = new byte[4];
     }
 
-    public void SetSnes(Snes snes, SnesCpu cpu, SnesPpu ppu, SnesSpc spc, SnesDsp dsp, SnesSpcLogger spclogger)
+    public void SetSnes(Snes snes)
     {
         Snes = snes;
-        Ppu = ppu;
-        Spc = spc;
-        Dsp = dsp;
-        Logger = spclogger;
+        Ppu = snes.Ppu;
+        Spc = snes.Spc;
+        Dsp = snes.Dsp;
+        Logger = snes.SpcLogger;
         Breakpoints = snes.Breakpoints;
         SetState = snes.SetState;
         if (snes.DebugWindow != null)
@@ -249,23 +240,23 @@ public class SnesApu : EmuState
         0x5d,0xd0,0xdb,0x1f,0x00,0x00,0xc0,0xff,
     ];
 
-    public Dictionary<string, string> GetIO() => new()
-    {
-        ["Port 0(Cpu)"] = $"{SpcIO[0]:X2}",
-        ["Port 0(Spc)"] = $"{CpuIO[0]:X2}",
-        ["Port 1(Cpu)"] = $"{SpcIO[1]:X2}",
-        ["Port 1(Spc)"] = $"{CpuIO[1]:X2}",
-        ["Port 2(Cpu)"] = $"{SpcIO[2]:X2}",
-        ["Port 2(Spc)"] = $"{CpuIO[2]:X2}",
-        ["Port 3(Cpu)"] = $"{SpcIO[3]:X2}",
-        ["Port 3(Spc)"] = $"{CpuIO[3]:X2}",
-    };
+    public List<RegisterInfo> GetState() =>
+    [
+        new("Port0","Cpu",$"{SpcIO[0]:X2}"),
+        new("Port0","Spc",$"{CpuIO[0]:X2}"),
+        new("Port1","Cpu",$"{SpcIO[1]:X2}"),
+        new("Port1","Spc",$"{CpuIO[1]:X2}"),
+        new("Port2","Cpu",$"{SpcIO[2]:X2}"),
+        new("Port2","Spc",$"{CpuIO[2]:X2}"),
+        new("Port3","Cpu",$"{SpcIO[3]:X2}"),
+        new("Port3","Spc",$"{CpuIO[3]:X2}"),
+    ];
 
     public override void Save(BinaryWriter bw)
     {
-        bw.Write(Cycles); EmuState.WriteArray<byte>(bw, SpcIO);
-        EmuState.WriteArray<byte>(bw, CpuIO); EmuState.WriteArray<int>(bw, TimerOut);
-        EmuState.WriteArray<byte>(bw, Ram); bw.Write(WriteEnabled);
+        bw.Write(Cycles); WriteArray(bw, SpcIO);
+        WriteArray(bw, CpuIO); WriteArray(bw, TimerOut);
+        WriteArray(bw, Ram); bw.Write(WriteEnabled);
         bw.Write(ReadEnabled); bw.Write(IplEnabled);
 
         for (int i = 0; i < Timers.Length; i++)
@@ -279,9 +270,9 @@ public class SnesApu : EmuState
 
     public override void Load(BinaryReader br)
     {
-        Cycles = br.ReadUInt64(); SpcIO = EmuState.ReadArray<byte>(br, SpcIO.Length);
-        CpuIO = EmuState.ReadArray<byte>(br, CpuIO.Length); TimerOut = EmuState.ReadArray<int>(br, TimerOut.Length);
-        Ram = EmuState.ReadArray<byte>(br, Ram.Length); WriteEnabled = br.ReadBoolean();
+        Cycles = br.ReadUInt64(); SpcIO = ReadArray<byte>(br, SpcIO.Length);
+        CpuIO = ReadArray<byte>(br, CpuIO.Length); TimerOut = ReadArray<int>(br, TimerOut.Length);
+        Ram = ReadArray<byte>(br, Ram.Length); WriteEnabled = br.ReadBoolean();
         ReadEnabled = br.ReadBoolean(); IplEnabled = br.ReadBoolean();
 
         for (int i = 0; i < Timers.Length; i++)

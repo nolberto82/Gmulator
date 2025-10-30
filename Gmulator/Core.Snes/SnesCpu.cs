@@ -1,7 +1,6 @@
 ﻿using Gmulator.Core.Snes.Mappers;
-using System.ComponentModel.DataAnnotations;
-
 namespace Gmulator.Core.Snes;
+
 public partial class SnesCpu : EmuState, ICpu
 {
     private const int FC = 1 << 0;
@@ -20,8 +19,8 @@ public partial class SnesCpu : EmuState, ICpu
     private const int RESETe = 0xFFFC;
     private const int BRKe = 0xFFFE;
 
-    private int pc, sp, ra, rx, ry, ps, db, pb, pbr, dr;
-    private bool Imme, Wait;
+    private int pc, sp, ra, rx, ry, ps, db, pb, dr;
+    private bool Imme;
 
     public int PC
     {
@@ -64,14 +63,14 @@ public partial class SnesCpu : EmuState, ICpu
     public int StepOverAddr;
     public int Cycles { get => cycles; private set => cycles = value; }
 
-    public bool XMem => (PS & FX) != 0;
-    public bool MMem => (PS & FM) != 0;
+    public bool XMem => (ps & FX) != 0;
+    public bool MMem => (ps & FM) != 0;
 
     private Snes Snes;
     private SnesPpu Ppu;
     private BaseMapper Mapper;
-    private int C => PS & FC;
-    private bool I => (PS & FI) != 0;
+    private int C => ps & FC;
+    private bool I => (ps & FI) != 0;
     public Action<int> SetState;
     private int cycles;
 
@@ -79,11 +78,11 @@ public partial class SnesCpu : EmuState, ICpu
 
     public SnesCpu() => CreateOpcodes();
 
-    public void SetSnes(Snes snes, SnesPpu ppu, BaseMapper mapper)
+    public void SetSnes(Snes snes)
     {
         Snes = snes;
-        Ppu = ppu;
-        Mapper = mapper;
+        Ppu = snes.Ppu;
+        Mapper = snes.Mapper;
     }
 
     public void ResetCycles() => cycles = 0;
@@ -192,14 +191,14 @@ public partial class SnesCpu : EmuState, ICpu
         if (NmiEnabled)
         {
             Nmi(NMIn);
-            NmiEnabled = Wait = false;
+            NmiEnabled = false;
 
             return;
         }
         if (!I && IRQEnabled)
         {
             Nmi(IRQn);
-            IRQEnabled = Wait = false;
+            IRQEnabled = false;
             return;
         }
 
@@ -312,7 +311,7 @@ public partial class SnesCpu : EmuState, ICpu
             case TXY: Txy(); break;
             case TYA: Tya(); break;
             case TYX: Tyx(); break;
-            case WAI: GetMode(mode, true); Idle(); Idle(); Wait = true; break;
+            case WAI: GetMode(mode, true); Idle(); Idle(); break;
             case WDM: PC++; break;
             case XBA: Xba(); break;
             case XCE: Xce(); break;
@@ -333,7 +332,7 @@ public partial class SnesCpu : EmuState, ICpu
                 b = (ra & 0xf) + (v & 0xf) + (PS & FC);
                 if (b > 0x09) b += 0x06;
                 SetFlagC(b >= 0x10);
-                b = ((A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
+                b = (A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf);
             }
             else
             {
@@ -1221,7 +1220,7 @@ public partial class SnesCpu : EmuState, ICpu
         if (mmem)
         {
             v = Read(a);
-            Write(a, (v & 0xff) & ~ra);
+            Write(a, v & 0xff & ~ra);
             v &= A;
         }
         else
@@ -1389,7 +1388,7 @@ public partial class SnesCpu : EmuState, ICpu
             }
             case AbsoluteLong:
             {
-                var a = (Read(pbr | PC++) | Read(pbr | PC++) << 8 | Read(pbr | PC++) << 16);
+                var a = Read(pbr | PC++) | Read(pbr | PC++) << 8 | Read(pbr | PC++) << 16;
                 return a;
             }
             case AbsoluteLongIndexedX:
@@ -1670,30 +1669,29 @@ public partial class SnesCpu : EmuState, ICpu
         else ps &= ~FV;
     }
 
-    public Dictionary<string, bool> GetFlags() => new()
+    public List<RegisterInfo> GetFlags() => new()
     {
-        ["C"] = (ps & FC) != 0,
-        ["Z"] = (ps & FZ) != 0,
-        ["I"] = (ps & FI) != 0,
-        ["D"] = (ps & FD) != 0,
-        ["X"] = (ps & FX) != 0,
-        ["M"] = (ps & FM) != 0,
-        ["V"] = (ps & FV) != 0,
-        ["N"] = (ps & FN) != 0,
-        ["E"] = E
+        new("","C",$"{(ps & FC) != 0}"),
+        new("","Z",$"{(ps & FZ) != 0}"),
+        new("","I",$"{(ps & FI) != 0}"),
+        new("","D",$"{(ps & FD) != 0}"),
+        new("","X",$"{(ps & FX) != 0}"),
+        new("","M",$"{(ps & FM) != 0}"),
+        new("","V",$"{(ps & FV) != 0}"),
+        new("","N",$"{(ps & FN) != 0}"),
+        new("","E",$"{E}"),
     };
 
-    public Dictionary<string, string> GetRegisters() => new()
+    public List<RegisterInfo> GetRegisters() => new()
     {
-        ["A"] = $"{A:X4}",
-        ["X"] = $"{X:X4}",
-        ["Y"] = $"{Y:X4}",
-        ["SP"] = $"{SP:X4}",
-        ["D"] = $"{D:X4}",
-        ["P"] = $"{PS:X4}",
-        ["DB"] = $"{DB:X2}",
-        ["PB"] = $"{PB:X2}",
-        ["PC"] = $"{PC:X4}"
+        new("","A ",$"{A:X4}"),
+        new("","X ",$"{X:X4}"),
+        new("","Y ",$"{Y:X4}"),
+        new("","SP",$"{SP:X4}"),
+        new("","D ",$"{D:X4}"),
+        new("","P ",$"{PS:X4}"),
+        new("","DB",$"{DB:X2}"),
+        new("","PB",$"{PB:X2}"),
     };
 
     public int GetReg(string reg)

@@ -2,6 +2,7 @@
 using Gmulator.Core.Nes.Mappers;
 
 namespace Gmulator.Core.Nes;
+
 public partial class NesCpu : EmuState
 {
     private const int FC = 1 << 0;
@@ -19,9 +20,9 @@ public partial class NesCpu : EmuState
     private int pc, sp, a, x, y, ps;
     private bool[] flags;
 
-    public int PC { get => (ushort)pc; set => pc = (ushort)value; }
+    public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
     public int SP { get => (byte)sp; set => sp = value & 0xff; }
-    public int A { get => a&0xff; set => a = value & 0xff; }
+    public int A { get => a & 0xff; set => a = value & 0xff; }
     public int X { get => (byte)x; set => x = value & 0xff; }
     public int Y { get => y & 0xff; set => y = (byte)value; }
     public int Instructions { get; private set; }
@@ -57,9 +58,6 @@ public partial class NesCpu : EmuState
         Cycles++;
         PpuStep(3);
         var v = ReadByte(a);
-#if DEBUG || RELEASE
-        
-#endif
         return v;
     }
 
@@ -68,9 +66,6 @@ public partial class NesCpu : EmuState
         Cycles++;
         PpuStep(3);
         WriteByte(a, v);
-#if DEBUG || RELEASE
-        
-#endif
     }
 
     public void Step()
@@ -83,9 +78,6 @@ public partial class NesCpu : EmuState
 
         int op = TickRead(PC++);
         int mode = Disasm[op].Mode;
-
-        //if (State == Stopped)
-        //    return;
 
         switch (Disasm[op].Id)
         {
@@ -857,23 +849,25 @@ public partial class NesCpu : EmuState
             Flags[i] = (PS & (1 << i)) != 0;
     }
 
-    public Dictionary<string, bool> GetFlags() => new()
+    public List<RegisterInfo> GetFlags() => new()
     {
-        ["C"] = Flags[0],
-        ["Z"] = Flags[1],
-        ["I"] = Flags[2],
-        ["D"] = Flags[3],
-        ["B"] = Flags[4],
-        ["U"] = Flags[5],
-        ["V"] = Flags[6],
-        ["N"] = Flags[7],
+        new("","C",$"{Flags[0]}"),
+        new("","Z",$"{Flags[1]}"),
+        new("","I",$"{Flags[2]}"),
+        new("","D",$"{Flags[3]}"),
+        new("","B",$"{Flags[4]}"),
+        new("","U",$"{Flags[5]}"),
+        new("","V",$"{Flags[6]}"),
+        new("","N",$"{Flags[7]}"),
     };
 
-    public Dictionary<string, byte> GetRegisters() => new()
+    public List<RegisterInfo> GetRegisters() => new()
     {
-        ["A:"] = (byte)A,
-        ["X:"] = (byte)X,
-        ["Y:"] = (byte)Y,
+        new("", "A ", $"{A:X2}"),
+        new("", "X ", $"{X:X2}"),
+        new("", "Y ", $"{Y:X2}"),
+        new("", "P ", $"{PS:X2}"),
+        new("", "SP", $"{SP:X2}"),
     };
 
     public int GetReg(string reg)

@@ -6,12 +6,12 @@ namespace Gmulator.Shared;
 public class Config
 {
     public string WorkingDir { get; set; } = "C:";
-    public float Volume { get; set; } = 0.1f;
-    public float FrameSkip { get; set; } = 15;
-    public float RotateAB { get; set; }
+    public int Volume { get; set; } = 10;
+    public int FrameSkip { get; set; } = 10;
+    public int RotateAB { get; set; }
 
     public Config() { }
-    public Config(string directory, float volume, float frameskip, float ab)
+    public Config(string directory, int volume, int frameskip, int ab)
     {
         WorkingDir = directory;
         Volume = volume;

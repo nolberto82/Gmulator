@@ -1,12 +1,6 @@
-﻿using Gmulator;
-using System;
-using Raylib_cs;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
-
-namespace Gmulator.Core.Nes
+﻿namespace Gmulator.Core.Nes
 {
-    public class NesPpu(NesMmu mmu, NesApu apu) : EmuState
+    public class NesPpu() : EmuState
     {
         private readonly int[] MirrorHor = [0, 0, 1, 1];
         private readonly int[] MirrorVer = [0, 1, 0, 1];
@@ -16,19 +10,10 @@ namespace Gmulator.Core.Nes
 
         private int Dummy2007;
         private int OamDma;
-        private int NtAddr;
-        private int AtAddr;
-        private int BgAddr;
-        private int NtNyte;
-        private int AtByte;
-        private int BgLo;
-        private int BgHi;
-        private int BgShiftLo;
-        private int BgShiftHi;
-        private int AtShiftLo;
-        private int AtShiftHi;
-        private int AtLo;
-        private int AtHi;
+        private int NtAddr, AtAddr, BgAddr;
+        private int NtNyte, AtByte;
+        private int BgLo, BgHi, AtLo, AtHi;
+        private int BgShiftLo, BgShiftHi, AtShiftLo, AtShiftHi;
         public int Scanline { get => scanline; private set => scanline = value; }
         public int Cycle { get => cycle; private set => cycle = value; }
         public int Cycles { get => cycles; set => cycles = value; }
@@ -42,46 +27,49 @@ namespace Gmulator.Core.Nes
         private int OamAddr;
 
         private int Nametable;
-        private int Vaddr;
-        private bool Spraddr;
-        private int Bgaddr;
-        private bool Spritesize;
-        private int Master;
-        private bool Nmi;
+        private int VaddrIncrease;
+        private bool _sprTable;
+        private int _bgTable;
+        private bool _spriteSize;
+        private int _masterSelect;
+        private bool _nmi;
 
-        private int Greyscale;
-        private bool Backgroundleft;
-        private bool Spriteleft;
-        private bool Background;
-        private bool Sprite;
-        private int Red;
-        private int Green;
-        private int Blue;
+        private int _greyscale;
+        private bool _backgroundLeft;
+        private bool _spriteLeft;
+        private bool _background;
+        private bool _sprite;
+        private int _red;
+        private int _green;
+        private int _blue;
 
         private int Lsb;
-        private int SprOverflow;
-        private bool Sprite0hit;
-        private int Vblank;
+        private bool _sprOverflow;
+        private bool _sprite0hit;
+        private bool _vBlank;
 
-        private const int CycleStart = 1;
-        private const int CycleEnd = 257;
-        private const int CyclePre1 = 321;
-        private const int CyclePre2 = 336;
-        private const int ScanlineEnd = 239;
-        private const int ScanlineIdle = 240;
-        private const int ScanVblank = 241;
-        private const int ScanlinePre = -1;
+        private enum CycleState
+        {
+            Start = 1, End = 257, Pre1 = 321, Pre2 = 336,
+        }
+
+        private enum ScanlineState
+        {
+            End = 239, Idle = 240, Vblank = 241, Pre = -1
+        }
+
         private int ScanlineFrameEnd;
 
-        public bool IsRendering => Background || Sprite;
+        public bool IsRendering => _background || _sprite;
         public int FineY => ((Lp.V & 0x7000) >> 12) & 0xff;
 
-        private NesMmu Mmu = mmu;
-        private NesApu Apu = apu;
+        private NesMmu Mmu;
+        private NesApu Apu;
         public uint[] NametableBuffer { get; private set; } = new uint[NesWidth * NesWidth * 4];
-        private uint[] ScreenBuffer;
+        public uint[] ScreenBuffer { get; private set; }
 
-        public Nes Nes { get; private set; }
+        private Nes Nes;
+        private Action<int, int> WriteByte;
 
         private readonly uint[] pixPalettes = new uint[192 / 3];
         private readonly byte[] palBuffer =
@@ -103,6 +91,9 @@ namespace Gmulator.Core.Nes
         public void Init(Nes nes)
         {
             Nes = nes;
+            Mmu = nes.Mmu;
+            Apu = nes.Apu;
+            WriteByte = nes.Mmu.WriteWram;
             ScreenBuffer = new uint[NesWidth * NesHeight * 4];
         }
 
@@ -112,10 +103,10 @@ namespace Gmulator.Core.Nes
             Dummy2007 = 0;
             Lp = default;
 
-            Nmi = false;
-            SprOverflow = 0;
-            Sprite0hit = false;
-            Vblank = 0;
+            _nmi = false;
+            _sprOverflow = false;
+            _sprite0hit = false;
+            _vBlank = false;
 
             Cycle = 25;
             Totalcycles = 7;
@@ -142,12 +133,12 @@ namespace Gmulator.Core.Nes
 
             while (c-- > 0)
             {
-                if ((Scanline < 240 || Scanline == ScanlinePre) && Cycle == 324 && IsRendering)
+                if ((Scanline < 240 || Scanline == (int)ScanlineState.Pre) && Cycle == 324 && IsRendering)
                     Mmu.Mapper.Scanline();
 
-                if (Scanline >= 0 && Scanline <= ScanlineEnd && IsRendering)
+                if (Scanline >= 0 && Scanline <= (int)ScanlineState.End && IsRendering)
                 {
-                    if ((Cycle >= CycleStart && Cycle < CycleEnd) || (Cycle >= CyclePre1 && Cycle <= CyclePre2))
+                    if ((Cycle >= (int)CycleState.Start && Cycle < (int)CycleState.End) || (Cycle >= (int)CycleState.Pre1 && Cycle <= (int)CycleState.Pre2))
                     {
                         GetTiles();
                         RenderPixels();
@@ -168,28 +159,27 @@ namespace Gmulator.Core.Nes
                     if (Cycle == 256)
                         Lp.V = Lp.V & ~0x41f | Lp.T & 0x41f;
                 }
-                else if (Scanline == ScanlineIdle)
+                else if (Scanline == (int)ScanlineState.Idle)
                 {
                     if (Cycle == 1)
                     {
                         FrameCounter++;
-                        Texture.Update(Nes.Screen.Texture, ScreenBuffer);
                     }
                 }
-                else if (Scanline == ScanVblank)
+                else if (Scanline == (int)ScanlineState.Vblank)
                 {
                     if (Cycle == 0)
                     {
-                        Vblank = 1;
-                        if (Nmi && !NoNmi)
+                        _vBlank = true;
+                        if (_nmi && !NoNmi)
                             NesCpu.NmiTriggered = 1;
                     }
                 }
-                else if (Scanline == ScanlinePre)
+                else if (Scanline == (int)ScanlineState.Pre)
                 {
                     if (IsRendering)
                     {
-                        if (Cycle >= CycleStart && Cycle <= CycleEnd || Cycle >= CyclePre1 && Cycle <= CyclePre2)
+                        if (Cycle >= (int)CycleState.Start && Cycle <= (int)CycleState.End || Cycle >= (int)CycleState.Pre1 && Cycle <= (int)CycleState.Pre2)
                             GetTiles();
 
                         //copy horizontal bits
@@ -208,7 +198,6 @@ namespace Gmulator.Core.Nes
                         Cycle += IsRendering && (FrameCounter & 1) == 1 && Scanline == -1 ? 1 : 0;
                 }
 
-                //cycle++;
                 if (cycle++ > 339)
                 {
                     cycle = 0;
@@ -216,9 +205,9 @@ namespace Gmulator.Core.Nes
                     if (scanline >= ScanlineFrameEnd)
                     {
                         Scanline = -1;
-                        Vblank = 0;
-                        Sprite0hit = false;
-                        SprOverflow = 0;
+                        _vBlank = false;
+                        _sprite0hit = false;
+                        _sprOverflow = false;
                         NoNmi = false;
                     }
                 }
@@ -231,29 +220,29 @@ namespace Gmulator.Core.Nes
         {
             Lp.T = Lp.T & ~0xc00 | (v & 3) << 10;
             Nametable = v >> 1 & 3;
-            Vaddr = v >> 2 & 1;
-            Spraddr = (v >> 3 & 1) != 0;
-            Bgaddr = v >> 4 & 1;
-            Spritesize = (v >> 5 & 1) != 0;
-            Nmi = v >> 7 != 0;
+            VaddrIncrease = v >> 2 & 1;
+            _sprTable = (v >> 3 & 1) != 0;
+            _bgTable = v >> 4 & 1;
+            _spriteSize = (v >> 5 & 1) != 0;
+            _nmi = v >> 7 != 0;
 
             if (Header.MapperId == 5)
-                Mmu.Mapper.SpriteSize = Spritesize;
+                Mmu.Mapper.SpriteSize = _spriteSize;
 
-            Mmu.Ram[0x2000 & 0x2007] = (byte)v;
+            WriteByte(0x2000 & 0x2007, v);
         }
 
         public void MaskW(int v)
         {
-            Backgroundleft = (v & 0x02) != 0;
-            Spriteleft = (v & 0x04) != 0;
-            Background = (v & 0x08) != 0;
-            Sprite = (v & 0x10) != 0;
+            _backgroundLeft = (v & 0x02) != 0;
+            _spriteLeft = (v & 0x04) != 0;
+            _background = (v & 0x08) != 0;
+            _sprite = (v & 0x10) != 0;
         }
 
         public int StatusR()
         {
-            int v = ((Vblank << 7 | (Sprite0hit ? 1 : 0) << 6 | SprOverflow << 5) & 0xe0
+            int v = (((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
                 | Dummy2007 & 0x1f);
 
             if (Scanline == 241)
@@ -269,12 +258,12 @@ namespace Gmulator.Core.Nes
                 else if (Cycle == 3)
                 {
                     NoNmi = false;
-                    Vblank = 0;
+                    _vBlank = false;
                     //p2002 &= 0x7f;
                     return (v & 0x7f);
                 }
             }
-            Vblank = 0;
+            _vBlank = false;
 
             Lp.W = false;
             return v;
@@ -319,7 +308,7 @@ namespace Gmulator.Core.Nes
         public void DataW(int v) //2007
         {
             Write(Lp.V, v);
-            Lp.V += Vaddr != 0 ? 32 : 1;
+            Lp.V += VaddrIncrease != 0 ? 32 : 1;
 
             if (((Lp.V ^ A12) & 0x1000) != 0)
             {
@@ -341,7 +330,7 @@ namespace Gmulator.Core.Nes
                 v = (Dummy2007 = Read(Lp.V));
 
 
-            Lp.V += Vaddr != 0 ? 32 : 1;
+            Lp.V += VaddrIncrease != 0 ? 32 : 1;
             return v & 0xff;
         }
 
@@ -383,16 +372,16 @@ namespace Gmulator.Core.Nes
             int fx_shift = 15 - Lp.Fx;
             int at_shift = 7 - Lp.Fx;
 
-            if (Background && (x >= 8 || Backgroundleft))
+            if (_background && (x >= 8 || _backgroundLeft))
             {
                 bg_pixel = ((BgShiftLo >> fx_shift) & 1) | (((BgShiftHi >> fx_shift) & 1) << 1);
                 bg_pal = ((AtShiftLo >> at_shift) & 1) | (((AtShiftHi >> at_shift) & 1) << 1);
                 bg_pal &= 3;
             }
 
-            if (Sprite && !(x < 8 && !Spriteleft))
+            if (_sprite && !(x < 8 && !_spriteLeft))
             {
-                int bgaddr = Spraddr ? 0x1000 : 0x0000;
+                int bgaddr = _sprTable ? 0x1000 : 0x0000;
                 // Use for loop for better performance than != 0
                 int spriteCount = SpriteScan.Count;
                 for (int i = 0; i < spriteCount; i++)
@@ -401,17 +390,17 @@ namespace Gmulator.Core.Nes
                     int tile = spr.Tile;
                     attrib = spr.Attrib;
                     int fx = x - spr.X;
-                    int fy = (y - (spr.Y + 1)) & (Spritesize ? 15 : 7);
+                    int fy = (y - (spr.Y + 1)) & (_spriteSize ? 15 : 7);
 
                     // Fast path: skip invisible sprites
                     if (spr.X == 255 || spr.Y > 238 || fx < 0 || fx > 7)
                         continue;
 
                     if ((attrib & 0x40) == 0) fx = 7 - fx;
-                    if ((attrib & 0x80) != 0) fy = (Spritesize ? 15 : 7) - fy;
+                    if ((attrib & 0x80) != 0) fy = (_spriteSize ? 15 : 7) - fy;
 
                     int spraddr;
-                    if (Spritesize)
+                    if (_spriteSize)
                         spraddr = ((tile & 1) * 0x1000) + ((tile & 0xfe) * 16) + fy + (fy & 8);
                     else
                         spraddr = bgaddr + tile * 16 + fy;
@@ -423,8 +412,8 @@ namespace Gmulator.Core.Nes
 
                     if (spr_pixel == 0) continue;
 
-                    if (spr.Id == 0 && Sprite && Background && bg_pixel != 0 && x != 255 && !Sprite0hit)
-                        Sprite0hit = true;
+                    if (spr.Id == 0 && _sprite && _background && bg_pixel != 0 && x != 255 && !_sprite0hit)
+                        _sprite0hit = true;
 
                     spr_pal = attrib & 3;
                     break;
@@ -468,7 +457,7 @@ namespace Gmulator.Core.Nes
                     break;
 
                 int yp = Scanline - Mmu.Oram[i * 4 + 0];
-                int size = Spritesize ? 16 : 8;
+                int size = _spriteSize ? 16 : 8;
                 if (yp > -1 && yp < size)
                 {
                     SpriteScan.Add(new
@@ -501,7 +490,7 @@ namespace Gmulator.Core.Nes
                     if ((Lp.V & 2) != 0)
                         AtByte >>= 2;
                     break;
-                case 5: BgAddr = Bgaddr * 0x1000 + NtNyte * 16 + FineY; break;
+                case 5: BgAddr = _bgTable * 0x1000 + NtNyte * 16 + FineY; break;
                 case 6: BgLo = Read(BgAddr); break;
                 case 7: BgAddr += 8; break;
                 case 0:
@@ -681,7 +670,7 @@ namespace Gmulator.Core.Nes
 
                     int fy = y & 7;
                     int fx = x & 7;
-                    int bgaddr = Bgaddr + Read(ppuaddr) * 16 + fy;
+                    int bgaddr = _bgTable + Read(ppuaddr) * 16 + fy;
                     byte attr_shift = (byte)((ppuaddr >> 4) & 4 | (ppuaddr & 2));
                     byte bit2 = (byte)((Read(attaddr) >> attr_shift) & 3);
 
@@ -695,26 +684,26 @@ namespace Gmulator.Core.Nes
         public override void Save(BinaryWriter bw)
         {
             bw.Write(Nametable);
-            bw.Write(Vaddr);
-            bw.Write(Spraddr);
-            bw.Write(Bgaddr);
-            bw.Write(Spritesize);
-            bw.Write(Master);
-            bw.Write(Nmi);
+            bw.Write(VaddrIncrease);
+            bw.Write(_sprTable);
+            bw.Write(_bgTable);
+            bw.Write(_spriteSize);
+            bw.Write(_masterSelect);
+            bw.Write(_nmi);
 
-            bw.Write(Greyscale);
-            bw.Write(Backgroundleft);
-            bw.Write(Spriteleft);
-            bw.Write(Background);
-            bw.Write(Sprite);
-            bw.Write(Red);
-            bw.Write(Green);
-            bw.Write(Blue);
+            bw.Write(_greyscale);
+            bw.Write(_backgroundLeft);
+            bw.Write(_spriteLeft);
+            bw.Write(_background);
+            bw.Write(_sprite);
+            bw.Write(_red);
+            bw.Write(_green);
+            bw.Write(_blue);
 
             bw.Write(Lsb);
-            bw.Write(SprOverflow);
-            bw.Write(Sprite0hit);
-            bw.Write(Vblank);
+            bw.Write(_sprOverflow);
+            bw.Write(_sprite0hit);
+            bw.Write(_vBlank);
             bw.Write(Dummy2007);
             bw.Write(OamDma);
             bw.Write(NtAddr);
@@ -739,26 +728,26 @@ namespace Gmulator.Core.Nes
         public override void Load(BinaryReader br)
         {
             Nametable = br.ReadInt32();
-            Vaddr = br.ReadInt32();
-            Spraddr = br.ReadBoolean();
-            Bgaddr = br.ReadInt32();
-            Spritesize = br.ReadBoolean();
-            Master = br.ReadInt32();
-            Nmi = br.ReadBoolean();
+            VaddrIncrease = br.ReadInt32();
+            _sprTable = br.ReadBoolean();
+            _bgTable = br.ReadInt32();
+            _spriteSize = br.ReadBoolean();
+            _masterSelect = br.ReadInt32();
+            _nmi = br.ReadBoolean();
 
-            Greyscale = br.ReadInt32();
-            Backgroundleft = br.ReadBoolean();
-            Spriteleft = br.ReadBoolean();
-            Background = br.ReadBoolean();
-            Sprite = br.ReadBoolean();
-            Red = br.ReadInt32();
-            Green = br.ReadInt32();
-            Blue = br.ReadInt32();
+            _greyscale = br.ReadInt32();
+            _backgroundLeft = br.ReadBoolean();
+            _spriteLeft = br.ReadBoolean();
+            _background = br.ReadBoolean();
+            _sprite = br.ReadBoolean();
+            _red = br.ReadInt32();
+            _green = br.ReadInt32();
+            _blue = br.ReadInt32();
 
             Lsb = br.ReadInt32();
-            SprOverflow = br.ReadInt32();
-            Sprite0hit = br.ReadBoolean();
-            Vblank = br.ReadInt32();
+            _sprOverflow = br.ReadBoolean();
+            _sprite0hit = br.ReadBoolean();
+            _vBlank = br.ReadBoolean();
 
             Dummy2007 = br.ReadInt32();
             OamDma = br.ReadInt32();
@@ -781,20 +770,36 @@ namespace Gmulator.Core.Nes
             Totalcycles = br.ReadUInt64();
         }
 
-        public Dictionary<string, dynamic> GetPpuInfo() => new()
-        {
-            ["Cycle"] = $"{Cycle}",
-            ["Scanline"] = $"{Scanline}",
-            ["Total Cycles"] = $"{Totalcycles}",
-            ["V"] = $"{Lp.V:X4}",
-            ["T"] = $"{Lp.T:X4}",
-            ["X"] = $"{Lp.Fx:X2}",
-            ["Background"] = $"{Background}",
-            ["Sprite"] = $"{Sprite}",
-            ["Sprite 0 Hit"] = $"{Sprite0hit}",
-            ["VBlank"] = $"{Vblank}",
-            ["Nmi"] = $"{Nmi}",
-        };
+        public List<RegisterInfo> GetState() =>
+        [
+            new("","Cycle",$"{Cycle}"),
+            new("","Scanline",$"{Scanline}"),
+            new("","V",$"{Lp.V:X4}"),
+            new("","T",$"{Lp.T:X4}"),
+            new("","X",$"{Lp.Fx:X2}"),
+            new("2000","Control",""),
+            new("2","Vram Increase",$"{VaddrIncrease}"),
+            new("3","Sprite Address",$"{_sprTable}"),
+            new("4","BG Address",$"{_bgTable}"),
+            new("5","Sprite Size",$"{_spriteSize}"),
+            new("6","Master Ppu",$"{_masterSelect}"),
+            new("7","Nmi",$"{_nmi}"),
+
+            new("2001","Mask",""),
+            new("0","Greyscale",$"{_greyscale}"),
+            new("1","Background Left 8px",$"{_backgroundLeft}"),
+            new("2","Sprites Left 8px",$"{_spriteLeft}"),
+            new("3","Show Background",$"{_background}"),
+            new("4","Show Sprites",$"{_sprite}"),
+            new("5","Red",$"{_red}"),
+            new("6","Green",$"{_green}"),
+            new("7","Blue",$"{_blue}"),
+
+            new("2002","Status",""),
+            new("5","Sprite Overflow",$"{_sprOverflow}"),
+            new("6","Sprite 0 Hit",$"{_sprite0hit}"),
+            new("7","VBlank",$"{_vBlank}"),
+        ];
 
         public struct PpuRegisters
         {

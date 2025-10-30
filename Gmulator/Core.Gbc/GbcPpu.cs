@@ -1,4 +1,6 @@
 ﻿using Gmulator.Shared;
+using Raylib_cs;
+using System;
 
 namespace Gmulator.Core.Gbc;
 public class GbcPpu : EmuState
@@ -33,7 +35,8 @@ public class GbcPpu : EmuState
     public int TileAddr { get => (IO.LCDC & 0x10) != 0 ? 0x8000 : 0x8800; }
     public int MapAddr { get => (IO.LCDC & 0x08) != 0 ? 0x9c00 : 0x9800; }
 
-    private uint[] ScreenBuffer;
+    public uint[] ScreenBuffer { get; private set; }
+    Action<uint[]> UpdateScreen;
 
     public readonly uint[][] GbColors =
     [
@@ -50,6 +53,7 @@ public class GbcPpu : EmuState
         Gbc = gbc;
         Mmu = gbc.Mmu;
         IO = gbc.IO;
+        UpdateScreen = gbc.UpdateScreen;
 
         ScreenBuffer = new uint[GbWidth * GbHeight * 4];
         LineBGColors = new byte[GbWidth * 4]; ;
@@ -109,7 +113,7 @@ public class GbcPpu : EmuState
                         IO.LY = 0;
                         WLY = 0;
                         FrameCounter++;
-                        Texture.Update(Gbc.Screen.Texture, ScreenBuffer);
+                        UpdateScreen(ScreenBuffer);
                     }
                 }
                 break;
@@ -238,7 +242,6 @@ public class GbcPpu : EmuState
                 rgb = GetRGB555(pal);
             }
             ScreenBuffer[IO.LY * GbWidth + wx + x] = rgb;
-            //LineBGColors[x] |= color;
         }
         WLY++;
     }
@@ -429,6 +432,8 @@ public class GbcPpu : EmuState
         var p = br.ReadBytes(ScreenBuffer.Length);
         Buffer.BlockCopy(p, 0, ScreenBuffer, 0, p.Length);
     }
+
+    public List<RegisterInfo> GetState() => [.. IO.GetState()];
 }
 
 public class Sprite(int i, byte x, byte y, byte tile, byte attribute)

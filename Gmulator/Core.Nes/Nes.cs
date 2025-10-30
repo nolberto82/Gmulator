@@ -1,5 +1,6 @@
 ﻿using Gmulator.Core.Nes;
 using Gmulator.Core.Nes.Mappers;
+using Gmulator.Ui;
 using ImGuiNET;
 using Raylib_cs;
 using System;
@@ -9,16 +10,17 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace Gmulator.Core.Nes;
+
 public class Nes : Emulator
 {
-    private NesCpu Cpu;
-    private NesPpu Ppu;
-    private NesApu Apu;
-    private NesMmu Mmu;
-    private BaseMapper Mapper;
-    private NesLogger Logger;
-    private NesJoypad Joypad1 = new();
-    private NesJoypad Joypad2 = new();
+    public NesCpu Cpu;
+    public NesPpu Ppu;
+    public NesApu Apu;
+    public NesMmu Mmu;
+    public BaseMapper Mapper;
+    public NesLogger Logger;
+    public NesJoypad Joypad1;
+    public NesJoypad Joypad2;
 
     public Nes()
     {
@@ -26,14 +28,15 @@ public class Nes : Emulator
         Mmu = new(Cheats);
         Cpu = new();
         Apu = new();
-        Ppu = new(Mmu, Apu);
-        Logger = new(Cpu);
+        Ppu = new();
+        Logger = new(this);
+        Joypad1 = new(new bool[8]);
+        Joypad2 = new(new bool[8]);
         Ppu.Init(this);
         Mmu.Init(Joypad1, Joypad2);
-        Input.Init(NesJoypad.GetButtons());
+        //Input.Init(NesJoypad.GetButtons());
+        Buttons = new bool[8];
 
-        Logger.OnGetFlags += Cpu.GetFlags;
-        Logger.OnGetRegs += Cpu.GetRegisters;
         Logger.ReadByte += Mmu.Read;
 
         Mmu.StatusR = Ppu.StatusR;
@@ -60,18 +63,24 @@ public class Nes : Emulator
         LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
     }
 
-    public override void Execute(bool opened)
+    public override void RunFrame(bool opened)
     {
-        if (Mapper != null && State == DebugState.Running && !opened)
+        if (Mapper != null && (State == DebugState.Running || State == DebugState.StepMain) && !opened)
         {
             var cyclesframe = Header.Region == 0 ? NesNtscCycles : NesPalCycles;
             while (Ppu.Cycles < cyclesframe)
             {
                 ushort pc = (ushort)Cpu.PC;
-                Cpu.Step();
 
                 if (Debug)
                 {
+                    if (State == DebugState.StepMain)
+                    {
+                        Cpu.Step();
+                        State = DebugState.Break;
+                        return;
+                    }
+
                     if (Cpu.StepOverAddr == Cpu.PC)
                     {
                         State = DebugState.Break;
@@ -79,7 +88,7 @@ public class Nes : Emulator
                         return;
                     }
 
-                    if (Breakpoints.Count > 0)
+                    if (!Run && Breakpoints.Count > 0)
                     {
                         if (DebugWindow.ExecuteCheck(pc))
                         {
@@ -90,19 +99,29 @@ public class Nes : Emulator
 
                     if (Logger.Logging)
                         Logger.Log(pc);
+
+                    Run = false;
                 }
 
                 if (State == DebugState.Break)
                     return;
+
+                Cpu.Step();
             }
             Ppu.Cycles -= cyclesframe;
+
+            UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
 
             if (Cheats.Count > 0)
                 Mmu.ApplyRawCheats();
         }
     }
 
-    public override void Update() => Input.Update(this, NesConsole, Ppu.FrameCounter);
+    //public override void Update() => Input.Update(this, NesConsole, Ppu.FrameCounter);
+    public override void Input()
+    {
+        Joypad1.Update(IsScreenWindow);
+    }
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
@@ -126,7 +145,7 @@ public class Nes : Emulator
             base.Reset(name, true);
 
 #if DEBUG || RELEASE
-            DebugWindow ??= new NesDebugWindow(this, Cpu, Mmu, Logger);
+            DebugWindow ??= new NesDebugWindow(this, Cpu, Ppu, Mmu, Logger);
 #endif
         }
     }
@@ -189,5 +208,10 @@ public class Nes : Emulator
 
     public override void Close() => SaveBreakpoints(Mapper.Name);
 
-    public override void SetState(DebugState v) => base.SetState(v);
+    public override void SetState(DebugState v)
+    {
+        if (v == DebugState.Running)
+            Run = true;
+        base.SetState(v);
+    }
 }

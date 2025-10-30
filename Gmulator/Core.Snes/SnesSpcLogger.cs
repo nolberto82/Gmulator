@@ -11,11 +11,11 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
     public StreamWriter Outfile { get; private set; }
     public Func<ushort> GetDp;
 
-    public void SetSnes(Snes snes, SnesCpu cpu, SnesSpc spc, SnesApu apu)
+    public void SetSnes(Snes snes)
     {
-        Cpu = cpu;
-        Spc = spc;
-        Apu = apu;
+        Cpu = snes.Cpu;
+        Spc = snes.Spc;
+        Apu = snes.Apu;
     }
 
     private readonly Dictionary<int, string> Labels = new()
@@ -120,16 +120,18 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
 
         if (getregs)
         {
-            var r = Spc.GetRegs();
-            regtext = $" A:{r["A"]} X:{r["X"]} Y:{r["Y"]} S:{r["S"]} P:";
-            string s = "";
-            foreach (var f in Spc.GetFlags())
+            var regs = Spc.GetRegisters();
+            var flags = Spc.GetFlags();
+            foreach(var r in regs)
             {
-                if (f.Key == "E")
+                regtext += $"{r.Name}:{r.Value} ";
+            }
+            string s = "";
+            foreach (var f in flags)
+            {
+                if (f.Value == "E")
                     break;
-
-                var k = f.Value ? f.Key : f.Key.ToLower();
-                s += $"{k}";
+               s +=  f.Value.ToLower();
             }
             regtext += new string([.. s.Reverse()]) + " ";
         }

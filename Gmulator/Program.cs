@@ -1,4 +1,6 @@
-﻿namespace Gmulator;
+﻿using Gmulator.Ui;
+
+namespace Gmulator;
 public partial class Program
 {
     [STAThread]
@@ -7,11 +9,11 @@ public partial class Program
 #if DECKDEBUG || DECKRELEASE
         GuiDeck Gui = new();
         Gui.Init(true);
-        Gui.Run(true);
+        Gui.Run();
 #else
         GuiDesktop Gui = new();
         Gui.Init(false);
-        Gui.Run(false);
+        Gui.Run();
 #endif
     }
 }

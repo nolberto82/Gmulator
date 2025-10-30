@@ -1,5 +1,6 @@
 ﻿
 namespace Gmulator.Core.Gbc.Sound;
+
 public class Square1 : BaseChannel
 {
     public int SweepPeriod { get; private set; }
@@ -90,7 +91,7 @@ public class Square1 : BaseChannel
             SweepEnabled = SweepPeriod > 0 || SweepShift > 0;
 
             if (SweepShift > 0)
-              UpdateFrequency();
+                UpdateFrequency();
 
             if ((v & 0x80) != 0)
                 Trigger(64, 4);
@@ -163,4 +164,30 @@ public class Square1 : BaseChannel
         NR13 = br.ReadByte();
         NR14 = br.ReadByte();
     }
+
+    public List<RegisterInfo> GetState() =>
+    [
+        new("FF10", "Channel 1", ""),
+        new("0-2", "Sweep Shift", $"{SweepShift}"),
+        new("3", "Sweep Negate", $"{SweepNegate}"),
+        new("4-7", "Sweep Period", $"{SweepPeriod}"),
+        new("FF11", "", ""),
+        new("0-5", "Length", $"{LengthCounter}"),
+        new("6-7", "Duty", $"{Duty}"),
+        new("FF12", "", ""),
+        new("0-2", "Env Period", $"{EnvPeriod}"),
+        new("3", "Env Increase", $"{EnvDirection}"),
+        new("4-7", "Env Volume", $"{EnvVolume}"),
+        new("FF13/4", "", ""),
+        new("0-2", "Frequency", $"{Frequency}"),
+        new("FF14", "", ""),
+        new("6", "Length Enabled", $"{LengthEnabled}"),
+        new("7", "Enabled", $"{Enabled}"),
+        new("", "Timer", $"{Timer}"),
+        new("", "Duty Position", $"{Position}"),
+        new("", "Sweep Enabled", $"{SweepPeriod > 0}"),
+        new("", "Sweep Frequency", $"{ShadowFrequency}"),
+        new("", "Sweep Timer", $"{SweepTimer}"),
+        new("", "Env Timer", $"{Duty}"),
+    ];
 }

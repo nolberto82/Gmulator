@@ -37,10 +37,9 @@ public partial class SnesSpc : EmuState
         StepOverAddr = -1;
     }
 
-    public void SetSnes(Snes snes, SnesApu apu)
+    public void SetSnes(Snes snes)
     {
-        Snes = snes;
-        Apu = apu;
+        Apu = snes.Apu;
     }
 
     public ushort GetPage() => (ushort)(((PS & FP) != 0 ? 0x100 : 0));
@@ -62,7 +61,7 @@ public partial class SnesSpc : EmuState
 
     private int ReadWord(int a) => (Read(a) | Read(a + 1) << 8) & 0xffff;
 
-    public void Step(bool debug = false)
+    public void Step()
     {
 #if DEBUG
         if (PC == 0x316)
@@ -518,25 +517,25 @@ public partial class SnesSpc : EmuState
         PC = ReadWord(0xfffe);
     }
 
-    public Dictionary<string, bool> GetFlags() => new()
+    public List<RegisterInfo> GetFlags() => new()
     {
-        ["C"] = (PS & 0x01) != 0,
-        ["Z"] = (PS & 0x02) != 0,
-        ["I"] = (PS & 0x04) != 0,
-        ["H"] = (PS & 0x08) != 0,
-        ["B"] = (PS & 0x10) != 0,
-        ["P"] = (PS & 0x20) != 0,
-        ["V"] = (PS & 0x40) != 0,
-        ["N"] = (PS & 0x80) != 0,
+        new("","C",$"{(PS&0x01) != 0}"),
+        new("","Z",$"{(PS&0x02) != 0}"),
+        new("","I",$"{(PS&0x04) != 0}"),
+        new("","H",$"{(PS&0x08) != 0}"),
+        new("","B",$"{(PS&0x10) != 0}"),
+        new("","P",$"{(PS&0x20) != 0}"),
+        new("","V",$"{(PS&0x40) != 0}"),
+        new("","N",$"{(PS&0x80) != 0}"),
     };
 
-    public Dictionary<string, string> GetRegs() => new()
+    public List<RegisterInfo> GetRegisters() => new()
     {
-        ["A"] = $"{A:X2}",
-        ["X"] = $"{X:X2}",
-        ["Y"] = $"{Y:X2}",
-        ["P"] = $"{PS:X2}",
-        ["S"] = $"{SP:X2}",
+        new("","A",$"{A:X2}"),
+        new("","X",$"{X:X2}"),
+        new("","Y",$"{Y:X2}"),
+        new("","P",$"{PS:X2}"),
+        new("","S",$"{SP:X2}"),
     };
 
     public override void Save(BinaryWriter bw)

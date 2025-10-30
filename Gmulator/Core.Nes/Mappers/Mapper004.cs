@@ -1,6 +1,7 @@
 ﻿using System.Net.Sockets;
 
 namespace Gmulator.Core.Nes.Mappers;
+
 internal class Mapper004 : BaseMapper
 {
     private int BankReg;
@@ -154,21 +155,25 @@ internal class Mapper004 : BaseMapper
         int prgsize = Header.PrgBanks * 0x4000;
         Prg = [0, 1, (byte)(prgsize / 0x2000 - 2), (byte)(prgsize / 0x2000 - 1)];
         Chr = [0, 1, 2, 3, 4, 5, 6, 7];
+        Fire = false;
+        Reload = 0;
+        Rvalue = 0;
         base.Reset();
     }
 
     public override void Scanline()
     {
-        if (Counter == 0 || Reload == 1)
+        if (Counter == 0)
         {
             Counter = Rvalue;
             Reload = 0;
         }
         else
+        {
             Counter--;
-
-        if (Counter == 0 && Irq)
-            Fire = true;
+            if (Counter == 0 && Irq)
+                Fire = true;
+        }
     }
 
     public override void SetLatch(int a, byte v) => base.SetLatch(a, v);

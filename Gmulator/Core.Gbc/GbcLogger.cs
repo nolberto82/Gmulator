@@ -8,10 +8,6 @@ public class GbcLogger(GbcCpu cpu)
 
     public delegate int Read(int a);
     public event Read ReadByte;
-    public Func<Dictionary<string, bool>> GetFlags;
-
-    public delegate Dictionary<string, int> GetRegs();
-    public event GetRegs OnGetRegs;
 
     private readonly GbcCpu Cpu = cpu;
 
@@ -158,17 +154,17 @@ public class GbcLogger(GbcCpu cpu)
             else
             {
                 //bytes = $"{op:X2},{b1:X2},{b2:X2},{b3:X2}";
-                var Regs = OnGetRegs();
-                var F = GetFlags();
+                var Regs = Cpu.GetRegisters();
+                var F = Cpu.GetFlags();
                 char[] flags =
                 [
-                    F["Z"] ? 'Z' : 'z',
-                    F["N"] ? 'N' : 'n',
-                    F["H"] ? 'H' : 'h',
-                    F["C"] ? 'C' : 'c'
+                    F[0].Value != "" ? 'Z' : 'z',
+                    F[1].Value != "" ? 'N' : 'n',
+                    F[2].Value != "" ? 'H' : 'h',
+                    F[3].Value != "" ? 'C' : 'c'
                 ];
 
-                foreach (var v in Regs.Values)
+                foreach (var v in Regs)
                 {
                     regtext += v;
                 }

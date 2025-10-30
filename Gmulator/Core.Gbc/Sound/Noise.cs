@@ -107,4 +107,23 @@ public class Noise : BaseChannel
         NR43 = br.ReadByte();
         NR44 = br.ReadByte();
     }
+
+    public List<RegisterInfo> GetState() =>
+    [
+        new("FF20","Channel 4",""),
+        new("0-5","Length", $"{LengthCounter}"),
+        new("FF21","",""),
+        new("0-2","Env Period", $"{EnvPeriod}"),
+        new("3","Env Increase", $"{EnvDirection}"),
+        new("4-7","Env Volume", $"{EnvVolume}"),
+        new("FF22","",""),
+        new("0-2","Divisor", $"{Shift}"),
+        new("3","Width", $"{LFSR}"),
+        new("4-7","Frequency", $"{Frequency}"),
+        new("FF23","",""),
+        new("6","Length Enabled", $"{LengthEnabled}"),
+        new("7","Enabled", $"{Enabled}"),
+        new("","Timer", $"{Timer}"),
+        new("","Position", $"{Position}"),
+    ];
 }

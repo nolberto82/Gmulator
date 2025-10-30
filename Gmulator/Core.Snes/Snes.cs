@@ -1,44 +1,29 @@
-﻿using Gmulator.Core.Snes;
-using Gmulator.Core.Snes.Mappers;
-using ImGuiNET;
+﻿using Gmulator.Core.Snes.Mappers;
+using Gmulator.Ui;
 using Raylib_cs;
-using System.ComponentModel.Design;
-using System.Diagnostics;
-using System.Linq;
-using System.Reflection.Metadata.Ecma335;
-using System.Runtime.Intrinsics.Arm;
 using System.Text;
 
 namespace Gmulator.Core.Snes;
+
 public class Snes : Emulator
 {
-    private SnesCpu Cpu;
-    private SnesPpu Ppu;
-    private SnesMmu Mmu;
-    private SnesSpc Spc;
-    private SnesSa1 Sa1;
-    private SnesApu Apu;
-    private SnesDsp Dsp;
-    private SnesDma Dma;
-    private BaseMapper Mapper;
-    private readonly SnesJoypad Joypad = new();
-    private SnesLogger Logger;
-    private SnesSpcLogger SpcLogger;
-    private readonly Breakpoint Breakpoint;
-
-    private List<SnesDma> _dma;
-
-    private int RamAddr;
-    private bool DmaEnabled;
-    private int DmaState;
+    public SnesCpu Cpu;
+    public SnesPpu Ppu;
+    public SnesMmu Mmu;
+    public SnesSpc Spc;
+    public SnesSa1 Sa1;
+    public SnesApu Apu;
+    public SnesDsp Dsp;
+    public SnesDma Dma;
+    public BaseMapper Mapper;
+    public readonly SnesJoypad Joypad;
+    public SnesLogger Logger;
+    public SnesSpcLogger SpcLogger;
+    public readonly Breakpoint Breakpoint;
 
     private readonly List<float> AudioSamples = [];
 
-    private bool Run;
-
     public bool IsSpc { get; set; }
-
-    public void SetRun(bool v) => Run = v;
 
     public Snes()
     {
@@ -51,9 +36,12 @@ public class Snes : Emulator
         Spc = new();
         Apu = new();
         Dsp = new();
-        Dma = new(this, Cpu);
-        Logger = new(this, Cpu);
+        Dma = new(this);
+        Logger = new(this);
         SpcLogger = new(Cpu, Spc, Apu);
+
+        Buttons = new bool[16];
+        Joypad = new(Buttons);
 
 #if DEBUG || DECKDEBUG
         //Debugger.Launch();
@@ -64,7 +52,7 @@ public class Snes : Emulator
         LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
     }
 
-    public override void Execute(bool opened)
+    public override void RunFrame(bool opened)
     {
         if (Mapper == null) return;
         if (!opened && (State == DebugState.Running || State == DebugState.StepMain))
@@ -139,6 +127,8 @@ public class Snes : Emulator
             if (Cheats.Count != 0)
                 ApplyRawCheats();
 
+            UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
+
             float[] dspSamples = Dsp.GetSamples();
             int totalSamples = AudioSamples.Count + dspSamples.Length;
             if (totalSamples >= SnesMaxSamples)
@@ -211,10 +201,10 @@ public class Snes : Emulator
         if (Mapper != null)
         {
 #if DEBUG || RELEASE
-            DebugWindow ??= new SnesDebugWindow(this, Cpu, Ppu, Spc, Apu, Sa1, Mapper, Dma, Logger, SpcLogger);
+            DebugWindow ??= new SnesDebugWindow(this);
 #endif
-            Cpu.SetSnes(this, Ppu, Mapper);
-            Mmu.SetSnes(Cpu, Ppu, Apu, Sa1, Mapper, Dma, Joypad);
+            Cpu.SetSnes(this);
+            Mmu.SetSnes(this);
             SetActions();
             Mapper?.LoadSram();
             Mmu.Reset();
@@ -234,7 +224,6 @@ public class Snes : Emulator
             Logger.Reset();
             SpcLogger.Reset(); ;
             LoadBreakpoints(Mapper.Name);
-            DmaEnabled = false;
             base.Reset(LastName, true);
         }
     }
@@ -302,8 +291,14 @@ public class Snes : Emulator
 
     public override void Update()
     {
+
+    }
+
+    public override void Input()
+    {
         if (!Raylib.IsWindowFocused()) return;
-        Input.Update(this, SnesConsole, Ppu.FrameCounter);
+        Joypad.Update(IsScreenWindow);
+        base.Input();
     }
 
     public override void Close()
@@ -345,7 +340,7 @@ public class Snes : Emulator
             {
                 //Logger.Log(Cpu.PB << 16 | Cpu.PC);
                 Cpu.Step();
-                Spc.Step(true);
+                Spc.Step();
             }
         }
     }
@@ -376,24 +371,20 @@ public class Snes : Emulator
 
     public void SetActions()
     {
-        Ppu.SetSnes(this, Cpu, Apu, Dma);
-        SpcLogger.SetSnes(this, Cpu, Spc, Apu);
-        Apu.SetSnes(this, Cpu, Ppu, Spc, Dsp, SpcLogger);
-        Spc.SetSnes(this, Apu);
-        Dsp.SetSnes(this, Apu);
+        Ppu.SetSnes(this);
+        SpcLogger.SetSnes(this);
+        Apu.SetSnes(this);
+        Spc.SetSnes(this);
+        Dsp.SetSnes(this);
 
         Ppu.SetNmi = Cpu.SetNmi;
         Ppu.SetIRQ = Cpu.SetIRQ;
         Ppu.AutoJoyRead = Joypad.AutoRead;
 
-        Logger.GetFlags = Cpu.GetFlags;
-        Logger.GetRegs = Cpu.GetRegisters;
         SpcLogger.GetDp = Spc.GetPage;
 
         Joypad.SetJoy1L = Ppu.SetJoy1L;
         Joypad.SetJoy1H = Ppu.SetJoy1H;
-
-        Input.SetButtons = Joypad.SetButtons;
     }
 
     public override void SetState(DebugState v) => base.SetState(v);

@@ -1,40 +1,41 @@
 ﻿
 using Gmulator.Core.Gbc.Mappers;
+using Gmulator.Ui;
+using Raylib_cs;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Gmulator.Core.Gbc
 {
-    public class Gbc : Emulator
+    public class Gbc : ConsoleBase<Gbc>
     {
-        public GbcIO IO { get; private set; }
-        public GbcCpu Cpu { get; private set; }
-        public GbcPpu Ppu { get; private set; }
-        public GbcApu Apu { get; private set; }
-        public GbcMmu Mmu { get; private set; }
-        public BaseMapper Mapper { get; private set; }
-        public GbcTimer Timer { get; private set; }
-        public GbcLogger Logger { get; private set; }
+        public GbcIO IO;
+        public GbcCpu Cpu;
+        public GbcPpu Ppu;
+        public GbcApu Apu;
+        public GbcMmu Mmu;
+        public BaseMapper Mapper;
+        public GbcTimer Timer;
+        public GbcJoypad Joypad;
+        public GbcLogger Logger;
 
         public Gbc()
         {
             CheatConverter = new(this);
             Timer = new();
-            IO = new(Timer);
+            IO = new(this);
             Mmu = new(IO, Cheats);
             Cpu = new(this);
             Ppu = new(this);
             Apu = new(Mmu, GbcCpuClock);
             Logger = new(Cpu);
-
+            Joypad = new(new bool[8]);
             Mmu.Init(this);
-            IO?.Init(Mmu, Ppu, Apu);
-            Input.Init(GbcJoypad.GetButtons());
+            IO?.Init(this);
+            //Input.Init(GbcJoypad.GetButtons());
 
             Cpu.Tick = Tick;
 
-            Logger.GetFlags += Cpu.GetFlags;
-            Logger.OnGetRegs += Cpu.GetRegs;
             Logger.ReadByte += Mmu.Read;
         }
 
@@ -43,7 +44,7 @@ namespace Gmulator.Core.Gbc
             LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
         }
 
-        public override void Execute(bool opened)
+        public override void RunFrame(bool opened)
         {
             DebugState state = State;
             if (Mapper != null && state == DebugState.Running && !opened)
@@ -55,7 +56,7 @@ namespace Gmulator.Core.Gbc
                     int pc = Cpu.PC;
                     if (Debug)
                     {
-                        if (Breakpoints?.Count > 0)
+                        if (!Run && Breakpoints?.Count > 0)
                         {
                             if (DebugWindow.ExecuteCheck(pc))
                             {
@@ -66,6 +67,8 @@ namespace Gmulator.Core.Gbc
 
                         if (Logger?.Logging == true)
                             Logger?.Log(pc);
+
+                        Run = false;
                     }
 
                     Cpu?.Step();
@@ -73,11 +76,21 @@ namespace Gmulator.Core.Gbc
                         return;
                 }
                 Cpu.Cycles -= cyclesframe;
+
                 Mmu.ApplyParCheats();
             }
         }
 
-        public override void Update() => Input.Update(this, GbcConsole, Ppu.FrameCounter);
+        public override void Update()
+        {
+            //Input.Update(this, GbcConsole, Ppu.FrameCounter);
+        }
+
+        public override void Input()
+        {
+            if (Raylib.IsGamepadAvailable(0))
+                Joypad.Update(IsScreenWindow);
+        }
 
         public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
@@ -97,8 +110,11 @@ namespace Gmulator.Core.Gbc
 
             if (Mapper != null)
             {
-                GameName = name;
+#if DEBUG || RELEASE
                 DebugWindow ??= new GbcDebugWindow(this);
+#endif
+
+                GameName = name;
                 Cpu.SetAccess(this);
                 Cpu?.Reset(Mmu.IsBios, Mapper.CGB);
                 Ppu?.Reset(Mapper.CGB);

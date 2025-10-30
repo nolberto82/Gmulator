@@ -3,7 +3,7 @@ using Raylib_cs;
 
 namespace Gmulator.Core.Snes
 {
-    public class SnesJoypad : IJoypad
+    public class SnesJoypad
     {
         private bool Strobe;
         private int ButtonId;
@@ -33,24 +33,11 @@ namespace Gmulator.Core.Snes
             [0x0e] = GamepadButton.RightFaceLeft, [0x0f] = GamepadButton.RightFaceDown,
         };
 
-        public const GamepadButton BtnA = GamepadButton.RightFaceRight;
-        public const GamepadButton BtnB = GamepadButton.RightFaceDown;
-        public const GamepadButton BtnSelect = GamepadButton.MiddleLeft;
-        public const GamepadButton BtnStart = GamepadButton.MiddleRight;
-        public const GamepadButton BtnRight = GamepadButton.LeftFaceRight;
-        public const GamepadButton BtnLeft = GamepadButton.LeftFaceLeft;
-        public const GamepadButton BtnUp = GamepadButton.LeftFaceUp;
-        public const GamepadButton BtnDown = GamepadButton.LeftFaceDown;
-        public const GamepadButton BtnL2 = GamepadButton.LeftTrigger2;
-        public const GamepadButton BtnR2 = GamepadButton.RightTrigger2;
-        public const GamepadButton BtnX = GamepadButton.RightFaceUp;
-        public const GamepadButton BtnY = GamepadButton.RightFaceLeft;
+        private bool[] _buttons;
 
-        public bool[] Buttons { get; set; }
-
-        public SnesJoypad()
+        public SnesJoypad(bool[] Buttons)
         {
-            Buttons = new bool[16];
+            _buttons= new bool[16];
         }
 
         public int Read(int min, int max)
@@ -58,8 +45,8 @@ namespace Gmulator.Core.Snes
             int v = 0;
             for (int i = min; i < max; i++)
             {
-                if (Buttons[i])
-                    v |= (Buttons[i] ? 1 : 0) << i;
+                if (_buttons[i])
+                    v |= (_buttons[i] ? 1 : 0) << i;
             }
             return (ushort)v;
         }
@@ -81,7 +68,7 @@ namespace Gmulator.Core.Snes
             byte v = 0x40;
             if (ButtonId >= 0 && Strobe)
             {
-                if (Buttons[ButtonId % 8])
+                if (_buttons[ButtonId % 8])
                     v |= 0x01;
 
                 if (++ButtonId > 7)
@@ -93,14 +80,14 @@ namespace Gmulator.Core.Snes
             return (byte)(v | 1);
         }
 
-        public void SetButtons(bool screenfocus)
+        public void Update(bool screenfocus)
         {
-            for (int i = 0; i < Buttons.Length; i++)
+            for (int i = 0; i < _buttons.Length; i++)
             {
                 if (screenfocus && Raylib.IsKeyDown(Keys[i]) || Raylib.IsGamepadButtonDown(0, Pad[i]))
-                    Buttons[i] = true;
+                    _buttons[i] = true;
                 else
-                    Buttons[i] = false;
+                    _buttons[i] = false;
             }
         }
     }

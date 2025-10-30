@@ -8,10 +8,9 @@ public class SnesDsp : EmuState
     public float[] SamplesR { get; private set; }
     public int SampleOffset { get; set; }
 
-    private Snes Snes;
     private SnesApu Apu;
 
-    private byte[] Ram;
+    private byte[] _ram;
     private short[] DecodeBuffer;
     private short[] RateNums;
 
@@ -54,7 +53,7 @@ public class SnesDsp : EmuState
 
     public void Reset()
     {
-        Ram = new byte[0x80];
+        _ram = new byte[0x80];
         DecodeBuffer = new short[19 * 8];
         RateNums = new short[5 * 8];
 
@@ -96,10 +95,9 @@ public class SnesDsp : EmuState
         DirPage = 0;
     }
 
-    public void SetSnes(Snes snes, SnesApu apu)
+    public void SetSnes(Snes snes)
     {
-        Snes = snes;
-        Apu = apu;
+        Apu = snes.Apu;
     }
 
     public void Cycle()
@@ -135,7 +133,7 @@ public class SnesDsp : EmuState
             SampleOffset = 533;
     }
 
-    public byte Read(int adr) => Ram[adr & 0x7f];
+    public byte Read(int adr) => _ram[adr & 0x7f];
 
     public void Write(int adr, int value)
     {
@@ -233,7 +231,7 @@ public class SnesDsp : EmuState
                 NoiseRate = _rates[value & 0x1f];
                 break;
             case 0x7c:
-                Ram[0x7c] = 0;
+                _ram[0x7c] = 0;
                 value = 0;
                 break;
             case 0x0d:
@@ -266,7 +264,7 @@ public class SnesDsp : EmuState
             case 0x0f or 0x1f or 0x2f or 0x3f or 0x4f or 0x5f or 0x6f or 0x7f:
                 break;
         }
-        Ram[adr & 0x7f] = (byte)value;
+        _ram[adr & 0x7f] = (byte)value;
     }
 
     private void DecodeBrr(int ch)
@@ -285,7 +283,7 @@ public class SnesDsp : EmuState
                 Gain[ch] = 0;
                 AdsrState[ch] = 3;
             }
-            Ram[0x7c] |= (byte)(1 << ch);
+            _ram[0x7c] |= (byte)(1 << ch);
         }
         byte header = Apu.Ram[DecodeOffset[ch]++];
         DecodeOffset[ch] &= 0xffff;
@@ -469,8 +467,8 @@ public class SnesDsp : EmuState
         }
 
         int gainedVal = (sample * Gain[ch]) >> 11;
-        Ram[(ch << 4) | 8] = (byte)(Gain[ch] >> 4);
-        Ram[(ch << 4) | 9] = (byte)(gainedVal >> 7);
+        _ram[(ch << 4) | 8] = (byte)(Gain[ch] >> 4);
+        _ram[(ch << 4) | 9] = (byte)(gainedVal >> 7);
         SampleOut[ch] = gainedVal;
     }
 
@@ -491,43 +489,48 @@ public class SnesDsp : EmuState
 
     public override void Save(BinaryWriter bw)
     {
-        EmuState.WriteArray<byte>(bw, Ram); EmuState.WriteArray<short>(bw, DecodeBuffer);
-        EmuState.WriteArray<short>(bw, RateNums); EmuState.WriteArray<int>(bw, Pitch);
-        EmuState.WriteArray<int>(bw, Counter); EmuState.WriteArray<bool>(bw, PitchMod);
-        EmuState.WriteArray<int>(bw, Srcn); EmuState.WriteArray<int>(bw, DecodeOffset);
-        EmuState.WriteArray<int>(bw, PrevFlags); EmuState.WriteArray<int>(bw, Old);
-        EmuState.WriteArray<int>(bw, Older); EmuState.WriteArray<bool>(bw, EnableNoise);
+        WriteArray(bw, _ram); WriteArray(bw, DecodeBuffer);
+        WriteArray(bw, RateNums); WriteArray(bw, Pitch);
+        WriteArray(bw, Counter); WriteArray(bw, PitchMod);
+        WriteArray(bw, Srcn); WriteArray(bw, DecodeOffset);
+        WriteArray(bw, PrevFlags); WriteArray(bw, Old);
+        WriteArray(bw, Older); WriteArray(bw, EnableNoise);
         bw.Write(NoiseSample); bw.Write(NoiseRate);
-        bw.Write(NoiseCounter); EmuState.WriteArray<int>(bw, RateCounter);
-        EmuState.WriteArray<int>(bw, AdsrState); EmuState.WriteArray<int>(bw, SustainLevel);
-        EmuState.WriteArray<bool>(bw, UseGain); EmuState.WriteArray<int>(bw, GainMode);
-        EmuState.WriteArray<bool>(bw, DirectGain); EmuState.WriteArray<int>(bw, GainValue);
-        EmuState.WriteArray<int>(bw, Gain); EmuState.WriteArray<int>(bw, ChannelVolumeL);
-        EmuState.WriteArray<int>(bw, ChannelVolumeR); bw.Write(VolumeL);
+        bw.Write(NoiseCounter); WriteArray(bw, RateCounter);
+        WriteArray(bw, AdsrState); WriteArray(bw, SustainLevel);
+        WriteArray(bw, UseGain); WriteArray(bw, GainMode);
+        WriteArray(bw, DirectGain); WriteArray(bw, GainValue);
+        WriteArray(bw, Gain); WriteArray(bw, ChannelVolumeL);
+        WriteArray(bw, ChannelVolumeR); bw.Write(VolumeL);
         bw.Write(VolumeR); bw.Write(Mute);
-        bw.Write(ResetFlag); EmuState.WriteArray<bool>(bw, NoteOff);
-        EmuState.WriteArray<int>(bw, SampleOut); bw.Write(DirPage);
+        bw.Write(ResetFlag); WriteArray(bw, NoteOff);
+        WriteArray(bw, SampleOut); bw.Write(DirPage);
     }
 
     public override void Load(BinaryReader br)
     {
-        Ram = EmuState.ReadArray<byte>(br, Ram.Length); DecodeBuffer = EmuState.ReadArray<short>(br, DecodeBuffer.Length);
-        RateNums = EmuState.ReadArray<short>(br, RateNums.Length); Pitch = EmuState.ReadArray<int>(br, Pitch.Length);
-        Counter = EmuState.ReadArray<int>(br, Counter.Length); PitchMod = EmuState.ReadArray<bool>(br, PitchMod.Length);
-        Srcn = EmuState.ReadArray<int>(br, Srcn.Length); DecodeOffset = EmuState.ReadArray<int>(br, DecodeOffset.Length);
-        PrevFlags = EmuState.ReadArray<int>(br, PrevFlags.Length); Old = EmuState.ReadArray<int>(br, Old.Length);
-        Older = EmuState.ReadArray<int>(br, Older.Length); EnableNoise = EmuState.ReadArray<bool>(br, EnableNoise.Length);
+        _ram = ReadArray<byte>(br, _ram.Length); DecodeBuffer = ReadArray<short>(br, DecodeBuffer.Length);
+        RateNums = ReadArray<short>(br, RateNums.Length); Pitch = ReadArray<int>(br, Pitch.Length);
+        Counter = ReadArray<int>(br, Counter.Length); PitchMod = ReadArray<bool>(br, PitchMod.Length);
+        Srcn = ReadArray<int>(br, Srcn.Length); DecodeOffset = ReadArray<int>(br, DecodeOffset.Length);
+        PrevFlags = ReadArray<int>(br, PrevFlags.Length); Old = ReadArray<int>(br, Old.Length);
+        Older = ReadArray<int>(br, Older.Length); EnableNoise = ReadArray<bool>(br, EnableNoise.Length);
         NoiseSample = br.ReadInt32(); NoiseRate = br.ReadInt32();
-        NoiseCounter = br.ReadInt32(); RateCounter = EmuState.ReadArray<int>(br, RateCounter.Length);
-        AdsrState = EmuState.ReadArray<int>(br, AdsrState.Length); SustainLevel = EmuState.ReadArray<int>(br, SustainLevel.Length);
-        UseGain = EmuState.ReadArray<bool>(br, UseGain.Length); GainMode = EmuState.ReadArray<int>(br, GainMode.Length);
-        DirectGain = EmuState.ReadArray<bool>(br, DirectGain.Length); GainValue = EmuState.ReadArray<int>(br, GainValue.Length);
-        Gain = EmuState.ReadArray<int>(br, Gain.Length); ChannelVolumeL = EmuState.ReadArray<int>(br, ChannelVolumeL.Length);
-        ChannelVolumeR = EmuState.ReadArray<int>(br, ChannelVolumeR.Length); VolumeL = br.ReadInt32();
+        NoiseCounter = br.ReadInt32(); RateCounter = ReadArray<int>(br, RateCounter.Length);
+        AdsrState = ReadArray<int>(br, AdsrState.Length); SustainLevel = ReadArray<int>(br, SustainLevel.Length);
+        UseGain = ReadArray<bool>(br, UseGain.Length); GainMode = ReadArray<int>(br, GainMode.Length);
+        DirectGain = ReadArray<bool>(br, DirectGain.Length); GainValue = ReadArray<int>(br, GainValue.Length);
+        Gain = ReadArray<int>(br, Gain.Length); ChannelVolumeL = ReadArray<int>(br, ChannelVolumeL.Length);
+        ChannelVolumeR = ReadArray<int>(br, ChannelVolumeR.Length); VolumeL = br.ReadInt32();
         VolumeR = br.ReadInt32(); Mute = br.ReadBoolean();
-        ResetFlag = br.ReadBoolean(); NoteOff = EmuState.ReadArray<bool>(br, NoteOff.Length);
-        SampleOut = EmuState.ReadArray<int>(br, SampleOut.Length); DirPage = br.ReadInt32();
+        ResetFlag = br.ReadBoolean(); NoteOff = ReadArray<bool>(br, NoteOff.Length);
+        SampleOut = ReadArray<int>(br, SampleOut.Length); DirPage = br.ReadInt32();
     }
+
+    public List<RegisterInfo> GetState() =>
+    [
+
+    ];
 
     private readonly int[] _rates =
     [

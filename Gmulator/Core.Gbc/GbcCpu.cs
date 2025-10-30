@@ -2,6 +2,7 @@
 using System.Diagnostics;
 
 namespace Gmulator.Core.Gbc;
+
 public partial class GbcCpu : EmuState
 {
     public int Cycles { get; set; }
@@ -68,7 +69,8 @@ public partial class GbcCpu : EmuState
 
     public void SetAccess(Gbc gbc)
     {
-        AccessCheck = gbc.DebugWindow.AccessCheck;
+        if (gbc.DebugWindow != null)
+            AccessCheck = gbc.DebugWindow.AccessCheck;
         SetState = gbc.SetState;
     }
 
@@ -114,8 +116,10 @@ public partial class GbcCpu : EmuState
     {
         Tick();
         Mmu.Write(a, v);
+#if DEBUG || RELEASE
         if (AccessCheck(a, v & 0xff, RamType.Wram, true))
             SetState(DebugState.Break);
+#endif
     }
 
     public void CheckInterrupts()
@@ -212,52 +216,6 @@ public partial class GbcCpu : EmuState
             IMEDelay--;
         else
             CheckInterrupts();
-    }
-
-    public Dictionary<string, bool> GetFlags() => new()
-    {
-        ["C"] = (F & FC) != 0,
-        ["N"] = (F & FN) != 0,
-        ["H"] = (F & FH) != 0,
-        ["Z"] = (F & FZ) != 0,
-    };
-
-    public Dictionary<string, int> GetRegs() => new()
-    {
-        ["A:"] = A,
-        ["B:"] = B,
-        ["C:"] = C,
-        ["D:"] = D,
-        ["E:"] = E,
-        ["H:"] = H,
-        ["L:"] = L,
-    };
-
-    public int GetReg(string reg)
-    {
-        switch (reg.ToLowerInvariant())
-        {
-            case "af": return AF;
-            case "bc": return BC;
-            case "de": return DE;
-            case "hl": return HL;
-            case "sp":return SP;
-            case "pc": return PC;
-            default: return 0;
-        }
-    }
-
-    public void SetReg(string reg, int v)
-    {
-        switch (reg.ToLowerInvariant())
-        {
-            case "af": AF = v; break;
-            case "bc": BC = v; break;
-            case "de": DE = v; break;
-            case "hl": HL = v; break;
-            case "sp": SP = v; break;
-            case "pc": PC = v; break;
-        }
     }
 
     public override void Save(BinaryWriter bw)
@@ -713,13 +671,47 @@ public partial class GbcCpu : EmuState
     private void OpSetHL(int r1) => OpLdWr(HL, (OpLdReg(HL) | (1 << r1)));
     #endregion
 
-    public Dictionary<string, string> GetRegisters() => new()
+    public List<RegisterInfo> GetFlags() => new()
     {
-        { "AF", $"{AF:X4}" },
-        { "BC", $"{BC:X4}" },
-        { "DE", $"{DE:X4}" },
-        { "HL", $"{HL:X4}" },
-        { "PC", $"{pc:X4}" },
-        { "SP", $"{sp:X4}" }
+        new("","C",$"{(F & FC) != 0}"),
+        new("","N",$"{(F & FN) != 0}"),
+        new("","H",$"{(F & FH) != 0}"),
+        new("","Z",$"{(F & FZ) != 0}"),
     };
+
+    public List<RegisterInfo> GetRegisters() => new()
+    {
+        new("","AF",$"{AF:X4}"),
+        new("","BC",$"{BC:X4}"),
+        new("","DE",$"{DE:X4}"),
+        new("","HL",$"{HL:X4}"),
+        new("","SP",$"{SP:X4}"),
+    };
+
+    public int GetReg(string reg)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "af": return AF;
+            case "bc": return BC;
+            case "de": return DE;
+            case "hl": return HL;
+            case "sp": return SP;
+            case "pc": return PC;
+            default: return 0;
+        }
+    }
+
+    public void SetReg(string reg, int v)
+    {
+        switch (reg.ToLowerInvariant())
+        {
+            case "af": AF = v; break;
+            case "bc": BC = v; break;
+            case "de": DE = v; break;
+            case "hl": HL = v; break;
+            case "sp": SP = v; break;
+            case "pc": PC = v; break;
+        }
+    }
 }

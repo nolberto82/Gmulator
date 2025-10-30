@@ -1,6 +1,8 @@
-﻿using static Gmulator.Shared.Cheat;
+﻿using Gmulator.Core.Gbc;
+using static Gmulator.Shared.Cheat;
 
 namespace Gmulator.Shared;
+
 public class CheatConverter
 {
     public static Dictionary<int, Cheat> Cheats { get; private set; }
@@ -49,7 +51,7 @@ public class CheatConverter
                 if (addr > -1)
                 {
                     codes.Add($"{input[i]}\r\n");
-                    rawcodes.Add(new RawCode(addr, cmp, val, type));
+                    rawcodes.Add(new(addr, cmp, val, type, true));
                 }
             }
         }

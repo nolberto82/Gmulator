@@ -76,7 +76,7 @@ public static class Constants
     public const int NesConsole = 1;
     public const int SnesConsole = 2;
 
-    public const int DisasmMaxLines = 15;
+    public const int DisasmMaxLines = 18;
 
     public static readonly Vector2 ButtonSize = new(60, 0);
     public static readonly Vector4 RED = new(1, 0, 0, 1);
@@ -131,7 +131,7 @@ public static class Constants
     public static readonly string ConfigDirectory = "Config";
     public static readonly string DebugDirectory = "Debugger";
 
-    public class RegistersInfo(string address, string name, string value)
+    public class RegisterInfo(string address, string name, string value)
     {
         public string Address { get; private set; } = address;
         public string Name { get; private set; } = name;

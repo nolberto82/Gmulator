@@ -1,8 +1,10 @@
-﻿using ImGuiNET;
+﻿using Gmulator.Ui;
+using ImGuiNET;
 using Raylib_cs;
 using System.Runtime.CompilerServices;
 
 namespace Gmulator.Shared;
+
 internal class Input
 {
     private static bool[] Buttons;
@@ -10,112 +12,32 @@ internal class Input
     private static float OldRightThumbY;
 
     public static void Init(bool[] buttons) => Buttons = buttons;
-    public static void Update(Emulator emu, int system, uint framecount)
+
+    public static void UpdateGuiInput(Emulator emu, Gui menu)
     {
-        if (system == SnesConsole)
-        {
-            SetButtons(emu.IsScreenWindow);
-            return;
-        }
-
-        if (emu.IsScreenWindow)
-        {
-            Buttons[0] = Raylib.IsKeyDown(KbA);
-            Buttons[1] = Raylib.IsKeyDown(KbB);
-            Buttons[2] = Raylib.IsKeyDown(KbSelect);
-            Buttons[3] = Raylib.IsKeyDown(KbStart);
-            if (system == NesConsole)
-            {
-                Buttons[4] = Raylib.IsKeyDown(KbUp);
-                Buttons[5] = Raylib.IsKeyDown(KbDown);
-                Buttons[6] = Raylib.IsKeyDown(KbLeft);
-                Buttons[7] = Raylib.IsKeyDown(KbRight);
-            }
-            else
-            {
-                Buttons[4] = Raylib.IsKeyDown(KbRight);
-                Buttons[5] = Raylib.IsKeyDown(KbLeft);
-                Buttons[6] = Raylib.IsKeyDown(KbUp);
-                Buttons[7] = Raylib.IsKeyDown(KbDown);
-            }
-
-            Buttons[0] |= Raylib.IsKeyPressedRepeat(KbX);
-            Buttons[1] |= Raylib.IsKeyPressedRepeat(KbY);
-        }
-
-        if (Raylib.IsGamepadAvailable(0))
-        {
-            if (emu.Config.RotateAB > 0)
-            {
-                Buttons[0] |= Raylib.IsGamepadButtonDown(0, BtnB);
-                Buttons[1] |= Raylib.IsGamepadButtonDown(0, BtnY);
-                //turbo
-                if (Raylib.IsGamepadButtonDown(0, BtnA) && framecount % emu?.Config.FrameSkip == 0)
-                    Buttons[0] = true;
-                if (Raylib.IsGamepadButtonDown(0, BtnX) && framecount % emu?.Config.FrameSkip == 0)
-                    Buttons[1] = true;
-            }
-            else
-            {
-                Buttons[0] |= Raylib.IsGamepadButtonDown(0, BtnA);
-                Buttons[1] |= Raylib.IsGamepadButtonDown(0, BtnB);
-
-                //turbo
-                if (Raylib.IsGamepadButtonDown(0, BtnX) && framecount % emu?.Config.FrameSkip == 0)
-                    Buttons[0] = true;
-                if (Raylib.IsGamepadButtonDown(0, BtnY) && framecount % emu?.Config.FrameSkip == 0)
-                    Buttons[1] = true;
-            }
-
-            Buttons[2] |= Raylib.IsGamepadButtonDown(0, BtnSelect);
-            Buttons[3] |= Raylib.IsGamepadButtonDown(0, BtnStart);
-            if (system == NesConsole)
-            {
-                Buttons[4] |= Raylib.IsGamepadButtonDown(0, BtnUp);
-                Buttons[5] |= Raylib.IsGamepadButtonDown(0, BtnDown);
-                Buttons[6] |= Raylib.IsGamepadButtonDown(0, BtnLeft);
-                Buttons[7] |= Raylib.IsGamepadButtonDown(0, BtnRight);
-            }
-            else
-            {
-                Buttons[4] |= Raylib.IsGamepadButtonDown(0, BtnRight);
-                Buttons[5] |= Raylib.IsGamepadButtonDown(0, BtnLeft);
-                Buttons[6] |= Raylib.IsGamepadButtonDown(0, BtnUp);
-                Buttons[7] |= Raylib.IsGamepadButtonDown(0, BtnDown);
-            }
-
-        }
-    }
-
-    public static void UpdateGuiInput(Emulator emu, Menu menu)
-    {
-        DisableInputs();
         if (emu == null) return;
         if (!Raylib.IsWindowFocused()) return;
 
         var newrightstickY = Raylib.GetGamepadAxisMovement(0, GamepadAxis.RightY);
         if (newrightstickY > -0.1f && newrightstickY < 0.1f) newrightstickY = 0.0f; //Deadzone
 
-        if (Raylib.IsGamepadButtonPressed(0, BtnL2))
-            menu?.Open(emu);
-
         if (menu?.Opened == false)
         {
             if (emu.State == DebugState.Paused)
                 emu.State = DebugState.Running;
-        }
 
-        if (Raylib.IsGamepadButtonDown(0, GamepadButton.RightTrigger2) && !emu.FastForward)
-        {
-            emu.FastForward = true;
-            Raylib.SetTargetFPS(0);
-            Raylib.ClearWindowState(ConfigFlags.VSyncHint);
-        }
-        else if (!Raylib.IsGamepadButtonDown(0, GamepadButton.RightTrigger2) && emu.FastForward)
-        {
-            emu.FastForward = false;
-            Raylib.SetTargetFPS(60);
-            Raylib.SetWindowState(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow);
+            if (Raylib.IsGamepadButtonDown(0, GamepadButton.RightTrigger2) && !emu.FastForward)
+            {
+                emu.FastForward = true;
+                Raylib.SetTargetFPS(0);
+                Raylib.ClearWindowState(ConfigFlags.VSyncHint);
+            }
+            else if (!Raylib.IsGamepadButtonDown(0, GamepadButton.RightTrigger2) && emu.FastForward)
+            {
+                emu.FastForward = false;
+                Raylib.SetTargetFPS(60);
+                Raylib.SetWindowState(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow);
+            }
         }
 
         if (newrightstickY < 0 && OldRightThumbY == 0)
@@ -140,19 +62,6 @@ internal class Input
         }
 
         OldRightThumbY = newrightstickY;
-    }
-
-    private static void DisableInputs()
-    {
-        var io = ImGui.GetIO();
-        if ((io.ConfigFlags & ImGuiConfigFlags.NavEnableGamepad) > 0)
-        {
-            //GetKeysPressed(io);
-            unsafe
-            {
-                io.NativePtr->KeysData_121.Down = 0; //disable Circle/B button in Deck mode
-            }
-        }
     }
 
     private static int GetSaveStateSlot()

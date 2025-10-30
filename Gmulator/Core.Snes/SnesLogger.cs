@@ -1,17 +1,14 @@
-﻿using Gmulator.Core.Gbc;
-using static Gmulator.Core.Snes.SnesCpu;
+﻿using static Gmulator.Core.Snes.SnesCpu;
 
 namespace Gmulator.Core.Snes;
 
-public class SnesLogger(Snes snes, SnesCpu cpu)
+public class SnesLogger(Snes snes)
 {
-    public bool Logging { get; internal set; }
+    public bool Logging { get; private set; }
 
-    internal Func<Dictionary<string, bool>> GetFlags;
-    internal Func<Dictionary<string, string>> GetRegs;
     private StreamWriter Outfile;
-    private Snes Snes = snes;
-    private SnesCpu Cpu = cpu;
+    private readonly Snes Snes = snes;
+    private readonly SnesCpu Cpu = snes.Cpu;
 
     private bool MMode;
     private bool XMode;
@@ -54,7 +51,7 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
             MMode = (b[1] & FM) == 0;
         }
 
-        if (cpu.MMem)
+        if (Cpu.MMem)
             MMode = true;
 
         switch (mode)
@@ -68,17 +65,17 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 break;
             case AbsoluteIndexedIndirect:
                 c = snes.ReadWord(pc + 1);
-                a = snes.ReadWord((ushort)(c + cpu.X));
+                a = snes.ReadWord((ushort)(c + Cpu.X));
                 data += $"(${c:x4},x)";// [${Cpu.PB:X2}{a:X4}] ";
                 break;
             case AbsoluteIndexedX:
                 c = snes.ReadWord(pc + 1);
-                a = c + (cpu.XMem ? (byte)cpu.X : cpu.X);
+                a = c + (Cpu.XMem ? (byte)Cpu.X : Cpu.X);
                 data += $"${c:x4},x";// [${Cpu.DB << 16 | a:X6}] ";
                 break;
             case AbsoluteIndexedY:
                 c = snes.ReadWord(pc + 1);
-                a = cpu.DB << 16 | c + (cpu.XMem ? (byte)cpu.Y : cpu.Y);
+                a = Cpu.DB << 16 | c + (Cpu.XMem ? (byte)Cpu.Y : Cpu.Y);
                 data += $"${c:x4},y";// [${Cpu.DB << 16 | a:X6}] ";
                 break;
             case AbsoluteIndirect:
@@ -102,21 +99,21 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 break;
             case DPIndexedIndirectX:
                 c = snes.ReadOp(pc + 1);
-                x = (c + cpu.D + cpu.X) & 0xffff;
-                x = cpu.E ? 0x100 : x;
-                a = cpu.DB << 16 | snes.ReadOp(x);
-                a |= cpu.DB << 16 | snes.ReadOp((x & 0xff) == 0xff ? x & 0xff00 : x + 1) << 8;
+                x = (c + Cpu.D + Cpu.X) & 0xffff;
+                x = Cpu.E ? 0x100 : x;
+                a = Cpu.DB << 16 | snes.ReadOp(x);
+                a |= Cpu.DB << 16 | snes.ReadOp((x & 0xff) == 0xff ? x & 0xff00 : x + 1) << 8;
                 data += $"(${c:x2},x)";// [{a:X6}]";
                 break;
             case DPIndexedX:
                 c = snes.ReadOp(pc + 1);
-                a = (c + cpu.D + cpu.X) & 0xffff;
-                a = cpu.E && a > 0xff ? a & 0xff | 0x100 : a;
+                a = (c + Cpu.D + Cpu.X) & 0xffff;
+                a = Cpu.E && a > 0xff ? a & 0xff | 0x100 : a;
                 data += $"${c:x2},x";// [${a:X6}]";
                 break;
             case DPIndexedY:
                 c = snes.ReadOp(pc + 1);
-                a = (ushort)(c + cpu.D + cpu.Y);
+                a = (ushort)(c + Cpu.D + Cpu.Y);
                 data += $"${c:x2},y";// [${a:X6}]";
                 break;
             case DPIndirect:
@@ -129,17 +126,17 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 break;
             case DPIndirectLong:
                 c = snes.ReadOp(pc + 1);
-                a = snes.ReadLong((c + cpu.D) & 0xffff);
+                a = snes.ReadLong((c + Cpu.D) & 0xffff);
                 data += $"[${c:x2}]";// [${a:X6}]";
                 break;
             case DPIndirectLongIndexedY:
                 c = snes.ReadOp(pc + 1);
-                a = snes.ReadLong(cpu.D + c) + cpu.Y;
+                a = snes.ReadLong(Cpu.D + c) + Cpu.Y;
                 data += $"[${c:x2}],y";// [${a:X6}]";
                 break;
             case DirectPage:
                 c = snes.ReadOp(pc + 1);
-                a = (snes.ReadOp(pc + 1) + cpu.D) & 0xffff;
+                a = (snes.ReadOp(pc + 1) + Cpu.D) & 0xffff;
                 data += $"${c:x2}";// [${a:X6}]";
                 break;
             case Immediate:
@@ -152,7 +149,7 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 //     MMode = true;
                 break;
             case ImmediateIndex:
-                if (!cpu.XMem)
+                if (!Cpu.XMem)
                 {
                     c = snes.ReadOp(pc + 2);
                     a = snes.ReadWord(pc + 1);
@@ -166,7 +163,7 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 }
                 break;
             case ImmediateMemory:
-                if (!cpu.MMem)
+                if (!Cpu.MMem)
                 {
                     c = snes.ReadOp(pc + 2);
                     a = snes.ReadWord(pc + 1);
@@ -189,7 +186,7 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
                 break;
             case SRIndirectIndexedY:
                 c = snes.ReadOp(pc + 1);
-                a = snes.ReadWord(c + cpu.SP + cpu.Y);
+                a = snes.ReadWord(c + Cpu.SP + Cpu.Y);
                 data += $"(${c:x2},s),y";// [${a:X6}]";
                 break;
             case StackAbsolute:
@@ -216,20 +213,20 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
 
         if (getregs)
         {
-            foreach (var r in cpu.GetRegisters())
+            foreach (var r in Cpu.GetRegisters())
             {
-                if (r.Key == "P" || r.Key == "PB") continue;
-                var v = r.Key == "DB" ? $"{r.Value:x2}" : $"{r.Value:x4}";
-                regtext += $"{r.Key}:{v.ToLower()} ";
+                if (r.Value == "P" || r.Value == "PB") continue;
+                var v = r.Value == "DB" ? $"{r.Value:x2}" : $"{r.Value:x4}";
+                regtext += $"{r.Value}:{v.ToLower()} ";
             }
 
             string s = "";
-            foreach (var f in GetFlags())
+            foreach (var f in Cpu.GetFlags())
             {
-                if (f.Key == "E")
+                if (f.Value == "E")
                     s += " ";
 
-                var k = f.Value ? f.Key : f.Key.ToLower();
+                var k = f.Value != "" ? f.Value : f.Value.ToLower();
                 s += $"{k}";
             }
             //regtext += new string([.. s.Reverse()]) + " ";
@@ -258,7 +255,7 @@ public class SnesLogger(Snes snes, SnesCpu cpu)
             Outfile?.Close();
     }
 
-    public void Close()
+    private void Close()
     {
         Logging = false;
         Outfile?.Close();

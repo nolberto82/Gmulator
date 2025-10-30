@@ -96,4 +96,24 @@ public class Square2 : BaseChannel
         NR23 = br.ReadByte();
         NR24 = br.ReadByte();
     }
+
+    public List<RegisterInfo> GetState() =>
+    [
+        new("FF16", "Channel 2", ""),
+        new("0-5", "Length", $"{LengthCounter}"),
+        new("6-7", "Duty", $"{Duty}"),
+        new("FF17", "", ""),
+        new("0-2", "Env Period", $"{EnvPeriod}"),
+        new("3", "Env Increase", $"{EnvDirection}"),
+        new("4-7", "Env Volume", $"{EnvVolume}"),
+        new("FF18", "", ""),
+        new("0-2", "Frequency", $"{Frequency}"),
+        new("FF19", "", ""),
+        new("0-2", "Frequency", $"{Frequency}"),
+        new("6", "Length Enabled", $"{LengthEnabled}"),
+        new("7", "Enabled", $"{Enabled}"),
+        new("", "Timer", $"{Timer}"),
+        new("", "Duty Position", $"{Position}"),
+        new("", "Env Timer", $"{Duty}"),
+    ];
 }

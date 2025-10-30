@@ -3,6 +3,7 @@ using Gmulator.Core.Nes.Sound;
 using Raylib_cs;
 
 namespace Gmulator.Core.Nes;
+
 public class NesApu : EmuState
 {
     public int Status { get; private set; }
@@ -227,7 +228,7 @@ public class NesApu : EmuState
             if (IrqEnabled)
                 res |= 0x40;
             IrqEnabled = false;
-            return res&0xff;
+            return res & 0xff;
         }
 
         return 0xff;
@@ -311,76 +312,84 @@ public class NesApu : EmuState
         Dmc.Load(br);
     }
 
-    public Dictionary<string, dynamic> GetChannel1() => new()
+    public List<RegisterInfo> GetState() => new()
     {
-        ["Env Volume"] = Square1.EnvVolume,
-        ["Env Constant"] = Square1.ConstVolumeFlag,
-        ["Length Halted"] = !Square1.LengthEnabled,
-        ["Duty"] = Square1.Position,
-        ["Sweep Shift"] = Square1.SweepShift,
-        ["Sweep Negate"] = Square1.SweepNegate,
-        ["Sweep Period"] = Square1.SweepPeriod,
-        ["Period"] = Square1.Frequency,
-        ["Length Counter"] = Square1.LengthCounter,
-        ["Enabled"] = Square1.Enabled,
-        ["Timer"] = Square1.Timer,
-        ["Env Divider"] = Square1.EnvDivider,
-        ["Volume"] = Square1.EnvCounter,
-        ["Apu Cycles"] = Cycles,
-    };
+        new("4000","Channel 1",""),
+        new("0-3","Env Volume",$"{Square1.EnvVolume:X2}"),
+        new("4","Env Constant",$"{Square1.ConstVolumeFlag}"),
+        new("5","Length Halted",$"{!Square1.LengthEnabled}"),
+        new("6-7","Duty",$"{Square1.Position:X2}"),
+        new("4001","",""),
+        new("0-2","Sweep Shift",$"{Square1.SweepShift:X2}"),
+        new("3","Sweep Negate",$"{Square1.SweepNegate:X2}"),
+        new("4-6","Sweep Period",$"{Square1.SweepPeriod:X2}"),
+        new("7","Sweep Enabled",$"{Square1.SweepEnabled}"),
+        new("4002/3","",""),
+        new("7","Period",$"{Square1.Frequency:X4}"),
+        new("4003","",""),
+        new("3-7","Length Counter",$"{Square1.LengthCounter:X4}"),
+        new("","Enabled",$"{Square1.Enabled}"),
+        new("","Timer",$"{Square1.Timer:X4}"),
+        new("","Env Divider",$"{Square1.EnvDivider:X2}"),
+        new("","Volume",$"{Square1.EnvCounter:X2}"),
+        new("4004","Channel 2",""),
+        new("0-3","Env Volume",$"{Square2.EnvVolume:X2}"),
+        new("4","Env Constant",$"{Square2.ConstVolumeFlag}"),
+        new("5","Length Halted",$"{!Square2.LengthEnabled}"),
+        new("6-7","Duty",$"{Square2.Position:X2}"),
+        new("4005","",""),
+        new("0-2","Sweep Shift",$"{Square2.SweepShift:X2}"),
+        new("3","Sweep Negate",$"{Square2.SweepNegate:X2}"),
+        new("4-6","Sweep Period",$"{Square2.SweepPeriod:X2}"),
+        new("7","Sweep Enabled",$"{Square2.SweepEnabled}"),
+        new("4006/7","",""),
+        new("0-2","Period",$"{Square2.Frequency:X4}"),
+        new("4007","",""),
+        new("3-7","Length Counter",$"{Square2.LengthCounter:X4}"),
+        new("","Enabled",$"{Square2.Enabled}"),
+        new("","Timer",$"{Square2.Timer:X4}"),
+        new("","Env Divider",$"{Square2.EnvDivider:X2}"),
+        new("","Volume",$"{Square2.EnvCounter:X2}"),
+        new("4008","Channel 3",""),
+        new("0-6","Linear Counter",$"{Triangle.LinearCounter:X2}"),
+        new("7","Length Halted",$"{Triangle.LengthEnabled}"),
+        new("400A/B","",""),
+        new("0-2","Period",$"{Triangle.Frequency:X4}"),
+        new("400B","",""),
+        new("3-7","Length Reload",$"{Triangle.LengthCounter:X4}"),
+        new("","Frequency",$"{Triangle.Frequency:X4}"),
+        new("","Enabled",$"{Triangle.Enabled}"),
+        new("","Timer",$"{Triangle.Timer:X4}"),
+        new("","Duty Position",$"{Triangle.Position:X2}"),
+        new("","Env Divider",$"{Triangle.EnvDivider:X2}"),
+        new("","Volume",$"{Triangle.EnvCounter:X2}"),
+        new("400C","Noise",""),
+        new("0-3","Env Volume",$"{Noise.EnvVolume:X2}"),
+        new("4","Env Constant Volume",$"{Noise.ConstVolumeFlag}"),
+        new("5","Length Counter",$"{Noise.LengthCounter:X2}"),
+        new("400E","",""),
+        new("0-3","Env Volume",$"{Noise.PeriodTimer:X4}"),
+        new("7","Env Constant Volume",$"{Noise.Mode}"),
+        new("400F","",""),
+        new("3-7","Length Counter",$"{Noise.LengthCounter:X2}"),
+        new("","LSFR",$"{$"{Noise.ShiftReg:X4}"}"),
+        new("","Frequency",$"{Noise.Frequency:X4}"),
+        new("","Enabled",$"{Noise.Enabled}"),
+        new("","Timer",$"{Noise.Timer:X4}"),
+        new("","Duty Position",$"{Noise.Position:X2}"),
+        new("","Env Divider",$"{Noise.EnvDivider:X2}"),
+        new("","Volume",$"{Noise.EnvCounter:X2}"),
+        new("4010","Dmc",""),
+        new("0-3","Period",$"{Dmc.Frequency:X4}"),
+        new("6","Loop",$"{$"{Dmc.Loop}"}"),
+        new("7","Irq",$"{$"{Dmc.Irq}"}"),
+        new("4011","",""),
+        new("","Output",$"{Dmc.OutputLevel:X2}"),
+        new("4012","",""),
+        new("","Sample Address",$"{$"{Dmc.SampleAddress:X4}"}"),
+        new("4013","",""),
+        new("","Sample Length",$"{$"{Dmc.SampleLength:X4}"}"),
+        new("","Timer",$"{Dmc.Timer:X4}"),
 
-    public Dictionary<string, dynamic> GetChannel2() => new()
-    {
-        ["Sweep Shift"] = Square2.SweepShift,
-        ["Sweep Negate"] = Square2.SweepNegate,
-        ["Sweep Period"] = Square2.SweepPeriod,
-        ["Length Counter"] = Square2.LengthCounter,
-        ["Duty"] = Square2.Duty,
-        ["Env Volume"] = Square2.EnvVolume,
-        ["Frequency"] = Square2.Frequency,
-        ["Enabled"] = Square2.Enabled,
-        ["Timer"] = Square2.Timer,
-        ["Duty Position"] = Square2.Position,
-        ["Env Divider"] = Square2.EnvDivider,
-        ["Volume"] = Square2.EnvCounter,
-    };
-
-    public Dictionary<string, dynamic> GetChannel3() => new()
-    {
-        ["Length Counter"] = Triangle.LengthCounter,
-        ["Linear Counter"] = Triangle.LinearCounter,
-        ["Duty"] = Triangle.Duty,
-        ["Env Volume"] = Triangle.EnvVolume,
-        ["Frequency"] = Triangle.Frequency,
-        ["Enabled"] = Triangle.Enabled,
-        ["Timer"] = Triangle.Timer,
-        ["Duty Position"] = Triangle.Position,
-        ["Env Divider"] = Triangle.EnvDivider,
-        ["Volume"] = Triangle.EnvCounter,
-    };
-
-    public Dictionary<string, dynamic> GetChannel4() => new()
-    {
-        ["Length Counter"] = Noise.LengthCounter,
-        ["LSFR"] = $"{Noise.ShiftReg:X4}",
-        ["Duty"] = Noise.Duty,
-        ["Env Volume"] = Noise.EnvVolume,
-        ["Frequency"] = Noise.Frequency,
-        ["Enabled"] = Noise.Enabled,
-        ["Timer"] = Noise.Timer,
-        ["Duty Position"] = Noise.Position,
-        ["Env Divider"] = Noise.EnvDivider,
-        ["Volume"] = Noise.EnvCounter,
-    };
-
-    public Dictionary<string, dynamic> GetChannel5() => new()
-    {
-        ["Period"] = Dmc.Frequency,
-        ["Loop"] = $"{Dmc.Loop}",
-        //["Irq"] = Apu.Dmc.,
-        ["Output"] = Dmc.OutputLevel,
-        ["Sample Address"] = $"{Dmc.SampleAddress:X4}",
-        ["Sample Length"] = $"{Dmc.SampleLength:X4}",
-        ["Timer"] = Dmc.Timer,
     };
 }

@@ -1,23 +1,16 @@
-﻿
-using Gmulator.Core.Gbc;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
+﻿using Gmulator.Ui;
+using Gmulator.Shared;
 using ImGuiNET;
 using Raylib_cs;
-using rlImGui_cs;
-using System;
-using System.Dynamic;
 using System.Numerics;
 using System.Text.Json;
-using System.Timers;
-using System.Xml.Linq;
-using Timer = System.Timers.Timer;
+using System.Runtime.CompilerServices;
 
 namespace Gmulator.Shared
 {
     public class Emulator
     {
-        public int Console { get; set; }
+        public int System { get; set; }
         public string GameName { get; set; }
         public string LastName { get; set; }
         public Config Config { get; set; }
@@ -29,10 +22,12 @@ namespace Gmulator.Shared
         public CheatConverter CheatConverter { get; set; }
 
         public DebugState State { get; set; }
+        public bool Run { get; set; }
         public bool FastForward { get; set; }
         public bool Debug { get; set; }
         public bool IsScreenWindow { get; set; }
         public bool IsDeck { get; set; }
+        public bool[] Buttons { get; set; }
         public Vector2 Dimensions { get; set; } = new(GbWidth, GbHeight);
         public object StateLock { get; set; } = new object();
         public SortedDictionary<int, Breakpoint> Breakpoints { get; set; } = [];
@@ -47,16 +42,20 @@ namespace Gmulator.Shared
             GameName = "";
         }
 
-        public void Init(int width, int height, int console, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
+        public void Init(int width, int height, int system, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
         {
             Screen = Raylib.LoadRenderTexture(width, height);
             Dimensions = new(width, height);
-            Console = console;
+            System = system;
             LuaApi = new(Screen.Texture, imguifont, raylibfont, menuheight, Debug);
         }
 
         public virtual void Reset(string name, bool reset)
         {
+#if DEBUG
+            Debug = true;
+#endif
+
             if (!Debug)
                 State = DebugState.Running;
             else
@@ -66,9 +65,14 @@ namespace Gmulator.Shared
                 GameName = name;
         }
 
-        public virtual void SetState(DebugState v) => State = v;
+        public virtual void SetState(DebugState v)
+        {
+            State = v;
+            if (v == DebugState.Running)
+                Run = true;
+        }
 
-        public virtual void Execute(bool opened) { }
+        public virtual void RunFrame(bool opened) { }
 
         public virtual void Render(float MenuHeight)
         {
@@ -83,47 +87,8 @@ namespace Gmulator.Shared
             IsScreenWindow = false;
             if (Debug)
             {
-                ImGui.SetNextWindowPos(new(5, MenuHeight + 5));
-                ImGui.SetNextWindowSize(new(320, 330));
-                if (ImGui.Begin("Screen"))
-                {
-                    if (ImGui.IsWindowFocused())
-                        IsScreenWindow = true;
-                    ImGui.Image((nint)Screen.Texture.Id, ImGui.GetContentRegionAvail());
-
-                    Notifications.RenderDebug();
-                }
-                ImGui.End();
-
-                ImGui.SetNextWindowPos(new(320 + 10, MenuHeight + 5), ImGuiCond.Once);
-                ImGui.SetNextWindowSize(new(220, 475));
-                if (ImGui.Begin("Debugger", NoScrollFlags))
-                {
-                    DebugWindow?.Draw();
-                    DebugWindow?.DrawCoProcessors();
-                }
-                ImGui.End();
-
-                ImGui.SetNextWindowPos(new(5, height - 300), ImGuiCond.Once);
-                ImGui.SetNextWindowSize(new(430, 300));
-                if (ImGui.Begin("Memory", NoScrollFlags))
-                    DebugWindow?.DrawMemory();
-                ImGui.End();
-
-                ImGui.SetNextWindowPos(new(5 + 435, height - 300));
-                ImGui.SetNextWindowSize(new(310, 300));
-                if (ImGui.Begin("Breakpoints", NoScrollFlags))
-                    DebugWindow?.DrawBreakpoints();
-                ImGui.End();
-
-                if (Console == SnesConsole)
-                {
-                    ImGui.SetNextWindowPos(new(5 + 750, height - 300));
-                    ImGui.SetNextWindowSize(new(0, 300));
-                    if (ImGui.Begin("DMA", NoScrollFlags))
-                        DebugWindow?.DrawDmaInfo();
-                    ImGui.End();
-                }
+                DebugWindow?.Draw(Screen.Texture);
+                IsScreenWindow = (bool)(DebugWindow?.IsScreenWindow);
             }
             else
             {
@@ -139,8 +104,19 @@ namespace Gmulator.Shared
                     Vector2.Zero, 0, Color.White);
 
                 Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), Debug);
-                Raylib.DrawFPS(width - 100, (int)(5 + MenuHeight));
             }
+            Raylib.DrawFPS(width - 80, (int)(5 + MenuHeight));
+        }
+
+        public virtual unsafe void UpdateTexture(Texture2D texture, uint[] buffer)
+        {
+            fixed (uint* pixels = &buffer[0])
+                Raylib.UpdateTexture(texture, pixels);
+        }
+
+        public void UpdateScreen(uint[] buffer)
+        {
+            UpdateTexture(Screen.Texture, buffer);
         }
 
         public T GetConsole<T>()
@@ -149,6 +125,9 @@ namespace Gmulator.Shared
         }
 
         public virtual void Update() { }
+
+        public virtual void Input() { }
+
         public virtual void Close() { }
         public virtual void SaveState(int slot, StateResult res)
         {

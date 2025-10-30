@@ -1,10 +1,4 @@
-﻿using Gmulator.Core.Gbc;
-using Raylib_cs;
-using System;
-using System.ComponentModel.Design;
-using System.Runtime.InteropServices;
-
-namespace Gmulator.Core.Snes;
+﻿namespace Gmulator.Core.Snes;
 public class SnesPpu : EmuState
 {
     public int VPos { get; private set; }
@@ -129,7 +123,7 @@ public class SnesPpu : EmuState
     private ushort[] Vram;
     private ushort[] Cram;
     private byte[] Oam;
-    private uint[] ScreenBuffer;
+    public uint[] ScreenBuffer { get; private set; }
 
     private GfxColor Main = new();
     private GfxColor Sub = new();
@@ -145,6 +139,8 @@ public class SnesPpu : EmuState
     private bool DramRefresh;
 
     private GfxColor Tranparent;
+
+    private Snes Snes;
 
     public void Division(int v)
     {
@@ -172,7 +168,6 @@ public class SnesPpu : EmuState
     public Func<int> ApuStep;
     public Action AutoJoyRead;
     public Action<int, byte> SetDma;
-    private Snes Snes;
     private SnesCpu Cpu;
     private SnesApu Apu;
     private SnesDma Dma;
@@ -185,14 +180,15 @@ public class SnesPpu : EmuState
             SpriteScan[i] = new();
     }
 
-    public void SetSnes(Snes snes, SnesCpu cpu, SnesApu apu, SnesDma dma)
+    public void SetSnes(Snes snes)
     {
         Snes = snes;
-        Cpu = cpu;
-        Apu = apu;
-        Dma = dma;
+        Cpu = snes.Cpu;
+        Apu = snes.Apu;
+        Dma = snes.Dma;
     }
 
+    
     public void SetJoy1L(int v) => JOY1L = v & 0xff;
     public void SetJoy1H(int v) => JOY1H = v & 0xff;
 
@@ -271,7 +267,7 @@ public class SnesPpu : EmuState
                         HVBJOY |= 0x41;
                         AutoJoyCounter = 1056;
                     }
-                    Texture.Update(Snes.Screen.Texture, ScreenBuffer);
+                    //UpdateTexture(Snes.Screen.Texture, ScreenBuffer);
                 }
             }
 
@@ -1340,10 +1336,15 @@ public class SnesPpu : EmuState
         public int Layer = layer;
     }
 
-    public List<RegistersInfo> GetRegs() =>
+    public List<RegisterInfo> GetState() =>
     [
         new("","HClock",$"{HPos}"),
         new("","Scanline", $"{VPos}"),
+        new("4200.4","HIrq", $"{GetHIrq}"),
+        new("4200.5","VIrq", $"{GetVIrq}"),
+        new("4207/8","HTIME", $"{GetHTime:X4}"),
+        new("4209/A","VTIME", $"{GetVTime:X4}"),
+        new("4212","HVBJOY", $"{HVBJOY:X2}"),
         new("2105","BGMode", $"{BgMode:X2}"),
         new("2100","Brightness", $"{Brightness:X2}"),
         new("2132","Fixed Color", $"{Fixed.Color:X4}"),
@@ -1357,47 +1358,48 @@ public class SnesPpu : EmuState
         new("2127","W1 Right", $"{W1Right:X2}"),
         new("2128","W2 Left", $"{W2Left:X2}"),
         new("2129","W2 Right", $"{W2Right:X2}"),
+        new("211B-20","Mode 7",""),
         new("211B","M7A", $"{M7A:X4}"),
         new("211C","M7B", $"{M7B:X4}"),
         new("211D","M7C", $"{M7C:X4}"),
         new("211E","M7D", $"{M7D:X4}"),
         new("211F","M7X", $"{M7X:X4}"),
         new("2120","M7Y", $"{M7Y:X4}"),
-        new("2107.0-1","BG1 Size", $"{BgCharSize[0]:X2}"),
-        new("2107.2-6","BG1 Addr", $"{BgMapbase[0]:X4}"),
-        new("2108.0-1","BG2 Size", $"{BgCharSize[1]:X2}"),
-        new("2108.2-6","BG2 Addr", $"{BgMapbase[1]:X4}"),
-        new("2109.0-1","BG3 Size", $"{BgCharSize[2]:X2}"),
-        new("2109.2-6","BG3 Addr", $"{BgMapbase[2]:X4}"),
-        new("210A.0-1","BG4 Size", $"{BgCharSize[3]:X2}"),
-        new("210A.2-6","BG4 Addr", $"{BgMapbase[3]:X4}"),
-        new("210B.0-2","BG1 Tile Addr", $"{BgTilebase[0]:X4}"),
-        new("210B.4-6","BG2 Tile Addr", $"{BgTilebase[1]:X4}"),
-        new("210C.0-2","BG3 Tile Addr", $"{BgTilebase[2]:X4}"),
-        new("210C.4-6","BG4 Tile Addr", $"{BgTilebase[3]:X4}"),
-        new("210D","BG1 X", $"{BgScrollX[0]:X4}"),
-        new("210E","BG1 Y", $"{BgScrollY[0]:X4}"),
-        new("210F","BG2 X", $"{BgScrollX[1]:X4}"),
-        new("2110","BG2 Y", $"{BgScrollY[1]:X4}"),
-        new("2111","BG3 X", $"{BgScrollX[2]:X4}"),
-        new("2112","BG3 Y", $"{BgScrollY[2]:X4}"),
-        new("2113","BG4 X", $"{BgScrollX[3]:X4}"),
-        new("2114","BG4 Y", $"{BgScrollY[3]:X4}"),
-        new("212C.0","MBG1 Enabled", $"{MainBgs[0]}"),
-        new("212C.1","MBG2 Enabled", $"{MainBgs[1]}"),
-        new("212C.2","MBG3 Enabled", $"{MainBgs[2]}"),
-        new("212C.3","MBG4 Enabled", $"{MainBgs[3]}"),
-        new("212C.4","MOAM Enabled", $"{MainBgs[4]}"),
-        new("212D.0","SBG1 Enabled", $"{SubBgs[0]}"),
-        new("212D.1","SBG2 Enabled", $"{SubBgs[1]}"),
-        new("212D.2","SBG3 Enabled", $"{SubBgs[2]}"),
-        new("212D.3","SBG4 Enabled", $"{SubBgs[3]}"),
-        new("212D.4","SOAM Enabled", $"{SubBgs[3]}"),
-        new("4200.4","HIrq", $"{GetHIrq}"),
-        new("4200.5","VIrq", $"{GetVIrq}"),
-        new("4207/8","HTIME", $"{GetHTime:X4}"),
-        new("4209/A","VTIME", $"{GetVTime:X4}"),
-        new("4212","HVBJOY", $"{HVBJOY:X2}"),
+        new("2107-0A","Tilemaps",""),
+        new("07|0-1","BG1 Size", $"{BgCharSize[0]:X2}"),
+        new("07|2-6","BG1 Addr", $"{BgMapbase[0]:X4}"),
+        new("08|0-1","BG2 Size", $"{BgCharSize[1]:X2}"),
+        new("08|2-6","BG2 Addr", $"{BgMapbase[1]:X4}"),
+        new("09|0-1","BG3 Size", $"{BgCharSize[2]:X2}"),
+        new("09|2-6","BG3 Addr", $"{BgMapbase[2]:X4}"),
+        new("0A|0-1","BG4 Size", $"{BgCharSize[3]:X2}"),
+        new("0A|2-6","BG4 Addr", $"{BgMapbase[3]:X4}"),
+        new("210B-0C","Tiles",""),
+        new("0B|0-2","BG1 Tile Addr", $"{BgTilebase[0]:X4}"),
+        new("0B|4-6","BG2 Tile Addr", $"{BgTilebase[1]:X4}"),
+        new("0C|0-2","BG3 Tile Addr", $"{BgTilebase[2]:X4}"),
+        new("0C|4-6","BG3 Tile Addr", $"{BgTilebase[3]:X4}"),
+        new("210D-2114","Scroll", ""),
+        new("0D","BG1 X", $"{BgScrollX[0]:X4}"),
+        new("0E","BG1 Y", $"{BgScrollY[0]:X4}"),
+        new("0F","BG2 X", $"{BgScrollX[1]:X4}"),
+        new("10","BG2 Y", $"{BgScrollY[1]:X4}"),
+        new("11","BG3 X", $"{BgScrollX[2]:X4}"),
+        new("12","BG3 Y", $"{BgScrollY[2]:X4}"),
+        new("13","BG4 X", $"{BgScrollX[3]:X4}"),
+        new("14","BG4 Y", $"{BgScrollY[3]:X4}"),
+        new("212C","Main Layers", ""),
+        new("|0","BG1 Enabled", $"{MainBgs[0]}"),
+        new("|1","BG2 Enabled", $"{MainBgs[1]}"),
+        new("|2","BG3 Enabled", $"{MainBgs[2]}"),
+        new("|3","BG4 Enabled", $"{MainBgs[3]}"),
+        new("|4","OAM Enabled", $"{MainBgs[4]}"),
+        new("212D","Sub Layers", ""),
+        new("|0","BG1 Enabled", $"{SubBgs[0]}"),
+        new("|1","BG2 Enabled", $"{SubBgs[1]}"),
+        new("|2","BG3 Enabled", $"{SubBgs[2]}"),
+        new("|3","BG4 Enabled", $"{SubBgs[3]}"),
+        new("|4","OAM Enabled", $"{SubBgs[3]}"),
     ];
 
     public override void Save(BinaryWriter bw)
@@ -1425,29 +1427,29 @@ public class SnesPpu : EmuState
         bw.Write(RDIO); bw.Write(JOY1L); bw.Write(JOY1H); bw.Write(JOY2L);
         bw.Write(JOY2H); bw.Write(JOY3L); bw.Write(JOY3H); bw.Write(JOY4L);
         bw.Write(JOY4H); bw.Write(CounterLatch); bw.Write(OphctLatch); bw.Write(OpvctLatch);
-        bw.Write(MultiplyRes); EmuState.WriteArray<int>(bw, BgMapbase);
-        EmuState.WriteArray<int>(bw, BgTilebase);
-        EmuState.WriteArray<int>(bw, BgScrollX);
-        EmuState.WriteArray<int>(bw, BgScrollY);
-        EmuState.WriteArray<int>(bw, BgSizeX);
-        EmuState.WriteArray<int>(bw, BgSizeY);
-        EmuState.WriteArray<bool>(bw, ColorMath);
-        EmuState.WriteArray<bool>(bw, Win1Enabled);
-        EmuState.WriteArray<bool>(bw, Win1Inverted);
-        EmuState.WriteArray<bool>(bw, Win2Enabled);
-        EmuState.WriteArray<bool>(bw, Win2Inverted);
-        EmuState.WriteArray<int>(bw, WinLogic);
-        EmuState.WriteArray<bool>(bw, MainBgs);
-        EmuState.WriteArray<bool>(bw, SubBgs);
-        EmuState.WriteArray<bool>(bw, WinMainBgs);
-        EmuState.WriteArray<bool>(bw, WinSubBgs);
-        EmuState.WriteArray<bool>(bw, MosaicEnabled);
-        EmuState.WriteArray<bool>(bw, Mode7Settings);
-        EmuState.WriteArray<bool>(bw, BgCharSize);
-        EmuState.WriteArray<ushort>(bw, Vram);
-        EmuState.WriteArray<ushort>(bw, Cram);
-        EmuState.WriteArray<byte>(bw, Oam);
-        EmuState.WriteArray<uint>(bw, ScreenBuffer);
+        bw.Write(MultiplyRes); WriteArray(bw, BgMapbase);
+        WriteArray(bw, BgTilebase);
+        WriteArray(bw, BgScrollX);
+        WriteArray(bw, BgScrollY);
+        WriteArray(bw, BgSizeX);
+        WriteArray(bw, BgSizeY);
+        WriteArray(bw, ColorMath);
+        WriteArray(bw, Win1Enabled);
+        WriteArray(bw, Win1Inverted);
+        WriteArray(bw, Win2Enabled);
+        WriteArray(bw, Win2Inverted);
+        WriteArray(bw, WinLogic);
+        WriteArray(bw, MainBgs);
+        WriteArray(bw, SubBgs);
+        WriteArray(bw, WinMainBgs);
+        WriteArray(bw, WinSubBgs);
+        WriteArray(bw, MosaicEnabled);
+        WriteArray(bw, Mode7Settings);
+        WriteArray(bw, BgCharSize);
+        WriteArray(bw, Vram);
+        WriteArray(bw, Cram);
+        WriteArray(bw, Oam);
+        WriteArray(bw, ScreenBuffer);
     }
 
     public override void Load(BinaryReader br)
@@ -1475,29 +1477,29 @@ public class SnesPpu : EmuState
         RDIO = br.ReadInt32(); JOY1L = br.ReadInt32(); JOY1H = br.ReadInt32(); JOY2L = br.ReadInt32();
         JOY2H = br.ReadInt32(); JOY3L = br.ReadInt32(); JOY3H = br.ReadInt32(); JOY4L = br.ReadInt32();
         JOY4H = br.ReadInt32(); CounterLatch = br.ReadBoolean(); OphctLatch = br.ReadBoolean(); OpvctLatch = br.ReadBoolean();
-        MultiplyRes = br.ReadInt32(); BgMapbase = EmuState.ReadArray<int>(br, BgMapbase.Length);
-        BgTilebase = EmuState.ReadArray<int>(br, BgTilebase.Length);
-        BgScrollX = EmuState.ReadArray<int>(br, BgScrollX.Length);
-        BgScrollY = EmuState.ReadArray<int>(br, BgScrollY.Length);
-        BgSizeX = EmuState.ReadArray<int>(br, BgSizeX.Length);
-        BgSizeY = EmuState.ReadArray<int>(br, BgSizeY.Length);
-        ColorMath = EmuState.ReadArray<bool>(br, ColorMath.Length);
-        Win1Enabled = EmuState.ReadArray<bool>(br, Win1Enabled.Length);
-        Win1Inverted = EmuState.ReadArray<bool>(br, Win1Inverted.Length);
-        Win2Enabled = EmuState.ReadArray<bool>(br, Win2Enabled.Length);
-        Win2Inverted = EmuState.ReadArray<bool>(br, Win2Inverted.Length);
-        WinLogic = EmuState.ReadArray<int>(br, WinLogic.Length);
-        MainBgs = EmuState.ReadArray<bool>(br, MainBgs.Length);
-        SubBgs = EmuState.ReadArray<bool>(br, SubBgs.Length);
-        WinMainBgs = EmuState.ReadArray<bool>(br, WinMainBgs.Length);
-        WinSubBgs = EmuState.ReadArray<bool>(br, WinSubBgs.Length);
-        MosaicEnabled = EmuState.ReadArray<bool>(br, MosaicEnabled.Length);
-        Mode7Settings = EmuState.ReadArray<bool>(br, Mode7Settings.Length);
-        BgCharSize = EmuState.ReadArray<bool>(br, BgCharSize.Length);
-        Vram = EmuState.ReadArray<ushort>(br, Vram.Length);
-        Cram = EmuState.ReadArray<ushort>(br, Cram.Length);
-        Oam = EmuState.ReadArray<byte>(br, Oam.Length);
-        ScreenBuffer = EmuState.ReadArray<uint>(br, ScreenBuffer.Length);
+        MultiplyRes = br.ReadInt32(); BgMapbase = ReadArray<int>(br, BgMapbase.Length);
+        BgTilebase = ReadArray<int>(br, BgTilebase.Length);
+        BgScrollX = ReadArray<int>(br, BgScrollX.Length);
+        BgScrollY = ReadArray<int>(br, BgScrollY.Length);
+        BgSizeX = ReadArray<int>(br, BgSizeX.Length);
+        BgSizeY = ReadArray<int>(br, BgSizeY.Length);
+        ColorMath = ReadArray<bool>(br, ColorMath.Length);
+        Win1Enabled = ReadArray<bool>(br, Win1Enabled.Length);
+        Win1Inverted = ReadArray<bool>(br, Win1Inverted.Length);
+        Win2Enabled = ReadArray<bool>(br, Win2Enabled.Length);
+        Win2Inverted = ReadArray<bool>(br, Win2Inverted.Length);
+        WinLogic = ReadArray<int>(br, WinLogic.Length);
+        MainBgs = ReadArray<bool>(br, MainBgs.Length);
+        SubBgs = ReadArray<bool>(br, SubBgs.Length);
+        WinMainBgs = ReadArray<bool>(br, WinMainBgs.Length);
+        WinSubBgs = ReadArray<bool>(br, WinSubBgs.Length);
+        MosaicEnabled = ReadArray<bool>(br, MosaicEnabled.Length);
+        Mode7Settings = ReadArray<bool>(br, Mode7Settings.Length);
+        BgCharSize = ReadArray<bool>(br, BgCharSize.Length);
+        Vram = ReadArray<ushort>(br, Vram.Length);
+        Cram = ReadArray<ushort>(br, Cram.Length);
+        Oam = ReadArray<byte>(br, Oam.Length);
+        ScreenBuffer = ReadArray<uint>(br, ScreenBuffer.Length);
     }
 }
 

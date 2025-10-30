@@ -2,6 +2,7 @@
 using Gmulator.Core.Gbc;
 
 namespace Gmulator.Core.Gbc.Sound;
+
 public class Wave : BaseChannel
 {
     public byte NR30 { get; private set; }
@@ -141,4 +142,22 @@ public class Wave : BaseChannel
 
         Dac = (NR30 & 0x80) != 0;
     }
+
+    public List<RegisterInfo> GetState() =>
+    [
+        new("FF1A","Channel 3",""),
+        new("7","Sound Enabled", $"{Dac}"),
+        new("FF1B","",""),
+        new("0-7","Length", $"{LengthCounter}"),
+        new("FF1C","",""),
+        new("5-6","Volume", $"{VolumeShift}"),
+        new("FF1D","",""),
+        new("0-2","Frequency", $"{Frequency}"),
+        new("FF1E","",""),
+        new("0-2","Frequency", $"{Frequency}"),
+        new("6","Length Enabled", $"{LengthEnabled}"),
+        new("7","Enabled", $"{Enabled}"),
+        new("","Timer", $"{Timer}"),
+        new("","Position", $"{Position}"),
+    ];
 }

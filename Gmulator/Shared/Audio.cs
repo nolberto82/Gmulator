@@ -3,6 +3,7 @@ using Raylib_cs;
 using System.IO;
 
 namespace Gmulator;
+
 public class Audio
 {
     public static AudioStream Stream { get; private set; }
@@ -21,9 +22,9 @@ public class Audio
         Raylib.PlayAudioStream(Stream);
     }
 
-    public static void SetVolume(float v)
+    public static void SetVolume(int v)
     {
-        Raylib.SetMasterVolume(v);
+        Raylib.SetMasterVolume(v / 100f);
         Raylib.SetAudioStreamVolume(Stream, v);
     }
 

@@ -1,6 +1,7 @@
 ﻿using Gmulator.Shared;
 
 namespace Gmulator.Core.Gbc;
+
 public partial class GbcIO : EmuState
 {
     public bool UpdateTIMA { get; set; }
@@ -54,30 +55,31 @@ public partial class GbcIO : EmuState
     public GbcApu Apu { get; private set; }
     public GbcMmu Mmu { get; private set; }
     public GbcPpu Ppu { get; private set; }
+    private GbcJoypad Joypad;
 
     public int SpeedMode { get => (KEY1 & 0x80) != 0 ? 2 : 1; }
     public bool DMAactive { get => (HDMA5 & 0x80) != 0; }
     public bool DMAHBlank { get; set; }
 
-    public GbcIO(GbcTimer timer)
+    public GbcIO(Gbc gbc)
     {
-        Timer = timer;
-        //Tick = m.Tick;
+        Timer = gbc.Timer;
     }
     public GbcIO() { }
 
-    public void Init(GbcMmu mmu, GbcPpu ppu, GbcApu apu)
+    public void Init(Gbc gbc)
     {
-        Mmu = mmu;
-        Ppu = ppu;
-        Apu = apu;
+        Mmu = gbc.Mmu;
+        Ppu = gbc.Ppu;
+        Apu = gbc.Apu;
+        Joypad = gbc.Joypad;
     }
 
     public byte Read(int a, bool editor = false)
     {
         var io = (byte)a;
         if (io == 0x00)
-            return GbcJoypad.Status;
+            return Joypad.Status;
         else if (io == 0x01)
             return SB;
         else if (io == 0x02)
@@ -167,7 +169,7 @@ public partial class GbcIO : EmuState
         var io = (byte)a;
         if (io == 0x00)
         {
-            GbcJoypad.Status = v;
+            Joypad.Status = v;
             IF |= IntJoypad;
         }
         else if (io == 0x01)
@@ -282,107 +284,36 @@ public partial class GbcIO : EmuState
         BGPD = 0xff;
     }
 
-    public List<RegistersInfo> GetLCDC() =>
+    public List<RegisterInfo> GetState() =>
     [
-        new("FF40.0","Background", (LCDC & 0x01) != 0 ? "Enabled" : "Disabled"),
-        new("FF40.1","Sprites", (LCDC & 0x02) != 0 ? "Enabled" : "Disabled"),
-        new("FF40.2","Sprite Size", (LCDC & 0x04) != 0 ? "8x16" : "8x8"),
-        new("FF40.3","BG Map", (LCDC & 0x08) != 0 ? "9C00:9FFF" : "9800:9BFF"),
-        new("FF40.4","BG Tile", (LCDC & 0x10) != 0 ? "8000:8FFF" : "8800:97FF"),
-        new("FF40.5","Window", (LCDC & 0x20) != 0 ? "Enabled" : "Disabled"),
-        new("FF40.6","Window Map", (LCDC & 0x40) != 0 ? "9C00:9FFF" : "9800:9BFF"),
-        new("FF40.7","LCD", (LCDC & 0x80) != 0 ? "Enabled" : "Disabled"),
-    ];
-
-    public List<RegistersInfo> GetSTAT() =>
-    [
-        new("FF41.0-1","PPU mode", $"{(STAT & 3)}"),
-        new("FF41.2","LYC == LY", (STAT & 0x04) != 0 ? "Enabled" : "Disabled"),
-        new("FF41.3","Mode 0 select", (STAT & 0x08) != 0 ? "Enabled" : "Disabled"),
-        new("FF41.4","Mode 1 select", (STAT & 0x10) != 0 ? "Enabled" : "Disabled"),
-        new("FF41.5","Mode 2 select", (STAT & 0x20) != 0 ? "Enabled" : "Disabled"),
-        new("FF41.6","LYC select", (STAT & 0x40) != 0 ? "Enabled" : "Disabled"),
-    ];
-
-    public List<RegistersInfo> GetIF() =>
-    [
-        new("FF0F.0","Vblank", (IF & 0x01) != 0 ? "Enabled" : "Disabled"),
-        new("FF0F.1","LCD", (IF & 0x02) != 0 ? "Enabled" : "Disabled"),
-        new("FF0F.2","Timer", (IF & 0x04) != 0 ? "Enabled" : "Disabled"),
-        new("FF0F.3","Serial", (IF & 0x08) != 0 ? "Enabled" : "Disabled"),
-        new("FF0F.4","Joypad", (IF & 0x10) != 0 ? "Enabled" : "Disabled"),
-    ];
-
-    public List<RegistersInfo> GetIE() =>
-    [
-        new("FFFF.0","Vblank", (IE & 0x01) != 0 ? "Enabled" : "Disabled"),
-        new("FFFF.1","LCD", (IE & 0x02) != 0 ? "Enabled" : "Disabled"),
-        new("FFFF.2","Timer", (IE & 0x04) != 0 ? "Enabled" : "Disabled"),
-        new("FFFF.3","Serial", (IE & 0x08) != 0 ? "Enabled" : "Disabled"),
-        new("FFFF.4","Joypad", (IE & 0x10) != 0 ? "Enabled" : "Disabled"),
-    ];
-
-    public List<RegistersInfo> GetChannel1() =>
-    [
-        new("FF10.0-2","Sweep Shift", $"{Apu.Square1.SweepShift}"),
-        new("FF10.3","Sweep Negate", $"{Apu.Square1.SweepNegate}"),
-        new("FF10.4-7","Sweep Period", $"{Apu.Square1.SweepPeriod}"),
-        new("FF11.0-5","Length", $"{Apu.Square1.LengthCounter}"),
-        new("FF11.6-7","Duty", $"{Apu.Square1.Duty}"),
-        new("FF12.0-2","Env Period", $"{Apu.Square1.EnvPeriod}"),
-        new("FF12.3","Env Increase", $"{Apu.Square1.EnvDirection}"),
-        new("FF12.4-7","Env Volume", $"{Apu.Square1.EnvVolume}"),
-        new("FF13/4.0-2","Frequency", $"{Apu.Square1.Frequency}"),
-        new("FF14.6","Length Enabled", $"{Apu.Square1.LengthEnabled}"),
-        new("FF14.7","Enabled", $"{Apu.Square1.Enabled}"),
-        new("","Timer", $"{Apu.Square1.Timer}"),
-        new("","Duty Position", $"{Apu.Square1.Position}"),
-        new("","Sweep Enabled", $"{Apu.Square1.SweepPeriod > 0}"),
-        new("","Sweep Frequency", $"{Apu.Square1.ShadowFrequency}"),
-        new("","Sweep Timer", $"{Apu.Square1.SweepTimer}"),
-        new("","Env Timer", $"{Apu.Square1.Duty}"),
-    ];
-
-    public List<RegistersInfo> GetChannel2() =>
-    [
-        new("FF16.0-5","Length", $"{Apu.Square2.LengthCounter}"),
-        new("FF16.6-7","Duty", $"{Apu.Square2.Duty}"),
-        new("FF17.0-2","Env Period", $"{Apu.Square2.EnvPeriod}"),
-        new("FF17.3","Env Increase", $"{Apu.Square2.EnvDirection}"),
-        new("FF17.4-7","Env Volume", $"{Apu.Square2.EnvVolume}"),
-        new("FF18/9.0-2","Frequency", $"{Apu.Square2.Frequency}"),
-        new("FF19.6","Length Enabled", $"{Apu.Square2.LengthEnabled}"),
-        new("FF19.7","Enabled", $"{Apu.Square2.Enabled}"),
-        new("","Timer", $"{Apu.Square2.Timer}"),
-        new("","Duty Position", $"{Apu.Square2.Position}"),
-        new("","Env Timer", $"{Apu.Square2.Duty}"),
-    ];
-
-    public List<RegistersInfo> GetChannel3() =>
-    [
-        new("FF1A.7","Sound Enabled", $"{Apu.Wave.Dac}"),
-        new("FF1B","Length", $"{Apu.Wave.LengthCounter}"),
-        new("FF1C.5-6","Volume", $"{Apu.Wave.VolumeShift}"),
-        new("FF1D/E.0-2","Frequency", $"{Apu.Wave.Frequency}"),
-        new("FF1E.6","Length Enabled", $"{Apu.Wave.LengthEnabled}"),
-        new("FF1E.7","Enabled", $"{Apu.Wave.Enabled}"),
-        new("","Timer", $"{Apu.Wave.Timer}"),
-        new("","Position", $"{Apu.Wave.Position}"),
-    ];
-
-    public List<RegistersInfo> GetChannel4() =>
-    [
-        new("FF20.0-5","Length", $"{Apu.Noise.LengthCounter}"),
-        new("FF21.0-2","Env Period", $"{Apu.Noise.EnvPeriod}"),
-        new("FF21.3","Env Increase", $"{Apu.Noise.EnvDirection}"),
-        new("FF21.4-7","Env Volume", $"{Apu.Noise.EnvVolume}"),
-        new("FF22.0-2","Divisor", $"{Apu.Noise.Shift}"),
-        new("FF22.3","Width", $"{Apu.Noise.LFSR}"),
-        new("FF22.4-7","Frequency", $"{Apu.Noise.Frequency}"),
-        new("FF23.6","Length Enabled", $"{Apu.Noise.LengthEnabled}"),
-        new("FF23.7","Enabled", $"{Apu.Noise.Enabled}"),
-        new("","Timer", $"{Apu.Noise.Timer}"),
-        new("","Position", $"{Apu.Noise.Position}"),
+        new("FF40","LCDC",""),
+        new("0","Background", (LCDC & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("1","Sprites", (LCDC & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("2","Sprite Size", (LCDC & 0x04) != 0 ? "8x16" : "8x8"),
+        new("3","BG Map", (LCDC & 0x08) != 0 ? "9C00:9FFF" : "9800:9BFF"),
+        new("4","BG Tile", (LCDC & 0x10) != 0 ? "8000:8FFF" : "8800:97FF"),
+        new("5","Window", (LCDC & 0x20) != 0 ? "Enabled" : "Disabled"),
+        new("6","Window Map", (LCDC & 0x40) != 0 ? "9C00:9FFF" : "9800:9BFF"),
+        new("7","LCD", (LCDC & 0x80) != 0 ? "Enabled" : "Disabled"),
+        new("FF41","STAT",""),
+        new("0-1","PPU mode", $"{(STAT & 3)}"),
+        new("2","LYC == LY", (STAT & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("3","Mode 0 select", (STAT & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("4","Mode 1 select", (STAT & 0x10) != 0 ? "Enabled" : "Disabled"),
+        new("5","Mode 2 select", (STAT & 0x20) != 0 ? "Enabled" : "Disabled"),
+        new("6","LYC select", (STAT & 0x40) != 0 ? "Enabled" : "Disabled"),
+        new("FF0F","IF",""),
+        new("0","Vblank", (IF & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("1","LCD", (IF & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("2","Timer", (IF & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("3","Serial", (IF & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("4","Joypad", (IF & 0x10) != 0 ? "Enabled" : "Disabled"),
+        new("FFFF","IE",""),
+        new("0","Vblank", (IE & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("1","LCD", (IE & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("2","Timer", (IE & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("3","Serial", (IE & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("4","Joypad", (IE & 0x10) != 0 ? "Enabled" : "Disabled"),
     ];
 
     public override void Save(BinaryWriter bw)

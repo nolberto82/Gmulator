@@ -1,10 +1,9 @@
 ﻿using System.Runtime.InteropServices;
-using System.Text;
 
 namespace Gmulator.Shared;
 public abstract class EmuState
 {
-    public const string Version = "1.09";
+    public const string Version = "1.10";
     public abstract void Save(BinaryWriter bw);
     public abstract void Load(BinaryReader br);
 

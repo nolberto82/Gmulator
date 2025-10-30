@@ -194,7 +194,7 @@ public unsafe class MemoryEditor
             for (int line_i = clipper.DisplayStart; line_i < clipper.DisplayEnd; line_i++) // display only visible lines
             {
                 int addr = line_i * Cols;
-                ImGui.Text($"{base_display_addr + addr:X4}");
+                ImGui.Text((base_display_addr + addr).ToString("X" + $"{OptAddrDigitsCount}"));
 
                 // Draw Hexadecimal
                 for (int n = 0; n < Cols && addr < mem_size; n++, addr++)

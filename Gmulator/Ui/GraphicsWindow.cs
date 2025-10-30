@@ -1,12 +1,11 @@
-﻿
-using ImGuiNET;
+﻿using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
 using System.Numerics;
 using Color = Raylib_cs.Color;
 using Rectangle = Raylib_cs.Rectangle;
 
-namespace Gmulator;
+namespace Gmulator.Ui;
 public class GraphicsWindow
 {
     private static Texture2D[] TilesTex;
@@ -25,11 +24,11 @@ public class GraphicsWindow
         TileBuffer[0] = new uint[128 * 256 * 4];
         TileBuffer[1] = new uint[128 * 256 * 4];
 
-        NametableTex = Texture.CreateTexture(MapBuffer, 256, 256);
-        SpritesTex = Texture.CreateTexture(SpriteBuffer, 256, 256);
-        TilesTex = new Texture2D[2];
-        TilesTex[0] = Texture.CreateTexture(TileBuffer[0], 128, 256);
-        TilesTex[1] = Texture.CreateTexture(TileBuffer[1], 128, 256);
+        //NametableTex = Texture.CreateTexture(MapBuffer, 256, 256);
+        //SpritesTex = Texture.CreateTexture(SpriteBuffer, 256, 256);
+        //TilesTex = new Texture2D[2];
+        //TilesTex[0] = Texture.CreateTexture(TileBuffer[0], 128, 256);
+        //TilesTex[1] = Texture.CreateTexture(TileBuffer[1], 128, 256);
     }
 
     public static void RenderPpuDebug(ImFontPtr consolas, uint frame)
@@ -37,7 +36,7 @@ public class GraphicsWindow
         //RenderNametable(ref MapBuffer);
         //if ((frame % 2) == 0)
         {
-            Texture.Update(NametableTex, MapBuffer);
+            //Texture.Update(NametableTex, MapBuffer);
             rlImGui.Image(NametableTex);
         }
     }
