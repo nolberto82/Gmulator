@@ -1,7 +1,10 @@
-﻿namespace Gmulator.Core.Gbc.Mappers;
-public abstract class BaseMapper : EmuState
+﻿using Gmulator.Interfaces;
+
+namespace Gmulator.Core.Gbc.Mappers;
+
+public abstract class BaseMapper : ISaveState
 {
-    public byte[] Rom { get; set; }
+    public GbcMmu Mmu { get; }
     public int Rombank { get; set; }
     public int Rambank { get; set; }
     public bool CartRamOn { get; set; }
@@ -11,6 +14,15 @@ public abstract class BaseMapper : EmuState
     public string MapperType { get; set; }
     public byte[] Sram { get; set; }
     private Timer Timer;
+    public byte[] Rom { get; set; }
+
+    public BaseMapper(byte[] rom, GbcMmu mmu)
+    {
+        Rom = rom;
+        Mmu = mmu;
+        //Mmu.SetMemory(0x0000, 0x4000, ReadRom, WriteRom0, RamType.Rom);
+        //Mmu.SetMemory(0x4000, 0x8000, ReadRom, WriteRom1, RamType.Rom);
+    }
 
     public virtual void Reset()
     {
@@ -31,10 +43,10 @@ public abstract class BaseMapper : EmuState
             MapperType = "Unknown";
     }
 
-    public virtual byte ReadRom(int a) => Rom[a % Rom.Length];
+    public virtual int ReadRom(int a) => Rom[a % Rom.Length];
     public abstract Span<byte> ReadRomBlock(int a, int size);
-    public abstract void WriteRom0(int a, byte v, bool edit = false);
-    public abstract void WriteRom1(int a, byte v, bool edit = false);
+    public abstract void WriteRom0(int a, int v);
+    public abstract void WriteRom1(int a, int v);
 
     public virtual void Write()
     {
@@ -114,7 +126,7 @@ public abstract class BaseMapper : EmuState
         [0xFF] = "HuC1RAMBATTERY",
     };
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         bw.Write(Name);
         bw.Write(Ramsize);
@@ -124,7 +136,7 @@ public abstract class BaseMapper : EmuState
         bw.Write(CGB);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         Name = br.ReadString();
         Ramsize = br.ReadInt32();

@@ -6,7 +6,7 @@ namespace Gmulator.Shared;
 public class Config
 {
     public string WorkingDir { get; set; } = "C:";
-    public int Volume { get; set; } = 10;
+    public int Volume { get; set; } = 2;
     public int FrameSkip { get; set; } = 10;
     public int RotateAB { get; set; }
 
@@ -44,7 +44,7 @@ public class Config
         File.WriteAllText(file, json);
     }
 
-    public static void CreateDirectories(bool isdeck)
+    public void CreateDirectories(bool isdeck)
     {
         if (!Directory.Exists(RomDirectory))
             Directory.CreateDirectory(RomDirectory);

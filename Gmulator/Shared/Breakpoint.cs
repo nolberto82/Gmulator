@@ -60,5 +60,5 @@ public static class BPType
 public enum RamType : int
 {
     Wram, Sram, Vram, Oram, Rom, Cram,
-    SpcRam, SpcRom, GsuRom, Register,
+    SpcRam, SpcRom, GsuRom, Register, None
 }

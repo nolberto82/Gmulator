@@ -1,5 +1,7 @@
-﻿namespace Gmulator.Core.Snes;
-public partial class SnesSpc : EmuState
+﻿using Gmulator.Interfaces;
+
+namespace Gmulator.Core.Snes;
+public partial class SnesSpc : ISaveState
 {
     private const int FC = 1 << 0;
     private const int FZ = 1 << 1;
@@ -27,7 +29,7 @@ public partial class SnesSpc : EmuState
     public int TestAddr { get; set; }
     public bool Stepped { get; set; }
 
-    private Snes Snes;
+    private readonly Snes Snes;
     private SnesApu Apu;
 
     public SnesSpc()
@@ -46,7 +48,7 @@ public partial class SnesSpc : EmuState
 
     private void Idle() => Apu.Idle();
 
-    public byte ReadOp(bool debug = false)
+    public int ReadOp(bool debug = false)
     {
         if (!debug)
             Apu.Cycle();
@@ -55,9 +57,9 @@ public partial class SnesSpc : EmuState
         return Read(pc - 1);
     }
 
-    public byte Read(int a, bool debug = false) => Apu.Read(a, debug);
+    public int Read(int a) => Apu.Read(a);
 
-    public void Write(int a, int v, bool debug = false) => Apu.Write(a, v);
+    public void Write(int a, int v) => Apu.Write(a, v);
 
     private int ReadWord(int a) => (Read(a) | Read(a + 1) << 8) & 0xffff;
 
@@ -73,7 +75,7 @@ public partial class SnesSpc : EmuState
 #endif
 
         int a1, a2;
-        byte op = Read(PC++);
+        int op = Read(PC++);
         switch (op)
         {
             //8-bit Data Transmission (Read)
@@ -249,7 +251,7 @@ public partial class SnesSpc : EmuState
                 a1 = Dir();
                 a = Read(a1);
                 y = Read((a1 + 1 & 0xff) | GetPage());
-                SetZN(y);
+                SetZN(y << 8 | a);
                 break;
             case 0xDA:
                 a1 = Dir();
@@ -351,7 +353,7 @@ public partial class SnesSpc : EmuState
         Stepped = true;
     }
 
-    public byte Imm() => ReadOp();
+    public int Imm() => ReadOp();
 
     public sbyte Rel() => (sbyte)ReadOp();
 
@@ -458,7 +460,7 @@ public partial class SnesSpc : EmuState
         return (a1, high);
     }
 
-    private byte Pop() => Read(++SP | 0x100);
+    private int Pop() => Read(++SP | 0x100);
 
     private void Push(int v) => Write(0x100 | SP--, v);
 
@@ -517,8 +519,8 @@ public partial class SnesSpc : EmuState
         PC = ReadWord(0xfffe);
     }
 
-    public List<RegisterInfo> GetFlags() => new()
-    {
+    public List<RegisterInfo> GetFlags() =>
+    [
         new("","C",$"{(PS&0x01) != 0}"),
         new("","Z",$"{(PS&0x02) != 0}"),
         new("","I",$"{(PS&0x04) != 0}"),
@@ -527,25 +529,25 @@ public partial class SnesSpc : EmuState
         new("","P",$"{(PS&0x20) != 0}"),
         new("","V",$"{(PS&0x40) != 0}"),
         new("","N",$"{(PS&0x80) != 0}"),
-    };
+    ];
 
-    public List<RegisterInfo> GetRegisters() => new()
-    {
+    public List<RegisterInfo> GetRegisters() =>
+    [
         new("","A",$"{A:X2}"),
         new("","X",$"{X:X2}"),
         new("","Y",$"{Y:X2}"),
         new("","P",$"{PS:X2}"),
         new("","S",$"{SP:X2}"),
-    };
+    ];
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         bw.Write(PC); bw.Write(SP);
         bw.Write(A); bw.Write(X);
         bw.Write(Y); bw.Write(PS);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         PC = br.ReadInt32(); SP = br.ReadInt32();
         A = br.ReadInt32(); X = br.ReadInt32();

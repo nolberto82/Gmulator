@@ -13,9 +13,10 @@ public class SnesLogger(Snes snes)
     private bool MMode;
     private bool XMode;
 
-    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes)
+    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes, bool isSa1=false)
     {
         var snes = Snes;
+        var Cpu = isSa1 ? Snes.Sa1 : Snes.Cpu;
         int op = snes.ReadOp(pc);
         int a, c, x = 0;
         string w = string.Empty;

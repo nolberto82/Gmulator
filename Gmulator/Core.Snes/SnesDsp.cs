@@ -1,8 +1,9 @@
-﻿using Raylib_cs;
+﻿using Gmulator.Interfaces;
+using Raylib_cs;
 
 namespace Gmulator.Core.Snes;
 
-public class SnesDsp : EmuState
+public class SnesDsp : ISaveState
 {
     public float[] SamplesL { get; private set; }
     public float[] SamplesR { get; private set; }
@@ -487,7 +488,7 @@ public class SnesDsp : EmuState
         return samples;
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         WriteArray(bw, _ram); WriteArray(bw, DecodeBuffer);
         WriteArray(bw, RateNums); WriteArray(bw, Pitch);
@@ -507,7 +508,7 @@ public class SnesDsp : EmuState
         WriteArray(bw, SampleOut); bw.Write(DirPage);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         _ram = ReadArray<byte>(br, _ram.Length); DecodeBuffer = ReadArray<short>(br, DecodeBuffer.Length);
         RateNums = ReadArray<short>(br, RateNums.Length); Pitch = ReadArray<int>(br, Pitch.Length);

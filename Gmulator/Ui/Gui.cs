@@ -1,6 +1,7 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
+using Gmulator.Shared;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -25,10 +26,10 @@ public abstract class Gui
     public LuaApi LuaApi { get; private set; }
     private Audio Audio { get; set; }
     private Cheat Cheat { get; set; }
+    public Dictionary<int, Cheat> Cheats => Emulator?.Cheats;
     public float MenuHeight { get; set; }
     public RenderTexture2D Screen { get; private set; }
     public RenderTexture2D MenuTarget { get; set; }
-    public Emulator Emulator { get; private set; } = new();
     public ImFontPtr[] DebugFont { get; private set; }
     public Font GuiFont { get; private set; }
 
@@ -40,7 +41,7 @@ public abstract class Gui
     public int[] OldTotal { get; set; } = new int[MaxTabs];
     public int[] MenuScroll { get; set; } = new int[MaxTabs];
 
-    public Config Config { get; set; }
+    public Emulator Emulator { get; private set; }
     public List<FileDetails> GameFiles { get; set; } = [];
     public List<FileDetails> CheatFiles { get; set; } = [];
     public List<FileDetails> LuaFiles { get; set; } = [];
@@ -48,15 +49,16 @@ public abstract class Gui
     public List<Option> Options { get; set; } = [];
     public string CurrentName { get; set; }
     public string PreviousName { get; set; }
-    public Action<string> Reset { get; set; }
     public bool OpenDialog { get; set; }
     public bool CheatDialog { get; set; }
     public bool ToggleAllCheats { get; set; }
     public bool DeleteFileMode { get; set; }
     public bool Opened;
+    private string _gameName;
 
     public string WorkingDirectory { get; set; }
     public string[] FileExtensions { get; set; }
+
 
     public virtual void Run()
     { }
@@ -69,6 +71,7 @@ public abstract class Gui
 
     public virtual void Update(bool isdeck)
     {
+        if (!Opened) return;
         switch (TabIndex)
         {
             case ScrMain:
@@ -86,16 +89,27 @@ public abstract class Gui
                 break;
             case ScrGames:
                 if (Raylib.IsGamepadButtonPressed(0, BtnB))
-                    LoadGame(GameFiles[SelOption[ScrGames]].Name);
+                {
+                    if (DeleteFileMode)
+                        DeleteFile(GameFiles[SelOption[ScrGames]]);
+                    else
+                        LoadGame(GameFiles[SelOption[ScrGames]].Name);
+                }
                 else if (Raylib.IsGamepadButtonPressed(0, BtnX))
                     DeleteFileMode = !DeleteFileMode;
                 break;
             case ScrCheats or ScrBrowser:
                 if (Raylib.IsGamepadButtonPressed(0, BtnY) && Emulator?.GameName != "")
+                {
                     CheatDialog = !CheatDialog;
+                    if (CheatDialog)
+                        TabIndex = ScrBrowser;
+                    else
+                        TabIndex = ScrCheats;
+                }
 
                 if (Raylib.IsGamepadButtonPressed(0, BtnX) && Emulator?.GameName != "")
-                    EnableAllCheats();
+                    EnableAllCheats(Emulator);
 
                 if (TabIndex == ScrCheats)
                 {
@@ -107,11 +121,19 @@ public abstract class Gui
                         var cht = res.Where(c => c.Description == res[i].Description).ToList();
                         if (Raylib.IsGamepadButtonPressed(0, BtnB) && j == SelOption[ScrCheats])
                         {
-                            ToggleCheat(cht, i);
+                            ToggleCheat(cht);
                             break;
                         }
                         i += cht.Count;
                         j++;
+                    }
+                }
+                else
+                {
+                    if (Raylib.IsGamepadButtonPressed(0, BtnB))
+                    {
+                        LoadCheats(CheatFiles[SelOption[ScrBrowser]].Name);
+                        TabIndex = ScrCheats;
                     }
                 }
                 ToggleAllCheats = false;
@@ -133,17 +155,18 @@ public abstract class Gui
                 if (v != old)
                 {
                     o.Value = v;
-                    Config.FrameSkip = Options[0].Value;
-                    Config.Volume = Options[1].Value;
-                    Config.RotateAB = Options[2].Value;
-                    Audio.SetVolume(Config.Volume);
-                    Config.Save();
+                    var config = Emulator.Config;
+                    config.FrameSkip = Options[0].Value;
+                    config.Volume = Options[1].Value;
+                    config.RotateAB = Options[2].Value;
+                    Audio.SetVolume(config.Volume);
+                    config.Save();
                 }
                 break;
         }
     }
 
-    public virtual void Unload(bool isdeck)
+    public virtual void Unload()
     {
         Emulator?.Close();
         Emulator?.Config.Save();
@@ -159,10 +182,11 @@ public abstract class Gui
         Raylib.SetConfigFlags(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow | ConfigFlags.HighDpiWindow);
         Raylib.InitWindow(DeckWidth, DeckHeight, EmulatorName);
         Raylib.SetTargetFPS(60);
+        Emulator = new();
         Audio = new();
 
 #if DEBUG || RELEASE
-        Raylib.SetWindowSize(1400, 980);
+        Raylib.SetWindowSize(1000, 980);
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
@@ -208,8 +232,8 @@ public abstract class Gui
         }
 
         Emulator?.Config = new();
-        Config.CreateDirectories(isdeck);
-        Emulator?.Config.Load();
+        Emulator.Config.CreateDirectories(isdeck);
+        Emulator.Config.Load();
         FileExtensions = [".gb", ".gbc", ".nes", ".sfc", ".smc", ".sms", ".gg"];
         CurrentName = PreviousName = "";
 
@@ -219,7 +243,7 @@ public abstract class Gui
         Cheat = new();
     }
 
-    public void Open(Emulator emu)
+    public void Open(Config config)
     {
         if (Opened)
         {
@@ -229,17 +253,16 @@ public abstract class Gui
             return;
         }
 
-        Emulator = emu;
-        Config = emu.Config;
-        WorkingDirectory = Config.WorkingDir;
+        Emulator.Config = config;
+        WorkingDirectory = Emulator.Config.WorkingDir;
         Opened = true;
         OpenDialog = true;
 
         Options =
         [
-            new("Frameskip", [Config.FrameSkip, 1, 1, 10], null, false, ChangeOption, null),
-            new("Volume", [Config.Volume, 1, 0, 100], null, false, ChangeOption, null),
-            new("Rotate AB Buttons", [Config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
+            new("Frameskip", [config.FrameSkip, 1, 1, 10], null, false, ChangeOption, null),
+            new("Volume", [config.Volume, 1, 0, 100], null, false, ChangeOption, null),
+            new("Rotate AB Buttons", [config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
             //new("Copy Hacks", [0, 0, 0, 0], [""], true, null, CopyHacks),
         ];
     }
@@ -266,37 +289,45 @@ public abstract class Gui
     {
         if (name != "")
         {
+            //Emulator.Close();
             switch (Path.GetExtension(name).ToLowerInvariant())
             {
                 case ".gb" or ".gbc":
-                    Gbc gbc = new();
-                    Emulator = gbc;
+                {
+                    Emulator = new Gbc();
                     Emulator.Init(GbWidth, GbHeight, GbcConsole, MenuHeight, DebugFont, GuiFont);
-                    LuaApi = Emulator.LuaApi;
-                    gbc.LuaMemoryCallbacks();
                     Audio.Init(GbcAudioFreq, 4096, 4096, 32);
                     break;
+                }
                 case ".nes":
-                    Nes nes = new();
-                    Emulator = nes;
+                {
+                    Emulator = new Nes();
                     Emulator.Init(NesWidth, NesHeight, NesConsole, MenuHeight, DebugFont, GuiFont);
-                    LuaApi = Emulator.LuaApi;
-                    nes.LuaMemoryCallbacks();
                     Audio.Init(NesAudioFreq, 4096, 4096, 32);
                     break;
+                }
                 case ".sfc" or ".smc":
-                    Snes snes = new();
-                    Emulator = snes;
+                {
+                    Emulator = new Snes();
                     Emulator.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebugFont, GuiFont);
-                    LuaApi = Emulator.LuaApi;
-                    snes.LuaMemoryCallbacks();
                     Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
                     break;
+                }
+                //case ".sms":
+                //Sms sms = new();
+                //Emulator = sms;
+                //Emulator.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebugFont, GuiFont);
+                //LuaApi = Emulator.LuaApi;
+                //sms.LuaMemoryCallbacks();
+                //Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
+                //break;
                 default: return;
             }
 
+            Emulator?.LuaMemoryCallbacks();
+            LuaApi = Emulator?.LuaApi;
             LuaApi.Init();
-            Emulator.Reset(name, false);
+            Emulator.Reset(name, false, null);
             Emulator.Config = new();
             Emulator?.Config.Load();
             LuaApi?.Reset();
@@ -304,9 +335,9 @@ public abstract class Gui
 
         Emulator?.Config?.Load();
 
-        string gameName = Emulator?.GameName;
-        Cheat?.Load(Emulator, gameName);
-        LuaApi?.Load(gameName);
+        _gameName = Emulator?.GameName;
+
+        LuaApi?.Load(name);
     }
 
     public void DisplayFiles(List<FileDetails> list, int x, int y, int width, Font font)
@@ -323,6 +354,19 @@ public abstract class Gui
         }
     }
 
+    public void DeleteFile(FileDetails file)
+    {
+        if (file.IsFile)
+        {
+            File.Delete(file.Name);
+            var filename = Path.GetFileNameWithoutExtension(file.Name);
+            if (File.Exists($"{CheatDirectory}/{filename}.cht"))
+                File.Delete($"{CheatDirectory}/{filename}.cht");
+            if (File.Exists($"{CheatDirectory}/{filename}.lua"))
+                File.Delete($"{CheatDirectory}/{filename}.lua");
+        }
+    }
+
     public void DrawCheats(List<Cheat> cheats, int x, int y, int width)
     {
         int j = 0;
@@ -335,7 +379,7 @@ public abstract class Gui
                 var chtstatus = cht[0].Enabled ? "ON" : "OFF";
                 var colorstatus = cht[0].Enabled ? Color.White : new(173, 173, 173, 255);
                 if (cht[0].Description.Length > 60)
-                    cht[0].Description = cht[0].Description.Substring(0, 60);
+                    cht[0].Description = cht[0].Description[..60];
                 Raylib.DrawTextEx(GuiFont, cht[0].Description, new(x, y), FontSize, 0, colorstatus);
                 Raylib.DrawTextEx(GuiFont, $"{chtstatus,-3}", new(x + width - 45, y), FontSize, 0, colorstatus);
                 i += cht.Count;
@@ -422,30 +466,32 @@ public abstract class Gui
 
     public void LoadGame(string filename)
     {
-        Config?.Save();
+        Emulator.Config?.Save();
         Opened = false;
         ResetGame(CurrentName = filename);
     }
 
-    public void LoadCheat(string filename)
+    public void LoadCheats(string filename)
     {
-        Emulator.Cheat.Load(Emulator, filename);
         CheatDialog = false;
+        Emulator.LoadCheats(filename);
+        if (!File.Exists($"{CheatDirectory}/{Path.GetFileNameWithoutExtension(_gameName)}.cht"))
+            Emulator.SaveCheats($"{CheatDirectory}/{Path.GetFileNameWithoutExtension(_gameName)}.cht");
     }
 
-    public void ToggleCheat(List<Cheat> cht, int i)
+    public void ToggleCheat(List<Cheat> cht)
     {
         if (cht == null) return;
         foreach (var c in cht)
             c.Enabled = !c.Enabled;
-        CheatConverter.Save(CurrentName);
+        Emulator.SaveCheats(CurrentName);
     }
 
-    public void EnableAllCheats()
+    public void EnableAllCheats(Emulator emulator)
     {
-        foreach (var c in Emulator.Cheats.Values)
+        foreach (var c in emulator.Cheats.Values)
             c.Enabled = true;
-        CheatConverter.Save(CurrentName);
+        emulator.SaveCheats(CurrentName);
     }
 
     public readonly string[] MainEntries = ["Games", "Cheats", "Lua", "Options", "Copy Hacks"];

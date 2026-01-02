@@ -1,30 +1,63 @@
 ﻿
+using Gmulator.Interfaces;
+using System.Runtime.Intrinsics.X86;
+
 namespace Gmulator.Core.Gbc;
-public class GbcTimer
+
+public class GbcTimer : ISaveState
 {
-    public int DivideRegister { get; private set; }
-    public int TimerCounter { get; private set; }
-    public int TotalCounter { get; private set; }
-    public bool Overflow { get; private set; }
+    private int _divideRegister;
+    private int _timerCounter;
+    private bool _overflow;
+    private bool _updateTIMA;
 
-    public GbcTimer() { }
+    private int _div;
+    private int _tima;
+    private int _tma;
+    private int _tac;
 
-    public void Step(GbcIO IO, GbcCpu cpu, int cycles)
+    public GbcTimer(Gbc gbc)
     {
-        var m = 1;
-        TotalCounter += cycles;
-        DivideRegister += cycles;
-        if (DivideRegister >= 256 / m)
+        gbc.SetMemory(0x00, 0x00, 0xff04, 0xff07, 0xffff, Read, Write, RamType.Register, 1);
+    }
+
+    public int Read(int a)
+    {
+        return a switch
         {
-            DivideRegister -= 256 / m;
-            IO.DIV++;
+            0xff04 => _div | 0xad,
+            0xff05 => _tima,
+            0xff06 => _tma,
+            0xff07 => _tac | 0xf8,
+            _ => 0,
+        };
+    }
+
+    public void Write(int a, int v)
+    {
+        switch (a)
+        {
+            case 0xff04: _div = v; break;
+            case 0xff05: _tima = v; break;
+            case 0xff06: _tma = v; break;
+            case 0xff07: _tac = v; break;
+        }
+    }
+
+    public void Step(GbcCpu cpu, int cycles)
+    {
+        _divideRegister += cycles;
+        if (_divideRegister >= 256)
+        {
+            _divideRegister -= 256;
+            _div++;
         }
 
-        if ((IO.TAC & 0x04) > 0)
+        if ((_tac & 0x04) > 0)
         {
             int div = 0;
 
-            _ = (IO.TAC & 3) switch
+            _ = (_tac & 3) switch
             {
                 0 => div = 1024,
                 1 => div = 16,
@@ -33,36 +66,47 @@ public class GbcTimer
                 _ => 0,
             };
 
-            if (Overflow)
+            if (_overflow)
             {
-                IO.TIMA = IO.TMA;
-                IO.IF |= 4;
-                cpu.Halt = false;
-                Overflow = false;
+                _tima = _tma;
+                cpu.RequestIF(IntTimer);
+                _overflow = false;
             }
 
-            if (IO.UpdateTIMA)
+            if (_updateTIMA)
             {
-                ++IO.TIMA;
-                IO.UpdateTIMA = false;
+                _tima++;
+                _updateTIMA = false;
             }
 
-            TimerCounter += cycles;
-            while (TimerCounter >= div / m)
+            _timerCounter += cycles;
+            while (_timerCounter >= div)
             {
 
-                TimerCounter -= div / m;
-                IO.UpdateTIMA = true;
-                if (IO.TIMA == 0xff)
-                    Overflow = true;
+                _timerCounter -= div;
+                _updateTIMA = true;
+                if (_tima == 0xff)
+                    _overflow = true;
             }
         }
     }
 
     public void Reset()
     {
-        TimerCounter = 0;
-        DivideRegister = 0;
-        TotalCounter = 0;
+        _timerCounter = 0;
+        _divideRegister = 0;
+        _div = _tima = _tma = _tac = 0;
+    }
+
+    public void Save(BinaryWriter bw)
+    {
+        bw.Write(_divideRegister); bw.Write(_timerCounter); bw.Write(_overflow); bw.Write(_updateTIMA);
+        bw.Write(_div); bw.Write(_tima); bw.Write(_tma); bw.Write(_tac);
+    }
+
+    public void Load(BinaryReader br)
+    {
+        _divideRegister = br.ReadInt32(); _timerCounter = br.ReadInt32(); _overflow = br.ReadBoolean(); _updateTIMA = br.ReadBoolean();
+        _div = br.ReadInt32(); _tima = br.ReadInt32(); _tma = br.ReadInt32(); _tac = br.ReadInt32();
     }
 }

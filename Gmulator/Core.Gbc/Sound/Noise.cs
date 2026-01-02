@@ -1,59 +1,66 @@
 ﻿
+using Gmulator.Interfaces;
+using System;
+using System.ComponentModel;
+using static Gmulator.Interfaces.IMmu;
+
 namespace Gmulator.Core.Gbc.Sound;
-public class Noise : BaseChannel
+
+public class Noise : BaseChannel, ISaveState
 {
-    public byte NR41 { get; private set; }
-    public byte NR42 { get; private set; }
-    public byte NR43 { get; private set; }
-    public byte NR44 { get; private set; }
+    private int _nr41;
+    private int _nr42;
+    private int _nr43;
+    private int _nr44;
 
-    public Noise() { }
-
-    public override byte Read(int a)
+    public Noise(Gbc gbc)
     {
-        if (a == 0x20)
-            return (byte)(NR41 | 0xff);
-        else if (a == 0x21)
-            return NR42;
-        else if (a == 0x22)
-            return NR43;
-        else if (a == 0x23)
-            return (byte)(NR44 | 0xbf);
-        return 0xff;
+        gbc.SetMemory(0x00, 0x01, 0xff20, 0xff23, 0xffff, Read, Write, RamType.Register, 1);
     }
 
-    public override void Write(int a, byte v)
+    public int Read(int a)
     {
-        if (a == 0x20)
+        return a switch
         {
-            LengthCounter = 64 - (v & 0x3f);
-            NR41 = v;
-        }
-        else if (a == 0x21)
+            0xff20 => _nr41 | 0xff,
+            0xff21 => _nr42,
+            0xff22 => _nr43,
+            0xff23 => _nr44 | 0xbf,
+            _ => 0xff,
+        };
+    }
+
+    public void Write(int a, int v)
+    {
+        switch (a)
         {
-            EnvVolume = (v & 0xf0) >> 4;
-            EnvDirection = (v & 0x08) > 0;
-            EnvPeriod = v & 0x07;
-            Dac = (v & 0xf8) > 0;
-            NR42 = v;
-        }
-        else if (a == 0x22)
-        {
-            Shift = (v & 0xf0) >> 4;
-            Width = (v & 0x08) >> 3;
-            Divisor = v & 0x07;
-            NR43 = v;
-        }
-        else if (a == 0x23)
-        {
-            LengthEnabled = (v & 0x40) != 0;
-            if ((v & 0x80) != 0)
-            {
-                Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-                Trigger(64, 4);
-                LFSR = 0x7fff;
-            }
-            NR44 = v;
+            case 0xff20:
+                LengthCounter = 64 - (v & 0x3f);
+                _nr41 = v;
+                break;
+            case 0xff21:
+                EnvVolume = (v & 0xf0) >> 4;
+                EnvDirection = (v & 0x08) > 0;
+                EnvPeriod = v & 0x07;
+                Dac = (v & 0xf8) > 0;
+                _nr42 = v;
+                break;
+            case 0xff22:
+                Shift = (v & 0xf0) >> 4;
+                Width = (v & 0x08) >> 3;
+                Divisor = v & 0x07;
+                _nr43 = v;
+                break;
+            case 0xff23:
+                LengthEnabled = (v & 0x40) != 0;
+                if ((v & 0x80) != 0)
+                {
+                    Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
+                    Trigger(64, 4);
+                    LFSR = 0x7fff;
+                }
+                _nr44 = v;
+                break;
         }
     }
 
@@ -66,46 +73,29 @@ public class Noise : BaseChannel
         Timer = 0;
         CurrentVolume = 0;
         Sample = 0;
-        NR41 = 0xff;
-        NR42 = 0x00;
-        NR43 = 0x00;
-        NR44 = 0xbf;
+        LFSR = 0x7fff;
+        _nr41 = 0xff;
+        _nr42 = 0x00;
+        _nr43 = 0x00;
+        _nr44 = 0xbf;
         Dac = false;
         Enabled = false;
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
-        bw.Write(Width);
-        bw.Write(Divisor);
-        bw.Write(LFSR);
-        bw.Write(Frequency);
-        bw.Write(LengthCounter);
-        bw.Write(Duty);
-        bw.Write(EnvVolume);
-        bw.Write(CurrentVolume);
-        bw.Write(Timer);
-        bw.Write(NR41);
-        bw.Write(NR42);
-        bw.Write(NR43);
-        bw.Write(NR44);
+        bw.Write(Width); bw.Write(Divisor); bw.Write(LFSR); bw.Write(Frequency);
+        bw.Write(LengthCounter); bw.Write(Duty); bw.Write(EnvVolume); bw.Write(CurrentVolume);
+        bw.Write(Timer); bw.Write(_nr41); bw.Write(_nr42); bw.Write(_nr43);
+        bw.Write(_nr44);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
-        Width = br.ReadInt32();
-        Divisor = br.ReadInt32();
-        LFSR = br.ReadInt32();
-        Frequency = br.ReadInt32();
-        LengthCounter = br.ReadInt32();
-        Duty = br.ReadInt32();
-        EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32();
-        Timer = br.ReadInt32();
-        NR41 = br.ReadByte();
-        NR42 = br.ReadByte();
-        NR43 = br.ReadByte();
-        NR44 = br.ReadByte();
+        Width = br.ReadInt32(); Divisor = br.ReadInt32(); LFSR = br.ReadInt32(); Frequency = br.ReadInt32();
+        LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32();
+        Timer = br.ReadInt32(); _nr41 = br.ReadInt32(); _nr42 = br.ReadInt32(); _nr43 = br.ReadInt32();
+        _nr44 = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() =>

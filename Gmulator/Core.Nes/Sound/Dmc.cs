@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Core.Nes.Sound;
+
 public class Dmc : BaseChannel
 {
     public int OutputLevel { get; set; }
@@ -20,33 +21,44 @@ public class Dmc : BaseChannel
        190, 160, 142, 128, 106,  84,  72,  54
     ];
 
+    public Dmc(Nes nes)
+    {
+        nes.SetMemory(0x00, 0x00, 0x4010, 0x4013, 0xffff, (int a) => 0xff, Write, RamType.Register, 1);
+    }
+
     public void Write(int a, int v)
     {
-        if (a == 0x4010)
+        switch (a)
         {
-            RateIndex = v & 0x0f;
-            Irq = (v & 0x80) != 0;
-            Loop = (v & 0x40) != 0;
-            Frequency = (Rate[v & 0x0f] / 2) & 0xffff;
+            case 0x4010:
+                RateIndex = v & 0x0f;
+                Irq = (v & 0x80) != 0;
+                Loop = (v & 0x40) != 0;
+                Frequency = (Rate[v & 0x0f] / 2) & 0xffff;
+                break;
+            case 0x4011:
+                OutputLevel = (byte)(v & 0x7f);
+                break;
+            case 0x4012:
+                SampleAddress = 0xc000 + (v << 6);
+                break;
+            case 0x4013:
+                SampleLength = (v << 4) + 1;
+                break;
         }
-        else if (a == 0x4011)
-            OutputLevel = (byte)(v & 0x7f);
-        else if (a == 0x4012)
-            SampleAddress = 0xc000 + (v << 6);
-        else if (a == 0x4013)
-            SampleLength = (v << 4) + 1;
-        else if (a == 0x4015)
-        {
-            if (Enabled)
-            {
-                if (LengthValue == 0)
-                    Reload();
-            }
-            else
-                LengthValue = 0;
+    }
 
-            Irq = false;
+    public void Write4015(int a, int v)
+    {
+        if (Enabled)
+        {
+            if (LengthValue == 0)
+                Reload();
         }
+        else
+            LengthValue = 0;
+
+        Irq = false;
     }
 
     public override void Reset()
@@ -116,25 +128,19 @@ public class Dmc : BaseChannel
 
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
-        bw.Write(OutputLevel);
-        bw.Write(Frequency);
-        bw.Write(Timer);
-        bw.Write(RateIndex);
-        bw.Write(Loop);
-        bw.Write(SampleAddress);
-        bw.Write(SampleLength);
+        bw.Write(Timer); bw.Write(Frequency); bw.Write(OutputLevel); bw.Write(OutputShift);
+        bw.Write(RateIndex); bw.Write(Irq); bw.Write(Loop); bw.Write(SampleAddress);
+        bw.Write(SampleLength); bw.Write(AddrValue); bw.Write(LengthValue); bw.Write(SampleBuffer);
+        bw.Write(OutputBits);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
-        OutputLevel = (byte)br.ReadInt32();
-        Frequency = br.ReadInt32();
-        Timer = br.ReadInt32();
-        RateIndex = br.ReadInt32();
-        Loop = br.ReadBoolean();
-        SampleAddress = br.ReadInt32();
-        SampleLength = br.ReadInt32();
+        Timer = br.ReadInt32(); Frequency = br.ReadInt32(); OutputLevel = br.ReadInt32(); OutputShift = br.ReadInt32();
+        RateIndex = br.ReadInt32(); Irq = br.ReadBoolean(); Loop = br.ReadBoolean(); SampleAddress = br.ReadInt32();
+        SampleLength = br.ReadInt32(); AddrValue = br.ReadInt32(); LengthValue = br.ReadInt32(); SampleBuffer = br.ReadInt32();
+        OutputBits = br.ReadInt32();
     }
 }

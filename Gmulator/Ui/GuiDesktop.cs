@@ -12,9 +12,7 @@ internal class GuiDesktop : Gui
 {
     private bool ShowPpuDebug;
 
-    private string _cheatName;
-    private string _cheatCodes;
-    private string _cheatsOut;
+    private string _cheatOut;
 
     public override void Run()
     {
@@ -34,7 +32,7 @@ internal class GuiDesktop : Gui
             Input.UpdateGuiInput(Emulator, this);
 
             ImGui.PushFont(DebugFont[0]);
-            
+
             Update(false);
             Render();
             RenderMenuBar();
@@ -45,7 +43,7 @@ internal class GuiDesktop : Gui
         }
 
         rlImGui.Shutdown();
-        base.Unload(false);
+        base.Unload();
     }
 
     private void RenderMenuBar()
@@ -59,13 +57,13 @@ internal class GuiDesktop : Gui
                 {
                     if (!Opened)
                     {
-                        Open(Emulator);
+                        Open(Emulator.Config);
                         Emulator.State = DebugState.Paused;
                         ImGui.OpenPopup("Menu");
                     }
                 }
                 if (ImGui.MenuItem("Reset"))
-                    Emulator.Reset("", true);
+                    Emulator.Reset("", true, null);
 
                 ImGui.EndMenu();
             }
@@ -76,10 +74,10 @@ internal class GuiDesktop : Gui
                 if (ImGui.MenuItem("Show Debugger", "", Emulator.Debug))
                 {
                     Emulator.Debug = !Emulator.Debug;
-                    LuaApi.SetDebug(Emulator.Debug);
+                    LuaApi?.SetDebug(Emulator.Debug);
                 }
 
-                ImGui.BeginDisabled(Emulator.System != SnesConsole);
+                ImGui.BeginDisabled(Emulator is not Snes);
                 if (ImGui.MenuItem("Show Sa1", "", Emulator.DebugWindow?.ShowSa1 == true))
                     Emulator.DebugWindow.ShowSa1 = !Emulator.DebugWindow.ShowSa1;
 
@@ -100,6 +98,8 @@ internal class GuiDesktop : Gui
 
     public override void Render()
     {
+        if (!Opened) return;
+
         ImGuiViewportPtr vp = ImGui.GetMainViewport();
         ImGui.SetNextWindowSize(new(vp.Size.X, vp.Size.Y));
         ImGui.SetNextWindowPos(new(0, 0));
@@ -151,8 +151,8 @@ internal class GuiDesktop : Gui
                                 GameFiles.Clear();
                                 if (file.Name == "..")
                                 {
-                                    Config.WorkingDir = WorkingDirectory = Path.GetFullPath(@$"{WorkingDirectory}/..");
-                                    Config.Save();
+                                    Emulator.Config.WorkingDir = WorkingDirectory = Path.GetFullPath(@$"{WorkingDirectory}/..");
+                                    Emulator.Config.Save();
                                     Enumerate("");
                                 }
                                 else
@@ -180,17 +180,7 @@ internal class GuiDesktop : Gui
                             if (ImGui.Selectable($"{name}", i == SelOption[ScrGames], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
                                 if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
-                                {
-                                    if (file.IsFile)
-                                    {
-                                        File.Delete(file.Name);
-                                        var filename = Path.GetFileNameWithoutExtension(file.Name);
-                                        if (File.Exists($"{CheatDirectory}/{filename}.cht"))
-                                            File.Delete($"{CheatDirectory}/{filename}.cht");
-                                        if (File.Exists($"{CheatDirectory}/{filename}.lua"))
-                                            File.Delete($"{CheatDirectory}/{filename}.lua");
-                                    }
-                                }
+                                    DeleteFile(file);
                                 else
                                 {
                                     if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
@@ -202,8 +192,8 @@ internal class GuiDesktop : Gui
                                         }
                                         else
                                         {
-                                            Config.WorkingDir = WorkingDirectory = file.Name;
-                                            Config.Save();
+                                            Emulator.Config.WorkingDir = WorkingDirectory = file.Name;
+                                            Emulator.Config.Save();
                                             GameFiles.Clear();
                                             Enumerate("");
                                             ImGui.PopStyleColor();
@@ -233,7 +223,7 @@ internal class GuiDesktop : Gui
                                 if (ImGui.Selectable($"{Path.GetFileName(c.Name)}", i == SelOption[ScrBrowser], ImGuiSelectableFlags.AllowDoubleClick))
                                 {
                                     if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-                                        LoadCheat(c.Name);
+                                        LoadCheats(c.Name);
                                 }
                             }
                             ImGui.EndChild();
@@ -249,9 +239,9 @@ internal class GuiDesktop : Gui
                             ImGui.TableSetupColumn("");
                             ImGui.TableNextColumn();
 
-                            for (int i = 0; i < Emulator.Cheats?.Count;)
+                            for (int i = 0; i < Cheats?.Count;)
                             {
-                                var res = Emulator.Cheats.Values.ToList();
+                                var res = Cheats.Values.ToList();
                                 var cht = res.Where(c => c.Description == res[i].Description).ToList();
                                 if (cht.Count > 0)
                                 {
@@ -259,24 +249,57 @@ internal class GuiDesktop : Gui
                                     if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == SelOption[ScrCheats], ImGuiSelectableFlags.AllowDoubleClick))
                                     {
                                         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-                                            ToggleCheat(res, i);
+                                        {
+
+                                            ImGui.OpenPopup("Add/Edit Cheat");
+                                        }
+                                    }
+
+                                    if (ImGui.BeginPopupModal("Add/Edit Cheat"))
+                                    {
+                                        ImGui.PushItemWidth(308);
+                                        ImGui.InputText($"##cheatinput1", ref cht[0].Description, 256);
+                                        ImGui.PopItemWidth();
+                                        ImGui.Separator();
+                                        string cheatstr = string.Join("\n", cht[0].Codes.Split("+"));
+                                        if (ImGui.InputTextMultiline($"##cheatinput2", ref cheatstr, 32768, new(150, 0)))
+                                        {
+                                            _cheatOut = cheatstr;
+                                            cht[0].Codes = cheatstr.Replace("\r\n", "+");
+                                        }
+                                        OpenCopyContext("Address", ref _cheatOut);
+                                        Emulator.ConvertCodes(cht[0], ref _cheatOut, false);
+                                        ImGui.SameLine();
+                                        ImGui.InputTextMultiline("##cheatoutput", ref _cheatOut, 32768, new(150, 0));
+                                        ImGui.Separator();
+                                        ImGui.SetCursorPosX(150);
+                                        if (ImGui.Button("OK", new(80, 0)))
+                                        {
+                                            Emulator.ConvertCodes(cht[0], ref _cheatOut, true);
+                                            ImGui.CloseCurrentPopup();
+                                        }
+                                        ImGui.SameLine(235);
+                                        if (ImGui.Button("Cancel", new(80, 0)))
+                                            ImGui.CloseCurrentPopup();
+                                        ImGui.EndPopup();
                                     }
 
                                     SetActive(ScrCheats, i);
 
                                     ImGui.TableNextColumn();
                                     var enabled = cht[0].Enabled;
-                                    ImGui.Checkbox("", ref enabled);
+                                    if (ImGui.Checkbox("", ref enabled))
+                                    {
+                                        ToggleCheat(cht);
+                                    }
                                     ImGui.TableNextColumn();
 
                                     ImGui.SameLine();
                                     if (ImGui.Button("x"))
                                     {
                                         foreach (var c in cht)
-                                        {
-                                            Emulator.Cheats.Remove(c.Address);
-                                        }
-                                        CheatConverter.Save(CurrentName);
+                                            Cheats.Remove(c.Address);
+                                        Emulator.SaveCheats(CurrentName);
                                     }
 
                                     if (!cht[0].Enabled)
@@ -289,31 +312,6 @@ internal class GuiDesktop : Gui
                                 }
                             }
                             ImGui.EndTable();
-
-                            if (ImGui.BeginPopupContextWindow("cheatmenu"))
-                            {
-                                ImGui.PushItemWidth(308);
-                                ImGui.InputText($"##cheatinput1", ref _cheatName, 256);
-                                ImGui.PopItemWidth();
-                                ImGui.Separator();
-                                ImGui.InputTextMultiline($"##cheatinput2", ref _cheatCodes, 32768, new(150, 0));
-                                OpenCopyContext("Address", ref _cheatCodes);
-                                CheatConverter.ConvertCodes(_cheatName, _cheatCodes, ref _cheatsOut, false, Emulator);
-                                ImGui.SameLine();
-                                ImGui.InputTextMultiline("##cheatoutput", ref _cheatsOut, 32768, new(150, 0));
-                                ImGui.Separator();
-                                ImGui.SetCursorPosX(150);
-                                if (ImGui.Button("OK", new(80, 0)))
-                                {
-                                    CheatConverter.ConvertCodes(_cheatName, _cheatCodes, ref _cheatsOut, true, Emulator);
-                                    CheatConverter.Save(CurrentName);
-                                    ImGui.CloseCurrentPopup();
-                                }
-                                ImGui.SameLine(235);
-                                if (ImGui.Button("Cancel", new(80, 0)))
-                                    ImGui.CloseCurrentPopup();
-                                ImGui.EndPopup();
-                            }
                         }
                         ImGui.EndChild();
                     }
@@ -333,8 +331,8 @@ internal class GuiDesktop : Gui
                                     if (File.Exists(file.Name))
                                     {
                                         Opened = false;
-                                        Emulator?.LuaApi?.Load(file.Name);
-                                        Emulator?.LuaApi?.Save(Emulator.GameName);
+                                        LuaApi?.Load(file.Name);
+                                        LuaApi?.Save(Emulator.GameName);
                                     }
                                 }
                             }
@@ -398,8 +396,8 @@ internal class GuiDesktop : Gui
     public override void Init(bool isdeck)
     {
         base.Init(isdeck);
-        _cheatName = _cheatCodes = _cheatsOut = "";
-        Open(Emulator);
+        _cheatOut = "";
+        Open(Emulator.Config);
         TabIndex = ScrGames;
     }
 

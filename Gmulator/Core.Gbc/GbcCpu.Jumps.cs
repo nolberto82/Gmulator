@@ -21,7 +21,7 @@ public partial class GbcCpu
             case 0x0d: C = OpDec8(C); break;
             case 0x0e: C = OpLdImm8(); break;
             case 0x0f: OpRrca(); break;
-            case 0x10: IME = false; Halt = true; Stop = 8200; break;
+            case 0x10: _ime = false; _halt = true; _stop = 8200; break;
             case 0x11: DE = OpLdImm16(); break;
             case 0x12: OpLdWr(DE, A); break;
             case 0x13: DE = OpInc16(DE); break;
@@ -123,7 +123,7 @@ public partial class GbcCpu
             case 0x73: OpLdWr(HL, E); break;
             case 0x74: OpLdWr(HL, H); break;
             case 0x75: OpLdWr(HL, L); break;
-            case 0x76: Halt = true; PC--; break;
+            case 0x76: _halt = true; PC--; break;
             case 0x77: OpLdWr(HL, A); break;
             case 0x78: A = B; break;
             case 0x79: A = C; break;

@@ -27,21 +27,21 @@ internal class GuiDeck : Gui
 
             Raylib.EndDrawing();
         }
-        Unload(true);
+        Unload();
     }
 
     public override void Render()
     {
         if (!Opened) return;
 
-        var texwidth = Emulator.Screen.Texture.Width == 0 ? 256 : Emulator.Screen.Texture.Width;
-        var texheight = Emulator.Screen.Texture.Height == 0 ? 240 : Emulator.Screen.Texture.Height;
+        var texwidth = Screen.Texture.Width == 0 ? 256 : Screen.Texture.Width;
+        var texheight = Screen.Texture.Height == 0 ? 240 : Screen.Texture.Height;
         var scale = Math.Min((float)Raylib.GetRenderWidth() / texwidth, (float)Raylib.GetRenderHeight() / texheight);
         var left = (Raylib.GetRenderWidth() - texwidth * scale) / 2;
         var renderwidth = Raylib.GetRenderWidth();
         int maxgamesview = Raylib.GetScreenHeight() / FontSize - 5;
-        int x = 0, y = 1, posx = 0;// (int)(x * scale + left);
-        List<FileDetails> list = new();
+        int  y = 1, posx = 0;// (int)(x * scale + left);
+        List<FileDetails> list = [];
 
         Rectangle rectName = new(posx, y, renderwidth, FontSize);
         Raylib.DrawRectangle((int)rectName.X + 1, (int)rectName.Y, (int)rectName.Width, (int)rectName.Height, Color.LightGray);
@@ -71,7 +71,7 @@ internal class GuiDeck : Gui
                 break;
             case ScrCheats or ScrBrowser:
                 if (!CheatDialog)
-                    DrawCheats(Emulator.Cheats.Values.ToList(), posx, y, renderwidth);
+                    DrawCheats([.. Cheats.Values], posx, y, renderwidth);
                 else
                 {
                     CheatFiles.Clear();
@@ -119,7 +119,7 @@ internal class GuiDeck : Gui
         {
             Raylib.SetTargetFPS(60);
             Raylib.SetWindowState(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow);
-            Open(Emulator);
+            Open(Emulator.Config);
         }
 
         if (!Opened) return;
@@ -153,7 +153,7 @@ internal class GuiDeck : Gui
             ScrCheats => Emulator.Cheats.DistinctBy(c => c.Value.Description).Count(),
             ScrLua => LuaFiles.Count,
             ScrOptions => Options.Count,
-            ScrBrowser => Emulator.Cheats.Count,
+            ScrBrowser => CheatFiles.Count,
             _ => 0,
         };
 
@@ -172,7 +172,10 @@ internal class GuiDeck : Gui
         OldTotal[TabIndex] = total;
 
         if (TabIndex != ScrMain && Raylib.IsGamepadButtonPressed(0, BtnA))
+        {
             TabIndex = ScrMain;
+            CheatDialog = false;
+        }
 
         base.Update(true);
     }
@@ -186,10 +189,10 @@ internal class GuiDeck : Gui
         Opened = true;
     }
 
-    public override void Unload(bool isdeck)
+    public override void Unload()
     {
         Raylib.UnloadRenderTexture(MenuTarget);
-        base.Unload(isdeck);
+        base.Unload();
     }
 
     public override void ResetGame(string name) => base.ResetGame(name);

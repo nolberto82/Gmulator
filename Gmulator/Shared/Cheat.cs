@@ -1,13 +1,16 @@
-﻿using System;
+﻿using Gmulator.Core.Gbc;
+using Gmulator.Core.Nes;
+using Gmulator.Core.Snes;
+using System;
 using System.Text.Json;
 
 namespace Gmulator.Shared;
 
 public class Cheat
 {
-    public string Description { get; set; }
-    public string Codes { get; set; }
-    public int Address { get; set; }
+    public string Description;
+    public string Codes;
+    public int Address;
     public byte Compare { get; set; }
     public byte Value { get; set; }
     public int Type { get; set; }
@@ -38,11 +41,11 @@ public class Cheat
         public bool Enabled { get; set; } = enabled;
     }
 
-    public static (int, byte, byte, int, int) DecryptCode(string c, Emulator Emu)
+    public (int, byte, byte, int, int) DecryptCode(string c, Emulator Emu)
     {
-        switch (Emu?.System)
+        switch (Emu)
         {
-            case GbcConsole:
+            case Gbc:
             {
                 if (c.Length == 9)
                 {
@@ -63,7 +66,7 @@ public class Cheat
                 }
                 return (-1, 0, 0, -1, GbcConsole);
             }
-            case NesConsole:
+            case Nes:
             {
                 if (c.Length == 8)
                 {
@@ -99,7 +102,7 @@ public class Cheat
                 }
                 break;
             }
-            case SnesConsole:
+            case Snes:
             {
                 if (c.Length == 9 && c.ToLowerInvariant().StartsWith("7e") || c.ToLowerInvariant().StartsWith("7f"))
                 {
@@ -143,68 +146,4 @@ public class Cheat
         }
         return (-1, 0, 0, -1, NoConsole);
     }
-
-    public void ReloadCheats(Emulator Emu) => Load(Emu);
-    public void Load(Emulator Emu, string filename = "")
-    {
-        if (filename.Contains("alttpr - "))
-            filename = "alttpr";
-
-        Emu.Cheats?.Clear();
-        var name = Filename = filename == "" ? Emu.GameName : filename;
-        name = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}";
-        var libretrocht = File.Exists($"{name}.cht") ? $"{name}.cht" : "";
-
-        if (libretrocht != "")
-        {
-            var txt = File.ReadAllText(libretrocht).Split(["\n\n", "\r\n"], StringSplitOptions.RemoveEmptyEntries);
-            for (int i = 1; i < txt.Length; i++)
-            {
-                if (!txt[0].Contains("cheats =", StringComparison.InvariantCultureIgnoreCase))
-                {
-                    Notifications.Init("Cheat File is Not in Libretro Format");
-                    return;
-                }
-
-                Cheat cht = new();
-                List<RawCode> rawcodes = [];
-                var lines = txt[i].Split("\n", StringSplitOptions.RemoveEmptyEntries);
-                if (lines.Length < 3) continue;
-                for (int j = 0; j < lines.Length; j++)
-                {
-                    var beg = lines[j].IndexOf("= ") + 2;
-                    if (beg == -1) break;
-                    cht.Description = lines[j][beg..].Replace(@"""", "");
-                    beg = lines[j + 1].IndexOf("= ") + 2;
-                    if (beg == -1) break;
-                    cht.Codes = lines[j + 1][beg..].Replace(@"""", "");
-                    beg = lines[j + 2].IndexOf("= ") + 2;
-                    if (beg == -1) break;
-                    cht.Enabled = Convert.ToBoolean(lines[j + 2][beg..].Replace(@"""", ""));
-                    j += 2;
-                }
-
-                foreach (var line in cht.Codes.Split("+"))
-                {
-                    var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "").Trim();
-                    if (c == "")
-                        continue;
-                    (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, Emu);
-                    rawcodes.Add(new(addr, cmp, val, type, cht.Enabled));
-                }
-
-                foreach (var r in rawcodes)
-                {
-                    if (!Emu.Cheats.ContainsKey(r.Address))
-                        Emu.Cheats.Add(r.Address, new(cht.Description, r.Address, r.Value, r.Compare, r.Type, r.Enabled, cht.Codes));
-                }
-            }
-        }
-
-        if (name != "Cheats/alttpr" && Emu?.Cheats.Count > 0)
-            CheatConverter.Save(Emu.GameName);
-        //    Save(, Emu?.Cheats);
-    }
-
-    public static void Save(string name) => CheatConverter.Save(name);
 }

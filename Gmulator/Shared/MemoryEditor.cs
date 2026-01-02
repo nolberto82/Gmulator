@@ -2,8 +2,10 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.Loader;
 
 namespace Gmulator.Shared;
+
 public unsafe class MemoryEditor
 {
     private enum DataFormat
@@ -28,9 +30,9 @@ public unsafe class MemoryEditor
     public int OptAddrDigitsCount;                         // = 0      // number of addr digits to display (default calculated based on maximum displayed addr).
     private readonly float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
     private readonly uint HighlightColor;                             //          // background color of highlighted bytes.
-    public delegate byte ReadDel(int off);    // = 0      // optional handler to read bytes.
+    public delegate int ReadDel(int off);    // = 0      // optional handler to read bytes.
     public ReadDel ReadFn;
-    public delegate void WriteDel(int off, byte d); // = 0      // optional handler to write bytes.
+    public delegate void WriteDel(int off, int d); // = 0      // optional handler to write bytes.
     public WriteDel WriteFn;
     public delegate bool HighlightDel(byte[] data, int off);//= 0      // optional handler to return Highlight property (to support non-contiguous highlighting).
     public HighlightDel HighlightFn;
@@ -195,7 +197,6 @@ public unsafe class MemoryEditor
             {
                 int addr = line_i * Cols;
                 ImGui.Text((base_display_addr + addr).ToString("X" + $"{OptAddrDigitsCount}"));
-
                 // Draw Hexadecimal
                 for (int n = 0; n < Cols && addr < mem_size; n++, addr++)
                 {
@@ -240,7 +241,7 @@ public unsafe class MemoryEditor
                         user_data.CursorPos = -1;
 
                         // TODO: check it (YTom)
-                        var buf = FixedHex(ReadFn != null ? ReadFn(addr) : mem_data[addr], 2).ToCharArray();
+                        var buf = FixedHex(ReadFn != null ? ReadFn(addr | base_display_addr) : mem_data[addr], 2).ToCharArray();
                         user_data.CurrentBufOverwrite[0] = buf[0];
                         user_data.CurrentBufOverwrite[1] = buf[1];
 
@@ -263,15 +264,15 @@ public unsafe class MemoryEditor
                         if (data_write && TryHexParse(DataInputBuf, out int data_input_value))
                         {
                             if (WriteFn != null)
-                                WriteFn(addr, (byte)data_input_value);
-                            else
+                                WriteFn(addr | base_display_addr, (byte)data_input_value);
+                            else if (mem_data != null)
                                 mem_data[addr] = (byte)data_input_value;
                         }
                         ImGui.PopID();
                     }
                     else
                     {
-                        byte b = ReadFn != null ? ReadFn(addr) : mem_data[addr];
+                        byte b = (byte)(ReadFn != null ? ReadFn(addr | base_display_addr) : mem_data[addr]);
 
                         if (OptShowHexII)
                         {
@@ -356,7 +357,7 @@ public unsafe class MemoryEditor
                             draw_list.AddRectFilled(pos, new(pos.X + s.GlyphWidth, pos.Y + s.LineHeight), ImGui.GetColorU32(ImGuiCol.FrameBg));
                             draw_list.AddRectFilled(pos, new(pos.X + s.GlyphWidth, pos.Y + s.LineHeight), ImGui.GetColorU32(ImGuiCol.TextSelectedBg));
                         }
-                        byte c = ReadFn != null ? ReadFn(addr) : mem_data[addr];
+                        byte c = (byte)(ReadFn != null ? ReadFn(addr) : mem_data[addr]);
                         char display_c = c < 32 || c >= 128 ? '.' : (char)c;
                         draw_list.AddText(pos, display_c == c ? color_text : color_disabled, $"{display_c}");
                         pos.X += s.GlyphWidth;

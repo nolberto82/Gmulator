@@ -1,33 +1,52 @@
-﻿namespace Gmulator.Core.Nes
+﻿using Gmulator.Core.Gbc;
+using Gmulator.Interfaces;
+using ImGuiNET;
+using static Gmulator.Interfaces.IMmu;
+
+namespace Gmulator.Core.Nes
 {
-    public class NesPpu() : EmuState
+    public class NesPpu() : ISaveState, IPpu
     {
-        private readonly int[] MirrorHor = [0, 0, 1, 1];
-        private readonly int[] MirrorVer = [0, 1, 0, 1];
         private readonly int[] MirrorNt0 = [0, 0, 0, 0];
         private readonly int[] MirrorNt1 = [1, 1, 1, 1];
-        private readonly int[] MirrorFsc = [0, 1, 2, 3];
+        private List<MemoryHandler> MemoryHandlers;
 
-        private int Dummy2007;
-        private int OamDma;
-        private int NtAddr, AtAddr, BgAddr;
-        private int NtNyte, AtByte;
-        private int BgLo, BgHi, AtLo, AtHi;
-        private int BgShiftLo, BgShiftHi, AtShiftLo, AtShiftHi;
-        public int Scanline { get => scanline; private set => scanline = value; }
-        public int Cycle { get => cycle; private set => cycle = value; }
-        public int Cycles { get => cycles; set => cycles = value; }
-        public uint FrameCounter { get => frameCounter; private set => frameCounter = value; }
-        public ulong Totalcycles { get => totalcycles; private set => totalcycles = value; }
+        public byte[] Vram { get; private set; } = new byte[0x4000];
+        public byte[] Oram { get; private set; } = new byte[0x100];
+        public byte[] Pram { get; private set; } = new byte[0x2000];
+        private int _dummy2007;
+        private int _oamDma;
+        private int _ntAddr;
+        private int _atAddr;
+        private int _bgAddr;
+        private int _ntByte;
+        private int _atByte;
+        private int _bgLo;
+        private int _bgHi;
+        private int _atLo;
+        private int _atHi;
+        private int _bgShiftLo;
+        private int _bgShiftHi;
+        private int _atShiftLo;
+        private int _atShiftHi;
+        public int Scanline { get; private set; }
+        public int Cycle { get; private set; }
+        public int Cycles { get; set; }
+        public uint FrameCounter { get; private set; }
+        public ulong Totalcycles { get; private set; }
         public bool NoNmi { get; private set; }
 
-        private List<SpriteData> SpriteScan;
-        private int A12;
-        private byte OamData;
-        private int OamAddr;
+        private int _vramAddr;
+        private int _tempAddr;
+        private int _fineX;
+        private bool _writeToggle;
 
-        private int Nametable;
-        private int VaddrIncrease;
+        private int _a12;
+        private int _oamData;
+        private int _oamAddr;
+
+        private int _nametable;
+        private int _vaddrIncrease;
         private bool _sprTable;
         private int _bgTable;
         private bool _spriteSize;
@@ -43,10 +62,12 @@
         private int _green;
         private int _blue;
 
-        private int Lsb;
+        private int _lsb;
         private bool _sprOverflow;
         private bool _sprite0hit;
         private bool _vBlank;
+
+        private List<SpriteData> SpriteScan;
 
         private enum CycleState
         {
@@ -61,15 +82,18 @@
         private int ScanlineFrameEnd;
 
         public bool IsRendering => _background || _sprite;
-        public int FineY => ((Lp.V & 0x7000) >> 12) & 0xff;
+        public int FineY => ((_vramAddr & 0x7000) >> 12) & 0xff;
+        public int GetScanline() => Scanline;
+        public int ReadOam(int a) => Oram[a & 0xff];
+        public void WriteOam(int a, int v) => Oram[a & 0xff] = (byte)v;
+        public int ReadVram(int a) => Vram[a & 0x3fff];
 
         private NesMmu Mmu;
         private NesApu Apu;
         public uint[] NametableBuffer { get; private set; } = new uint[NesWidth * NesWidth * 4];
-        public uint[] ScreenBuffer { get; private set; }
+        public uint[] ScreenBuffer { get; set; }
 
         private Nes Nes;
-        private Action<int, int> WriteByte;
 
         private readonly uint[] pixPalettes = new uint[192 / 3];
         private readonly byte[] palBuffer =
@@ -93,16 +117,23 @@
             Nes = nes;
             Mmu = nes.Mmu;
             Apu = nes.Apu;
-            WriteByte = nes.Mmu.WriteWram;
             ScreenBuffer = new uint[NesWidth * NesHeight * 4];
+
+            MemoryHandlers = [];
+            for (int i = 0; i < 0x4000; i++)
+            {
+                MemoryHandlers.Add(new(0, 0, 0, 0, 0, (int a) => 0, (int a, int v) => { }, RamType.None));
+            }
+
+            nes.SetMemory(0x00, 0x01, 0x0000, 0x3fff, 0x3fff, Read, Write, RamType.Vram, 1);
         }
 
         public void Reset()
         {
             Scanline = 0;
-            Dummy2007 = 0;
-            Lp = default;
-
+            _dummy2007 = 0;
+            _vramAddr = _tempAddr = _fineX = 0;
+            _writeToggle = false;
             _nmi = false;
             _sprOverflow = false;
             _sprite0hit = false;
@@ -145,7 +176,7 @@
                     }
 
                     if (Cycle == 338 || Cycle == 339)
-                        NtNyte = Read(0x2000 | Lp.V & 0xfff);
+                        _ntByte = Read(0x2000 | _vramAddr & 0xfff);
 
                     //increment y scroll
                     if (Cycle == 257)
@@ -157,7 +188,7 @@
 
                     //copy horizontal bits
                     if (Cycle == 256)
-                        Lp.V = Lp.V & ~0x41f | Lp.T & 0x41f;
+                        _vramAddr = _vramAddr & ~0x41f | _tempAddr & 0x41f;
                 }
                 else if (Scanline == (int)ScanlineState.Idle)
                 {
@@ -172,7 +203,7 @@
                     {
                         _vBlank = true;
                         if (_nmi && !NoNmi)
-                            NesCpu.NmiTriggered = 1;
+                            Nes.Cpu.NmiTriggered = 1;
                     }
                 }
                 else if (Scanline == (int)ScanlineState.Pre)
@@ -187,22 +218,22 @@
                         {
                             LoadRegisters();
                             EvalSprites();
-                            Lp.V = Lp.V & ~0x41f | Lp.T & 0x41f;
+                            _vramAddr = _vramAddr & ~0x41f | _tempAddr & 0x41f;
                         }
 
                         if (Cycle > 280 && Cycle <= 304)
-                            Lp.V = Lp.V & ~0x7be0 | Lp.T & 0x7be0;
+                            _vramAddr = _vramAddr & ~0x7be0 | _tempAddr & 0x7be0;
                     }
 
                     if (Cycle == 339)
                         Cycle += IsRendering && (FrameCounter & 1) == 1 && Scanline == -1 ? 1 : 0;
                 }
 
-                if (cycle++ > 339)
+                if (Cycle++ > 339)
                 {
-                    cycle = 0;
-                    scanline++;
-                    if (scanline >= ScanlineFrameEnd)
+                    Cycle = 0;
+                    Scanline++;
+                    if (Scanline >= ScanlineFrameEnd)
                     {
                         Scanline = -1;
                         _vBlank = false;
@@ -216,130 +247,136 @@
             Cycles++;
         }
 
-        public void ControlW(int v) //2000
+        public int ReadRegister(int a)
         {
-            Lp.T = Lp.T & ~0xc00 | (v & 3) << 10;
-            Nametable = v >> 1 & 3;
-            VaddrIncrease = v >> 2 & 1;
-            _sprTable = (v >> 3 & 1) != 0;
-            _bgTable = v >> 4 & 1;
-            _spriteSize = (v >> 5 & 1) != 0;
-            _nmi = v >> 7 != 0;
-
-            if (Header.MapperId == 5)
-                Mmu.Mapper.SpriteSize = _spriteSize;
-
-            WriteByte(0x2000 & 0x2007, v);
-        }
-
-        public void MaskW(int v)
-        {
-            _backgroundLeft = (v & 0x02) != 0;
-            _spriteLeft = (v & 0x04) != 0;
-            _background = (v & 0x08) != 0;
-            _sprite = (v & 0x10) != 0;
-        }
-
-        public int StatusR()
-        {
-            int v = (((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
-                | Dummy2007 & 0x1f);
-
-            if (Scanline == 241)
+            switch (a)
             {
-                if (Cycle == 0)
+                case 0x2002:
                 {
-                    NoNmi = true;
-                }
-                else if (Cycle == 1 || Cycle == 2)
-                {
-                    return v &= 0x7f;
-                }
-                else if (Cycle == 3)
-                {
-                    NoNmi = false;
+                    int v = (((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
+                        | _dummy2007 & 0x1f);
+
+                    if (Scanline == 241)
+                    {
+                        if (Cycle == 0)
+                        {
+                            NoNmi = true;
+                        }
+                        else if (Cycle == 1 || Cycle == 2)
+                        {
+                            return v &= 0x7f;
+                        }
+                        else if (Cycle == 3)
+                        {
+                            NoNmi = false;
+                            _vBlank = false;
+                            return (v & 0x7f);
+                        }
+                    }
                     _vBlank = false;
-                    //p2002 &= 0x7f;
-                    return (v & 0x7f);
+                    _writeToggle = false;
+                    return v;
+                }
+                case 0x2007:
+                {
+                    int v;
+                    if (_vramAddr <= 0x3eff)
+                    {
+                        v = _dummy2007;
+                        _dummy2007 = Read(_vramAddr);
+                    }
+                    else
+                        v = (_dummy2007 = Read(_vramAddr));
+
+                    _vramAddr += _vaddrIncrease != 0 ? 32 : 1;
+                    return v & 0xff;
+                }
+                default: return 0;
+            }
+        }
+
+        public void WriteRegister(int a, int v)
+        {
+            switch (a)
+            {
+                case 0x2000:
+                {
+                    _tempAddr = _tempAddr & ~0xc00 | (v & 3) << 10;
+                    _nametable = v >> 1 & 3;
+                    _vaddrIncrease = v >> 2 & 1;
+                    _sprTable = (v >> 3 & 1) != 0;
+                    _bgTable = v >> 4 & 1;
+                    _spriteSize = (v >> 5 & 1) != 0;
+                    _nmi = v >> 7 != 0;
+
+                    if (Header.MapperId == 5)
+                        Mmu.Mapper.SpriteSize = _spriteSize;
+                    break;
+                }
+                case 0x2001:
+                {
+                    _backgroundLeft = (v & 0x02) != 0;
+                    _spriteLeft = (v & 0x04) != 0;
+                    _background = (v & 0x08) != 0;
+                    _sprite = (v & 0x10) != 0;
+                    break;
+                }
+                case 0x2003: _oamAddr = v; break;
+                case 0x2004:
+                {
+                    _oamData = v & 0xff;
+                    _oamAddr++;
+                    break;
+                }
+                case 0x2005:
+                {
+                    if (!_writeToggle)
+                    {
+                        _tempAddr &= 0x7fe0;
+                        _tempAddr |= (v & 0xf8) >> 3;
+                        _fineX = (byte)(v & 0x07);
+                    }
+                    else
+                        _tempAddr = _tempAddr & 0xc1f | (v & 0xf8) << 2 | (v & 7) << 12;
+                    _writeToggle ^= true;
+                    break;
+                }
+                case 0x2006:
+                {
+                    if (!_writeToggle)
+                    {
+                        _tempAddr = (ushort)(_tempAddr & 0x80ff | (v & 0x3f) << 8);
+                    }
+                    else
+                    {
+                        _tempAddr = _tempAddr & 0xff00 | v;
+                        _vramAddr = _tempAddr;
+                    }
+                    _writeToggle ^= true;
+                    break;
+                }
+                case 0x2007:
+                {
+                    Write(_vramAddr, v);
+                    _vramAddr += _vaddrIncrease != 0 ? 32 : 1;
+
+                    if (((_vramAddr ^ _a12) & 0x1000) != 0)
+                    {
+                        if ((_vramAddr & 0x1000) != 0)
+                            Mmu.Mapper.Scanline();
+                        _a12 = _vramAddr;
+                    }
+                    break;
                 }
             }
-            _vBlank = false;
-
-            Lp.W = false;
-            return v;
         }
 
-        public void OamAddressW(int v) => OamAddr = v;
-
-        public void OamDataW(int v)
-        {
-            OamData = (byte)v;
-            OamAddr++;
-        }
-
-        public void ScrollW(int v) //2005
-        {
-            if (!Lp.W)
-            {
-                Lp.T &= 0x7fe0;
-                Lp.T |= (v & 0xf8) >> 3;
-                Lp.Fx = (byte)(v & 0x07);
-            }
-            else
-                Lp.T = Lp.T & 0xc1f | (v & 0xf8) << 2 | (v & 7) << 12;
-            Lp.W ^= true;
-        }
-
-        public void AddressDataW(int v) //2006
-        {
-            if (!Lp.W)
-            {
-                Lp.T = (ushort)(Lp.T & 0x80ff | (v & 0x3f) << 8);
-                //cycle -= 9;
-            }
-            else
-            {
-                Lp.T = Lp.T & 0xff00 | v;
-                Lp.V = Lp.T;
-            }
-            Lp.W ^= true;
-        }
-
-        public void DataW(int v) //2007
-        {
-            Write(Lp.V, v);
-            Lp.V += VaddrIncrease != 0 ? 32 : 1;
-
-            if (((Lp.V ^ A12) & 0x1000) != 0)
-            {
-                if ((Lp.V & 0x1000) != 0)
-                    Mmu.Mapper.Scanline();
-                A12 = Lp.V;
-            }
-        }
-
-        public int DataR()
-        {
-            int v;
-            if (Lp.V <= 0x3eff)
-            {
-                v = Dummy2007;
-                Dummy2007 = Read(Lp.V);
-            }
-            else
-                v = (Dummy2007 = Read(Lp.V));
-
-
-            Lp.V += VaddrIncrease != 0 ? 32 : 1;
-            return v & 0xff;
-        }
-
-        public void OamDamyCopy(int v) //4014
+        public void Write4014(int a, int v) //4014
         {
             for (int i = 0; i < 256; i++)
             {
-                int oamaddr = v << 8; OamDma = v;
-                Mmu.Oram[i] = Mmu.Ram[oamaddr + i];
+                int oamaddr = v << 8; _oamDma = v;
+                Mmu.Oram[i] = Mmu.Wram[oamaddr + i];
                 Step(3); Step(3);
                 Totalcycles++;
             }
@@ -347,21 +384,18 @@
             if ((Totalcycles & 1) == 1)
             {
                 Step(3); Step(3);
-                Totalcycles++;
             }
             else
-            {
                 Step(3);
-                Totalcycles++;
-            }
+            Totalcycles++;
         }
 
         private void RenderPixels()
         {
-            if (Nes.FastForward && FrameCounter % Nes.Config.FrameSkip == 0) return;
+            //if (Nes.FastForward && FrameCounter % Nes.Config.FrameSkip == 0) return;
 
-            int x = cycle - 1;
-            int y = scanline;
+            int x = Cycle - 1;
+            int y = Scanline;
             int bg_pixel = 0;
             int bg_pal = 0;
             int spr_pixel = 0;
@@ -369,13 +403,13 @@
             int attrib = 0;
 
             // Cache Lp.Fx for repeated use
-            int fx_shift = 15 - Lp.Fx;
-            int at_shift = 7 - Lp.Fx;
+            int fx_shift = 15 - _fineX;
+            int at_shift = 7 - _fineX;
 
             if (_background && (x >= 8 || _backgroundLeft))
             {
-                bg_pixel = ((BgShiftLo >> fx_shift) & 1) | (((BgShiftHi >> fx_shift) & 1) << 1);
-                bg_pal = ((AtShiftLo >> at_shift) & 1) | (((AtShiftHi >> at_shift) & 1) << 1);
+                bg_pixel = ((_bgShiftLo >> fx_shift) & 1) | (((_bgShiftHi >> fx_shift) & 1) << 1);
+                bg_pal = ((_atShiftLo >> at_shift) & 1) | (((_atShiftHi >> at_shift) & 1) << 1);
                 bg_pal &= 3;
             }
 
@@ -406,13 +440,13 @@
                         spraddr = bgaddr + tile * 16 + fy;
 
                     // Cache Read(spraddr) and Read(spraddr+8)
-                    byte spr_lo = Read(spraddr);
-                    byte spr_hi = Read(spraddr + 8);
+                    int spr_lo = Read(spraddr);
+                    int spr_hi = Read(spraddr + 8);
                     spr_pixel = (spr_lo >> fx & 1) | ((spr_hi >> fx & 1) << 1);
 
                     if (spr_pixel == 0) continue;
 
-                    if (spr.Id == 0 && _sprite && _background && bg_pixel != 0 && x != 255 && !_sprite0hit)
+                    if (!_sprite0hit && spr.Id == 0 && _background && bg_pixel != 0 && x != 255)
                         _sprite0hit = true;
 
                     spr_pal = attrib & 3;
@@ -475,26 +509,26 @@
 
         private void GetTiles()
         {
-            switch (cycle & 7)
+            switch (Cycle & 7)
             {
                 case 1:
-                    NtAddr = 0x2000 | Lp.V & 0xfff;
+                    _ntAddr = 0x2000 | _vramAddr & 0xfff;
                     LoadRegisters();
                     break;
-                case 2: NtNyte = Read(NtAddr); break;
-                case 3: AtAddr = 0x23c0 | Lp.V & 0xc00 | Lp.V >> 4 & 0x38 | Lp.V >> 2 & 0x07; break;
+                case 2: _ntByte = Read(_ntAddr); break;
+                case 3: _atAddr = 0x23c0 | _vramAddr & 0xc00 | _vramAddr >> 4 & 0x38 | _vramAddr >> 2 & 0x07; break;
                 case 4:
-                    AtByte = Read(AtAddr);
-                    if ((Lp.V >> 5 & 2) != 0)
-                        AtByte >>= 4;
-                    if ((Lp.V & 2) != 0)
-                        AtByte >>= 2;
+                    _atByte = Read(_atAddr);
+                    if ((_vramAddr >> 5 & 2) != 0)
+                        _atByte >>= 4;
+                    if ((_vramAddr & 2) != 0)
+                        _atByte >>= 2;
                     break;
-                case 5: BgAddr = _bgTable * 0x1000 + NtNyte * 16 + FineY; break;
-                case 6: BgLo = Read(BgAddr); break;
-                case 7: BgAddr += 8; break;
+                case 5: _bgAddr = _bgTable * 0x1000 + _ntByte * 16 + FineY; break;
+                case 6: _bgLo = Read(_bgAddr); break;
+                case 7: _bgAddr += 8; break;
                 case 0:
-                    BgHi = Read(BgAddr);
+                    _bgHi = Read(_bgAddr);
                     XIncrease();
                     break;
             }
@@ -502,154 +536,170 @@
 
         private void XIncrease()
         {
-            if ((Lp.V & 0x1f) == 0x1f)
-                Lp.V = Lp.V & ~0x1f ^ 0x400;
+            if ((_vramAddr & 0x1f) == 0x1f)
+                _vramAddr = _vramAddr & ~0x1f ^ 0x400;
             else
-                Lp.V++;
+                _vramAddr++;
         }
 
         private void YIncrease()
         {
-            if ((Lp.V & 0x7000) != 0x7000)
-                Lp.V += 0x1000;
+            if ((_vramAddr & 0x7000) != 0x7000)
+                _vramAddr += 0x1000;
             else
             {
-                Lp.V &= ~0x7000;
-                int y = (Lp.V & 0x3e0) >> 5;
+                _vramAddr &= ~0x7000;
+                int y = (_vramAddr & 0x3e0) >> 5;
 
                 if (y == 29)
                 {
                     y = 0;
-                    Lp.V ^= 0x800;
+                    _vramAddr ^= 0x800;
                 }
                 else if (y == 31)
                     y = 0;
                 else
                     y++;
 
-                Lp.V = Lp.V & ~0x3e0 | y << 5;
+                _vramAddr = _vramAddr & ~0x3e0 | y << 5;
             }
         }
 
         private void LoadRegisters()
         {
-            BgShiftLo = BgShiftLo & 0xff00 | BgLo;
-            BgShiftHi = BgShiftHi & 0xff00 | BgHi;
-            AtLo = AtByte & 1;
-            AtHi = (AtByte & 2) != 0 ? 1 : 0;
+            _bgShiftLo = _bgShiftLo & 0xff00 | _bgLo;
+            _bgShiftHi = _bgShiftHi & 0xff00 | _bgHi;
+            _atLo = _atByte & 1;
+            _atHi = (_atByte & 2) != 0 ? 1 : 0;
         }
 
         private void UpdateRegisters()
         {
-            BgShiftLo <<= 1;
-            BgShiftHi <<= 1;
-            AtShiftLo = (AtShiftLo << 1) | AtLo;
-            AtShiftHi = (AtShiftHi << 1) | AtHi;
+            _bgShiftLo <<= 1;
+            _bgShiftHi <<= 1;
+            _atShiftLo = (_atShiftLo << 1) | _atLo;
+            _atShiftHi = (_atShiftHi << 1) | _atHi;
         }
 
-        public byte Read(int addr)
+        public int Read(int a)
         {
-            addr &= 0x3fff;
-            byte v = 0;
-            var Vram = Mmu.Vram;
-
-            if (addr < 0x2000)
+            return a switch
             {
-                if (Header.MapperId == 15)
-                    Mmu.Mapper.SetLatch(addr, v);
-                if (Mmu.Mapper.Header.ChrBanks != 0)
-                    return Mmu.Mapper.ReadChr(addr);
-                else
-                    return Vram[addr];
-            }
-            else if (addr >= 0x3f00)
-                return Vram[addr];
+                < 0x2000 => ReadPattern(a),
+                < 0x3f00 => ReadNametable(a),
+                _ => ReadPalette(a)
+            };
+        }
 
-            var a = addr % 0x400;
+        public void Write(int a, int v)
+        {
+            switch (a)
+            {
+                case < 0x2000: WritePattern(a, v); break;
+                case < 0x3f00: WriteNametable(a, v); break;
+                default: WritePalette(a, v); break;
+            }
+        }
+
+        private int ReadNametable(int addr)
+        {
+            int a = addr % 0x400;
             if (Header.Mirror == SingleNt0)
-                v = Vram[0x2000 + (a % 0x400) + MirrorNt0[(a >> 10) & 3] * 0x400];
+                return Vram[0x2000 + a + MirrorNt0[(a >> 10) & 3] * 0x400];
             else if (Header.Mirror == SingleNt1)
-                v = Vram[0x2000 + (a % 0x400) + MirrorNt1[(a >> 10) & 3] * 0x400];
+                return Vram[0x2000 + a + MirrorNt1[(a >> 10) & 3] * 0x400];
             else if (Header.Mirror == Horizontal)
             {
                 switch ((addr >> 10) & 3)
                 {
-                    case 0: v = Vram[0x2000 + a]; break;
-                    case 1: v = Vram[0x2000 + a]; break;
-                    case 2: v = Vram[0x2400 + a]; break;
-                    case 3: v = Vram[0x2400 + a]; break;
+                    case 0: return Vram[0x2000 + a];
+                    case 1: return Vram[0x2000 + a];
+                    case 2: return Vram[0x2400 + a];
+                    case 3: return Vram[0x2400 + a];
                 }
             }
             else if (Header.Mirror == Vertical)
             {
                 switch ((addr >> 10) & 3)
                 {
-                    case 0: v = Vram[0x2000 + a]; break;
-                    case 1: v = Vram[0x2400 + a]; break;
-                    case 2: v = Vram[0x2000 + a]; break;
-                    case 3: v = Vram[0x2400 + a]; break;
+                    case 0: return Vram[0x2000 + a];
+                    case 1: return Vram[0x2400 + a];
+                    case 2: return Vram[0x2000 + a];
+                    case 3: return Vram[0x2400 + a];
                 }
             }
-
-            //Mmu.CheckForBeakpoint(addr, v, BPType.VRead);
-
-            return v;
+            return 0;
         }
 
-        public void Write(int addr, int v)
+        public int ReadPattern(int a)
         {
-            addr &= 0x3fff;
-            var vram = Mmu.Vram;
-
-            //Mmu.CheckForBeakpoint(addr, v, BPType.VWrite);
-
-            if (addr < 0x2000 || addr >= 0x3f00)
-                vram[addr] = (byte)v;
+            if (Header.MapperId == 9)
+                Mmu.Mapper.SetLatch(a, 0);
+            if (Mmu.Mapper.Header.ChrBanks != 0)
+                return Mmu.Mapper.ReadChr(a);
             else
+                return Vram[a];
+        }
+
+        public int ReadPalette(int a)
+        {
+            return Vram[a & 0x3fff];
+        }
+
+        public void WriteNametable(int addr, int v)
+        {
+            var a = addr % 0x400;
+            if (Header.Mirror == SingleNt0)
             {
-                var a = addr % 0x400;
-                if (Header.Mirror == SingleNt0)
+                var b = MirrorNt0[(addr >> 10) & 3];
+                Vram[0x2000 + a + b * 0x400] = (byte)v;
+            }
+            else if (Header.Mirror == SingleNt1)
+            {
+                var b = MirrorNt1[((a >> 10) & 3)];
+                Vram[0x2000 + a + b * 0x400] = (byte)v;
+            }
+            else if (Header.Mirror == Horizontal)
+            {
+                switch ((addr >> 10) & 3)
                 {
-                    var b = MirrorNt0[(addr >> 10) & 3];
-                    vram[0x2000 + a + b * 0x400] = (byte)v;
-                }
-                else if (Header.Mirror == SingleNt1)
-                {
-                    var b = MirrorNt1[((a >> 10) & 3)];
-                    vram[0x2000 + a + b * 0x400] = (byte)v;
-                }
-                else if (Header.Mirror == Horizontal)
-                {
-                    switch ((addr >> 10) & 3)
-                    {
-                        case 0: vram[0x2000 + a] = (byte)v; break;
-                        case 1: vram[0x2000 + a] = (byte)v; break;
-                        case 2: vram[0x2400 + a] = (byte)v; break;
-                        case 3: vram[0x2400 + a] = (byte)v; break;
-                    }
-                }
-                else if (Header.Mirror == Vertical)
-                {
-                    switch ((addr >> 10) & 3)
-                    {
-                        case 0: vram[0x2000 + a] = (byte)v; break;
-                        case 1: vram[0x2400 + a] = (byte)v; break;
-                        case 2: vram[0x2000 + a] = (byte)v; break;
-                        case 3: vram[0x2400 + a] = (byte)v; break;
-                    }
+                    case 0: Vram[0x2000 + a] = (byte)v; break;
+                    case 1: Vram[0x2000 + a] = (byte)v; break;
+                    case 2: Vram[0x2400 + a] = (byte)v; break;
+                    case 3: Vram[0x2400 + a] = (byte)v; break;
                 }
             }
+            else if (Header.Mirror == Vertical)
+            {
+                switch ((addr >> 10) & 3)
+                {
+                    case 0: Vram[0x2000 + a] = (byte)v; break;
+                    case 1: Vram[0x2400 + a] = (byte)v; break;
+                    case 2: Vram[0x2000 + a] = (byte)v; break;
+                    case 3: Vram[0x2400 + a] = (byte)v; break;
+                }
+            }
+        }
+
+        private void WritePattern(int a, int v)
+        {
+            Vram[a & 0x3fff] = (byte)v;
+        }
+
+        public void WritePalette(int a, int v)
+        {
+            Vram[a & 0x3fff] = (byte)v;
 
             for (int i = 0; i < 7; i++)
-                Array.Copy(vram, 0x3f00, vram, 0x3f20 + i * 32, 0x20);
+                Array.Copy(Vram, 0x3f00, Vram, 0x3f20 + i * 32, 0x20);
 
             for (int i = 0; i < 4; i++)
-                Array.Copy(vram, 0x3f10, vram, 0x3f04 + i * 0x4, 0x01);
+                Array.Copy(Vram, 0x3f10, Vram, 0x3f04 + i * 0x4, 0x01);
 
-            if (addr == 0x3f10)
-                vram[0x3f00] = (byte)v;
-            else if (addr == 0x3f00)
-                vram[0x3f10] = (byte)v;
+            if (a == 0x3f10)
+                Vram[0x3f00] = (byte)v;
+            else if (a == 0x3f00)
+                Vram[0x3f10] = (byte)v;
         }
 
         public void RenderNametable(ref uint[] buffer)
@@ -681,104 +731,49 @@
             }
         }
 
-        public override void Save(BinaryWriter bw)
+        public void Save(BinaryWriter bw)
         {
-            bw.Write(Nametable);
-            bw.Write(VaddrIncrease);
-            bw.Write(_sprTable);
-            bw.Write(_bgTable);
-            bw.Write(_spriteSize);
-            bw.Write(_masterSelect);
-            bw.Write(_nmi);
-
-            bw.Write(_greyscale);
-            bw.Write(_backgroundLeft);
-            bw.Write(_spriteLeft);
-            bw.Write(_background);
-            bw.Write(_sprite);
-            bw.Write(_red);
-            bw.Write(_green);
-            bw.Write(_blue);
-
-            bw.Write(Lsb);
-            bw.Write(_sprOverflow);
-            bw.Write(_sprite0hit);
-            bw.Write(_vBlank);
-            bw.Write(Dummy2007);
-            bw.Write(OamDma);
-            bw.Write(NtAddr);
-            bw.Write(AtAddr);
-            bw.Write(BgAddr);
-            bw.Write(NtNyte);
-            bw.Write(AtByte);
-            bw.Write(BgLo);
-            bw.Write(BgHi);
-            bw.Write(BgShiftLo);
-            bw.Write(BgShiftHi);
-            bw.Write(AtShiftLo);
-            bw.Write(AtShiftHi);
-            bw.Write(AtLo);
-            bw.Write(AtHi);
-            bw.Write(Scanline);
-            bw.Write(Cycle);
-            bw.Write(FrameCounter);
-            bw.Write(Totalcycles);
+            WriteArray(bw, Vram); WriteArray(bw, Oram); WriteArray(bw, Pram); bw.Write(_dummy2007);
+            bw.Write(_oamDma); bw.Write(_ntAddr); bw.Write(_atAddr); bw.Write(_bgAddr);
+            bw.Write(_ntByte); bw.Write(_atByte); bw.Write(_bgLo); bw.Write(_bgHi);
+            bw.Write(_atLo); bw.Write(_atHi); bw.Write(_bgShiftLo); bw.Write(_bgShiftHi);
+            bw.Write(_atShiftLo); bw.Write(_atShiftHi); bw.Write(Scanline); bw.Write(Cycle);
+            bw.Write(Cycles); bw.Write(FrameCounter); bw.Write(Totalcycles); bw.Write(NoNmi);
+            bw.Write(_vramAddr); bw.Write(_tempAddr); bw.Write(_fineX); bw.Write(_writeToggle);
+            bw.Write(_a12); bw.Write(_oamData); bw.Write(_oamAddr); bw.Write(_nametable);
+            bw.Write(_vaddrIncrease); bw.Write(_sprTable); bw.Write(_bgTable); bw.Write(_spriteSize);
+            bw.Write(_masterSelect); bw.Write(_nmi); bw.Write(_greyscale); bw.Write(_backgroundLeft);
+            bw.Write(_spriteLeft); bw.Write(_background); bw.Write(_sprite); bw.Write(_red);
+            bw.Write(_green); bw.Write(_blue); bw.Write(_lsb); bw.Write(_sprOverflow);
+            bw.Write(_sprite0hit); bw.Write(_vBlank);
         }
 
-        public override void Load(BinaryReader br)
+        public void Load(BinaryReader br)
         {
-            Nametable = br.ReadInt32();
-            VaddrIncrease = br.ReadInt32();
-            _sprTable = br.ReadBoolean();
-            _bgTable = br.ReadInt32();
-            _spriteSize = br.ReadBoolean();
-            _masterSelect = br.ReadInt32();
-            _nmi = br.ReadBoolean();
-
-            _greyscale = br.ReadInt32();
-            _backgroundLeft = br.ReadBoolean();
-            _spriteLeft = br.ReadBoolean();
-            _background = br.ReadBoolean();
-            _sprite = br.ReadBoolean();
-            _red = br.ReadInt32();
-            _green = br.ReadInt32();
-            _blue = br.ReadInt32();
-
-            Lsb = br.ReadInt32();
-            _sprOverflow = br.ReadBoolean();
-            _sprite0hit = br.ReadBoolean();
-            _vBlank = br.ReadBoolean();
-
-            Dummy2007 = br.ReadInt32();
-            OamDma = br.ReadInt32();
-            NtAddr = br.ReadInt32();
-            AtAddr = br.ReadInt32();
-            BgAddr = br.ReadInt32();
-            NtNyte = br.ReadInt32();
-            AtByte = br.ReadInt32();
-            BgLo = br.ReadInt32();
-            BgHi = br.ReadInt32();
-            BgShiftLo = br.ReadInt32();
-            BgShiftHi = br.ReadInt32();
-            AtShiftLo = br.ReadInt32();
-            AtShiftHi = br.ReadInt32();
-            AtLo = br.ReadInt32();
-            AtHi = br.ReadInt32();
-            Scanline = br.ReadInt32();
-            Cycle = br.ReadInt32();
-            FrameCounter = br.ReadUInt32();
-            Totalcycles = br.ReadUInt64();
+            Vram = ReadArray<byte>(br, Vram.Length); Oram = ReadArray<byte>(br, Oram.Length); Pram = ReadArray<byte>(br, Pram.Length); _dummy2007 = br.ReadInt32();
+            _oamDma = br.ReadInt32(); _ntAddr = br.ReadInt32(); _atAddr = br.ReadInt32(); _bgAddr = br.ReadInt32();
+            _ntByte = br.ReadInt32(); _atByte = br.ReadInt32(); _bgLo = br.ReadInt32(); _bgHi = br.ReadInt32();
+            _atLo = br.ReadInt32(); _atHi = br.ReadInt32(); _bgShiftLo = br.ReadInt32(); _bgShiftHi = br.ReadInt32();
+            _atShiftLo = br.ReadInt32(); _atShiftHi = br.ReadInt32(); Scanline = br.ReadInt32(); Cycle = br.ReadInt32();
+            Cycles = br.ReadInt32(); FrameCounter = br.ReadUInt32(); Totalcycles = br.ReadUInt64(); NoNmi = br.ReadBoolean();
+            _vramAddr = br.ReadInt32(); _tempAddr = br.ReadInt32(); _fineX = br.ReadInt32(); _writeToggle = br.ReadBoolean();
+            _a12 = br.ReadInt32(); _oamData = br.ReadInt32(); _oamAddr = br.ReadInt32(); _nametable = br.ReadInt32();
+            _vaddrIncrease = br.ReadInt32(); _sprTable = br.ReadBoolean(); _bgTable = br.ReadInt32(); _spriteSize = br.ReadBoolean();
+            _masterSelect = br.ReadInt32(); _nmi = br.ReadBoolean(); _greyscale = br.ReadInt32(); _backgroundLeft = br.ReadBoolean();
+            _spriteLeft = br.ReadBoolean(); _background = br.ReadBoolean(); _sprite = br.ReadBoolean(); _red = br.ReadInt32();
+            _green = br.ReadInt32(); _blue = br.ReadInt32(); _lsb = br.ReadInt32(); _sprOverflow = br.ReadBoolean();
+            _sprite0hit = br.ReadBoolean(); _vBlank = br.ReadBoolean();
         }
 
         public List<RegisterInfo> GetState() =>
         [
             new("","Cycle",$"{Cycle}"),
             new("","Scanline",$"{Scanline}"),
-            new("","V",$"{Lp.V:X4}"),
-            new("","T",$"{Lp.T:X4}"),
-            new("","X",$"{Lp.Fx:X2}"),
+            new("","V",$"{_vramAddr:X4}"),
+            new("","T",$"{_tempAddr:X4}"),
+            new("","X",$"{_fineX:X2}"),
             new("2000","Control",""),
-            new("2","Vram Increase",$"{VaddrIncrease}"),
+            new("2","Vram Increase",$"{_vaddrIncrease}"),
             new("3","Sprite Address",$"{_sprTable}"),
             new("4","BG Address",$"{_bgTable}"),
             new("5","Sprite Size",$"{_spriteSize}"),
@@ -800,20 +795,6 @@
             new("6","Sprite 0 Hit",$"{_sprite0hit}"),
             new("7","VBlank",$"{_vBlank}"),
         ];
-
-        public struct PpuRegisters
-        {
-            public int V;
-            public int T;
-            public int Fx;
-            public bool W;
-        };
-        public PpuRegisters Lp;
-        private int cycle;
-        private int scanline;
-        private int cycles;
-        private uint frameCounter;
-        private ulong totalcycles;
 
         public struct SpriteData(int y, int tile, int attrib, int x, int id)
         {

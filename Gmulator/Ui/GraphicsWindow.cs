@@ -8,7 +8,7 @@ using Rectangle = Raylib_cs.Rectangle;
 namespace Gmulator.Ui;
 public class GraphicsWindow
 {
-    private static Texture2D[] TilesTex;
+    private static readonly Texture2D[] TilesTex;
     private static Texture2D SpritesTex;
     private static Texture2D NametableTex;
     private static uint[][] TileBuffer;

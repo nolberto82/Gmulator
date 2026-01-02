@@ -1,11 +1,18 @@
 ﻿namespace Gmulator.Core.Gbc.Mappers;
 public class Mapper2 : BaseMapper
 {
+    public Mapper2(byte[] rom, GbcMmu mmu) : base(rom, mmu)
+    {
+    }
+
     public override void Reset() => base.Reset();
 
-    public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
+    public override void Init(byte[] rom, string filename)
+    {
+        base.Init(rom, filename);
+    }
 
-    public override byte ReadRom(int a)
+    public override int ReadRom(int a)
     {
         var addr = a + (0x4000 * (Rombank - 1));
         if (Rombank > 1)
@@ -22,17 +29,16 @@ public class Mapper2 : BaseMapper
             return new(Rom, a + 0x4000 * (Rombank - 1), size);
     }
 
-    public override void WriteRom0(int a, byte v, bool edit = false)
+    public override void WriteRom0(int a, int v)
     {
-        if (edit)
-            Rom[a] = v;
+
     }
 
-    public override void WriteRom1(int a, byte v, bool edit = false)
+    public override void WriteRom1(int a, int v)
     {
-        if (edit)
-            Rom[a + (0x4000 * (Rombank - 1))] = v;
-        else
+        //if (edit)
+        //    Rom[a + (0x4000 * (Rombank - 1))] = v;
+        //else
         {
             if (a >= 0x2000)
                 Rombank = v & 0x1f;

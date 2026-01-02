@@ -1,5 +1,10 @@
-﻿namespace Gmulator.Core.Snes;
-public class SnesPpu : EmuState
+﻿using Gmulator.Interfaces;
+using static Gmulator.Interfaces.IMmu;
+using static Gmulator.Shared.EmuState;
+
+namespace Gmulator.Core.Snes;
+
+public partial class SnesPpu : ISaveState, IPpu
 {
     public int VPos { get; private set; }
     public int HPos { get; private set; }
@@ -75,31 +80,6 @@ public class SnesPpu : EmuState
     private int STAT77; //213E
     private int STAT78; //213F
 
-    private int NMITIMEN; ///4200
-    private int WRIO; //4201
-    private int HTIMEL; //4207
-    private int HTIMEH; //4208
-    private int VTIMEL; //4209
-    private int VTIMEH; //420A
-    private int MDMAEN; //420B
-    private int HDMAEN; //420C
-    private int RDNMI; //4210
-    private int TIMEUP; //4211
-    private int HVBJOY; //4212
-    private int RDIO; //4213
-    private int JOY1L; //4218
-    private int JOY1H; //4219
-    private int JOY2L; //421A
-    private int JOY2H; //421B
-    private int JOY3L; //421C
-    private int JOY3H; //421D
-    private int JOY4L; //421E
-    private int JOY4H; //421F
-    private bool CounterLatch;
-    private bool OphctLatch;
-    private bool OpvctLatch;
-    private int MultiplyRes;
-
     private int[] BgMapbase = [0, 0, 0, 0];
     private int[] BgTilebase = [0, 0, 0, 0];
     private int[] BgScrollX = [0, 0, 0, 0];
@@ -123,7 +103,8 @@ public class SnesPpu : EmuState
     private ushort[] Vram;
     private ushort[] Cram;
     private byte[] Oam;
-    public uint[] ScreenBuffer { get; private set; }
+    public uint[] ScreenBuffer { get; set; }
+    private int _cgBuffer;
 
     private GfxColor Main = new();
     private GfxColor Sub = new();
@@ -141,6 +122,8 @@ public class SnesPpu : EmuState
     private GfxColor Tranparent;
 
     private Snes Snes;
+
+    public int GetScanline() => VPos;
 
     public void Division(int v)
     {
@@ -172,12 +155,14 @@ public class SnesPpu : EmuState
     private SnesApu Apu;
     private SnesDma Dma;
 
-    public SnesPpu()
+    public SnesPpu(Snes snes)
     {
         ScreenBuffer = new uint[SnesWidth * SnesHeight];
         SpriteScan = new SpriteData[32];
         for (int i = 0; i < SpriteScan.Length; i++)
             SpriteScan[i] = new();
+
+        var mmu = snes.Mmu;
     }
 
     public void SetSnes(Snes snes)
@@ -188,7 +173,6 @@ public class SnesPpu : EmuState
         Dma = snes.Dma;
     }
 
-    
     public void SetJoy1L(int v) => JOY1L = v & 0xff;
     public void SetJoy1H(int v) => JOY1H = v & 0xff;
 
@@ -283,7 +267,7 @@ public class SnesPpu : EmuState
             {
                 Hblank = false;
                 DramRefresh = false;
-                HVBJOY = ~0x40;
+                HVBJOY &= ~0x40;
                 HPos = 0;
                 VPos++;
                 if (VPos >= 262)
@@ -513,6 +497,8 @@ public class SnesPpu : EmuState
                             half = 0;
                         }
                     }
+                    else
+                        Sub.Color = Fixed.Color;
                 }
 
                 float brightness = (float)(Brightness / 15f);
@@ -687,7 +673,7 @@ public class SnesPpu : EmuState
             break;
         }
         // Return default color (avoid allocation by using static readonly if possible)
-        return new(Cram[0], 0, 5); ;
+        return new(Cram[0], 0, 5);
     }
 
     private (int, int, int) GetColor(int sx, int sy, int mapaddr, int tilebase, bool bigchar, int bpp, int paloff)
@@ -847,318 +833,7 @@ public class SnesPpu : EmuState
         return 0;
     }
 
-    public ushort ReadVram(int a) => (ushort)(Vram[a] | Vram[a + 1] << 8);
-    public int ReadCram(int a) => Cram[a] & 0xff;
-    public ushort[] GetVram() => Vram;
-    public ushort[] GetCram() => Cram;
-    public byte[] GetOam() => Oam;
-
-    public int Read(int a)
-    {
-        switch (a & 0xff)
-        {
-            case 0x34: return MultiplyRes & 0xff;
-            case 0x35: return (MultiplyRes >> 8) & 0xff;
-            case 0x36: return (MultiplyRes >> 16) & 0xff;
-            case 0x37:
-                if ((WRIO & 0x80) != 0)
-                {
-                    OPHCT = HPos >> 2;
-                    OPVCT = VPos;
-                    CounterLatch = true;
-                }
-                return Cpu.OpenBus & 0xff;
-            case 0x38:
-            {
-                var v = 0;
-                if (OamAddr < 0x200 && (OamAddr & 1) == 1)
-                {
-                    v = Oam[OamAddr];
-                }
-                else if (OamAddr > 0x1ff)
-                    v = Oam[OamAddr % Oam.Length];
-                OamAddr++;
-                return v & 0xff;
-            }
-            case 0x39:
-            {
-                var v = VramLatch & 0xff;
-                if (!VramAddrMode)
-                {
-                    VramLatch = Vram[GetVramRemap()];
-                    VramAddr += ppuaddrinc[VramAddrInc];
-                }
-                return v & 0xff;
-            }
-            case 0x3a:
-            {
-                var v = (VramLatch >> 8) & 0xff;
-                if (VramAddrMode)
-                {
-                    VramLatch = Vram[GetVramRemap()];
-                    VramAddr += ppuaddrinc[VramAddrInc];
-                }
-                return v & 0xff;
-            }
-            case 0x3c:
-            {
-                int v;
-                if (!OphctLatch)
-                    v = OPHCT & 0xff;
-                else
-                    v = OPHCT >> 8;
-                OphctLatch = !OphctLatch;
-                return v & 0xff;
-            }
-            case 0x3d:
-            {
-                int v;
-                if (!OpvctLatch)
-                    v = OPVCT & 0xff;
-                else
-                    v = OPVCT >> 8;
-                OpvctLatch = !OpvctLatch;
-                return v & 0xff;
-            }
-            case 0x3f:
-                CounterLatch = false;
-                OphctLatch = false;
-                OpvctLatch = false;
-                return STAT78 & 0xff;
-        }
-        return 0x00;
-    }
-
-    private readonly int[] ppuaddrinc = [1, 32, 128, 128];
-    public void Write(int a, byte v)
-    {
-        switch (a & 0xff)
-        {
-            case 0x00:
-                ForcedBlank = (v & 0x80) != 0;
-                Brightness = v & 0x0f;
-                break;
-            case 0x01:
-                ObjTable1 = (v & 0x03) << 13;
-                ObjTable2 = ((v & 0x18) >> 3) + 1 << 12;
-                ObjSize = ((v & 0xe0) >> 5) & 7;
-                break;
-            case 0x02:
-                OamAddr = v;
-                InterOamAddr = v << 1;
-                ObjPrioIndex = v & 0xe0;
-                break;
-            case 0x03:
-                OamAddr |= v << 8;
-                OamAddr = (OamAddr & 0x1ff) << 1;
-                ObjPrioRotation = (v & 0x80) != 0;
-                break;
-            case 0x04:
-                if ((OamAddr & 1) == 0)
-                    OamLatch = v;
-                if (OamAddr < 0x200 && (OamAddr & 1) == 1)
-                {
-                    Oam[OamAddr - 1] = OamLatch;
-                    Oam[OamAddr++] = v;
-                    break;
-                }
-                else if (OamAddr > 0x1ff)
-                    Oam[OamAddr % Oam.Length] = v;
-                OamAddr++;
-                break;
-            case 0x05:
-                BgMode = v & 7;
-                Mode1Bg3Prio = (v & 0x08) != 0;
-                BgCharSize = [(v & 0x10) != 0, (v & 0x20) != 0, (v & 0x40) != 0, (v & 0x80) != 0];
-                break;
-            case 0x06:
-                MosaicEnabled = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0];
-                MosaicSize = (v & 0xc0) >> 4;
-                break;
-            case 0x07 or 0x08 or 0x09 or 0x0a:
-                var b = v & 3;
-                BgMapbase[(a & 0xff) - 7] = (v >> 2 << 10) & 0x7fff;
-                var i = (a & 0xff) - 7;
-                switch (b)
-                {
-                    case 0:
-                        BgSizeX[i] = 255; BgSizeY[i] = 255;
-                        break;
-                    case 1:
-                        BgSizeX[i] = 511; BgSizeY[i] = 255;
-                        break;
-                    case 2:
-                        BgSizeX[i] = 255; BgSizeY[i] = 511;
-                        break;
-                    case 3:
-                        BgSizeX[i] = 511; BgSizeY[i] = 511;
-                        break;
-                }
-                break;
-            case 0x0b:
-                BgTilebase[a - 0xb & 0xff] = (v & 0xf) << 12;
-                BgTilebase[a - 0xb + 1 & 0xff] = (v >> 4) << 12;
-                break;
-            case 0x0c:
-                BgTilebase[a - 0xb + 1 & 0xff] = (v & 0xf) << 12;
-                BgTilebase[a - 0xb + 2 & 0xff] = (v >> 4) << 12;
-                break;
-            case 0x0d:
-                ScrollXMode7 = ((v << 8) | Mode7Latch) & 0xffff;
-                Mode7Latch = v;
-                goto case 0x0f;
-            case 0x0f:
-            case 0x11:
-            case 0x13:
-                BgScrollX[((a & 0xff) - 0xd) / 2] = (((v << 8) | (PrevScrollX & ~7) | (CurrScrollX & 7)) & 0xffff);
-                PrevScrollX = v;
-                CurrScrollX = v;
-                break;
-            case 0x0e:
-                ScrollYMode7 = ((v << 8) | Mode7Latch) & 0xffff;
-                Mode7Latch = v;
-                goto case 0x10;
-            case 0x10:
-            case 0x12:
-            case 0x14:
-                BgScrollY[((a & 0xff) - 0xe) / 2] = (((v << 8) | (PrevScrollX & 0xff)) & 0xffff);
-                PrevScrollX = v;
-                break;
-            case 0x15:
-                VramAddrInc = v & 3;
-                VramAddrRemap = (v >> 2) & 3;
-                VramAddrMode = (v & 0x80) != 0;
-                break;
-            case 0x16:
-                VramAddr = VramAddr & 0xff00 | v;
-                VramLatch = Vram[GetVramRemap()];
-                break;
-            case 0x17:
-                VramAddr = VramAddr & 0xff | (v << 8);
-                VramLatch = Vram[GetVramRemap()];
-                break;
-            case 0x18:
-            {
-                var va = GetVramRemap();
-                Vram[va] = (ushort)(Vram[va] & 0xff00 | v);
-                if (!VramAddrMode)
-                    VramAddr += ppuaddrinc[VramAddrInc];
-                if (Snes.Debug && Snes.DebugWindow.AccessCheck((VramAddr * 2) & 0xffff, v, RamType.Vram, true))
-                    Snes.State = DebugState.Break;
-                break;
-            }
-            case 0x19:
-            {
-                var va = GetVramRemap();
-                Vram[va] = (ushort)(Vram[va] & 0xff | v << 8);
-                if (VramAddrMode)
-                    VramAddr += ppuaddrinc[VramAddrInc];
-                if (Snes.Debug && Snes.DebugWindow.AccessCheck((VramAddr * 2) & 0xffff, v, RamType.Vram, true))
-                    Snes.State = DebugState.Break;
-                break;
-            }
-
-            case 0x1a:
-                Mode7Settings = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x40) != 0, (v & 0x80) != 0];
-                break;
-            case 0x1b:
-                M7A = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                break;
-            case 0x1c:
-                M7B = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                MultiplyRes = (short)M7A * (sbyte)(M7B >> 8);
-                break;
-            case 0x1d:
-                M7C = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                break;
-            case 0x1e:
-                M7D = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                break;
-            case 0x1f:
-                M7X = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                break;
-            case 0x20:
-                M7Y = (v << 8) | Mode7Latch;
-                Mode7Latch = v;
-                break;
-            case 0x21: CGADD = v; CgRamToggle = false; break;
-            case 0x22:
-                if (!CgRamToggle)
-                    Cram[CGADD & 0xff] = v;
-                else
-                {
-                    Cram[CGADD & 0xff] = (ushort)(Cram[CGADD & 0xff] & 0xff | v << 8);
-                    CGADD++;
-                }
-                CgRamToggle = !CgRamToggle;
-                break;
-            case 0x23:
-                Win1Inverted[0] = (v & 0x01) != 0; Win1Enabled[0] = (v & 0x02) != 0;
-                Win2Inverted[0] = (v & 0x04) != 0; Win2Enabled[0] = (v & 0x08) != 0;
-                Win1Inverted[1] = (v & 0x10) != 0; Win1Enabled[1] = (v & 0x20) != 0;
-                Win2Inverted[1] = (v & 0x40) != 0; Win2Enabled[1] = (v & 0x80) != 0;
-                break;
-            case 0x24:
-                Win1Inverted[2] = (v & 0x01) != 0; Win1Enabled[2] = (v & 0x02) != 0;
-                Win2Inverted[2] = (v & 0x04) != 0; Win2Enabled[2] = (v & 0x08) != 0;
-                Win1Inverted[3] = (v & 0x10) != 0; Win1Enabled[3] = (v & 0x20) != 0;
-                Win2Inverted[3] = (v & 0x40) != 0; Win2Enabled[3] = (v & 0x80) != 0;
-                break;
-            case 0x25:
-                Win1Inverted[4] = (v & 0x01) != 0; Win1Enabled[4] = (v & 0x02) != 0;
-                Win2Inverted[4] = (v & 0x04) != 0; Win2Enabled[4] = (v & 0x08) != 0;
-                Win1Inverted[5] = (v & 0x10) != 0; Win1Enabled[5] = (v & 0x20) != 0;
-                Win2Inverted[5] = (v & 0x40) != 0; Win2Enabled[5] = (v & 0x80) != 0;
-                break;
-            case 0x26: W1Left = v; break;
-            case 0x27: W1Right = v; break;
-            case 0x28: W2Left = v; break;
-            case 0x29: W2Right = v; break;
-            case 0x2a:
-                WinLogic[0] = v & 3; WinLogic[1] = (v >> 2) & 3;
-                WinLogic[2] = (v >> 4) & 3; WinLogic[3] = (v >> 6) & 3;
-                break;
-            case 0x2b:
-                WinLogic[4] = v & 3; WinLogic[5] = (v >> 2) & 3;
-                break;
-            case 0x2c: MainBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
-            case 0x2d: SubBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
-            case 0x2e: WinMainBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break; ;
-            case 0x2f: WinSubBgs = [(v & 0x01) != 0, (v & 0x02) != 0, (v & 0x04) != 0, (v & 0x08) != 0, (v & 0x10) != 0]; break;
-            case 0x30:
-                DirColor = (v & 0x01) != 0;
-                AddSub = (v & 0x02) != 0;
-                Prevent = (v >> 4) & 3;
-                Clip = (v >> 6) & 3;
-                break;
-            case 0x31:
-                ColorMath = [(v&0x01)!=0, (v&0x02)!=0, (v&0x04)!=0, (v&0x08)!=0,
-                    (v&0x10)!=0, (v&0x20)!=0, (v&0x40)!=0, (v&0x80)!=0];
-                break;
-            case 0x32:
-                var c = v & 0x1f;
-                if ((v & 0x20) != 0)
-                    Fixed.Color = (Fixed.Color & 0x7fe0 | c) & 0xffff;
-                if ((v & 0x40) != 0)
-                    Fixed.Color = (Fixed.Color & 0x7c1f | c << 5) & 0xffff;
-                if ((v & 0x80) != 0)
-                    Fixed.Color = (Fixed.Color & 0x3ff | c << 10) & 0xffff;
-                break;
-            case 0x33:
-                OverscanMode = (v & 0x04) != 0;
-                HiResMode = (v & 0x08) != 0;
-                ExtBgMode = (v & 0x10) != 0;
-                break;
-            case 0x81: RamAddrLow = v; break;
-            case 0x82: RamAddrMedium = v; break;
-            case 0x83: RamAddrHigh = v; break;
-        }
-    }
+    public int ReadByte(int a) => (Vram[a & 0x7fff]) & 0xffff;
 
     public void WriteByte(int a, int v)
     {
@@ -1167,62 +842,6 @@ public class SnesPpu : EmuState
             Vram[a / 2] = (ushort)((Vram[a / 2] & 0xff00) | v);
         else
             Vram[a / 2] = (ushort)((Vram[a / 2] & 0x00ff) | v << 8);
-    }
-
-    public int ReadIO(int a)
-    {
-        switch (a & 0x1f)
-        {
-            case 0x10:
-            {
-                var v = RDNMI;
-                v |= Cpu.OpenBus & 0x70;
-                RDNMI &= 0x7f;
-                return v & 0xff;
-            }
-            case 0x11:
-            {
-                var v = TIMEUP;
-                v |= Cpu.OpenBus & 0x7f;
-                HVBJOY &= 0x3f;
-                TIMEUP &= 0x7f;
-                return v & 0xff;
-            }
-            case 0x12:
-            {
-                var v = HVBJOY & 0x01;
-                v |= (HPos < 4 || HPos >= 1096) ? 0x40 : 0x00;
-                v |= HVBJOY & 0x80;
-                v |= Cpu.OpenBus & 0x3e;
-                return v & 0xff;
-            }
-            case 0x14: return MulDivResult & 0xff;
-            case 0x15: return (MulDivResult >> 8) & 0xff;
-            case 0x16: return MulDivRemainder & 0xff;
-            case 0x17: return (MulDivRemainder >> 8) & 0xff;
-            case 0x18: return JOY1L & 0xff;
-            case 0x19: return JOY1H & 0xff;
-        }
-        return 0x00;
-    }
-
-    public void WriteIO(int a, int v)
-    {
-        v &= 0xff;
-        switch (a & 0x1f)
-        {
-            case 0x00: NMITIMEN = v; break;
-            case 0x01: WRIO = v; break;
-            case 0x02: MultiplyA = v; break;
-            case 0x03: MulDivRemainder = MultiplyA * v; break;
-            case 0x04: Dividend = (Dividend & 0xff00) | v; break;
-            case 0x05: Dividend = (Dividend & 0x00ff) | v << 8; break;
-            case 0x06: Division(v); break;
-            case 0x07: HTIMEL = v; break;
-            case 0x08: HTIMEH = v; break;
-            case 0x09: VTIMEL = v; break;
-            case 0x0a: VTIMEH = v; break;
-        }
     }
 
     private int GetVramRemap()
@@ -1237,6 +856,18 @@ public class SnesPpu : EmuState
         };
     }
 
+    public int ReadVram(int a)
+    {
+        if ((a & 1) == 0)
+        {
+            return Vram[a >> 1] & 0x00ff;
+        }
+        else
+        {
+            return Vram[a >> 1] >> 8 & 0xff;
+        }
+    }
+
     public void WriteVram(int a, int v)
     {
         if ((a & 1) == 0)
@@ -1248,6 +879,34 @@ public class SnesPpu : EmuState
         {
             var s = Vram[a >> 1];
             Vram[a >> 1] = (ushort)(s & 0x00ff | v << 8);
+        }
+    }
+
+    public int ReadOram(int a) => Oam[a];
+    public void WriteOram(int a, int v) => Oam[a] = (byte)v;
+
+    public int ReadCram(int a)
+    {
+        if ((a & 1) == 0)
+        {
+            return Cram[a >> 1] & 0x00ff;
+        }
+        else
+        {
+            return Cram[a >> 1] >> 8 & 0xff;
+        }
+    }
+
+    public void WriteCram(int a, int v)
+    {
+        if ((a & 1) == 0)
+        {
+            Cram[a & 0xff] = (ushort)v;
+        }
+        else
+        {
+            var s = Cram[a >> 1];
+            Cram[a >> 1] = (ushort)(s & 0x00ff | v << 8);
         }
     }
 
@@ -1269,7 +928,7 @@ public class SnesPpu : EmuState
         WRIO = 0xff;
         HVBJOY = 0x02;
         DramRefresh = false;
-        Array.Fill<uint>(ScreenBuffer, 0xff000000);
+        Array.Fill(ScreenBuffer, 0xff000000);
         MBgs = [new(), new(), new(), new(), new(), new(),];
         Tranparent = new(0, 0, 5);
     }
@@ -1352,8 +1011,7 @@ public class SnesPpu : EmuState
         new("","ObjAddr", $"{OamAddr:X4}"),
         new("2102/3","ObjPrioIndex", $"{ObjPrioIndex:X4}"),
         new("2103.7","ObjPrioRotation", $"{ObjPrioRotation}"),
-        new("2116/7","Vram Addr", $"{VramAddr:X4}"),
-        new("2126/7","Wram Address", $"{VramAddr * 2:X4}"),
+        new("2115-7","Vram Addr", $"{(VramAddr * 2)&0xffff:X4}"),
         new("2126","W1 Left", $"{W1Left:X2}"),
         new("2127","W1 Right", $"{W1Right:X2}"),
         new("2128","W2 Left", $"{W2Left:X2}"),
@@ -1402,7 +1060,7 @@ public class SnesPpu : EmuState
         new("|4","OAM Enabled", $"{SubBgs[3]}"),
     ];
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         bw.Write(VPos); bw.Write(HPos); bw.Write(Cycles); bw.Write(FrameCounter);
         bw.Write(CgRamToggle); bw.Write(PrevScrollX); bw.Write(CurrScrollX); bw.Write(FrameReady);
@@ -1452,7 +1110,7 @@ public class SnesPpu : EmuState
         WriteArray(bw, ScreenBuffer);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         VPos = br.ReadInt32(); HPos = br.ReadInt32(); Cycles = br.ReadUInt64(); FrameCounter = br.ReadUInt32();
         CgRamToggle = br.ReadBoolean(); PrevScrollX = br.ReadInt32(); CurrScrollX = br.ReadInt32(); FrameReady = br.ReadBoolean();

@@ -7,34 +7,17 @@
         public int Shift { get; private set; }
         public int PrgBank { get; private set; }
 
-        public Mapper001(Header cart) : base(cart)
+        public Mapper001(Header header, NesMmu mmu) : base(header, mmu)
         {
-            Header = cart;
-            var Mmu = Header.Mmu;
-            int prgsize = Header.PrgBanks * 0x4000;
-            int chrsize = Header.ChrBanks * 0x2000;
-
-            Prom = Header.Prom;
-            Vrom = cart.Vrom;
-
-            Buffer.BlockCopy(Prom, 0, Mmu.Ram, 0x8000, prgsize / Header.PrgBanks);
-            Buffer.BlockCopy(Prom, prgsize - prgsize / Header.PrgBanks, Mmu.Ram, 0xc000, prgsize / Header.PrgBanks);
-
-            if (Header.ChrBanks > 0)
-                Buffer.BlockCopy(Vrom, 0, Mmu.Vram, 0x0000, chrsize / Header.ChrBanks);
-
             Reset();
         }
 
-        public override byte ReadPrg(int a)
+        public override int ReadPrg(int a)
         {
-            if (a < 0xc000)
-                return base.ReadPrg(0x4000 * Prg[0] + a % 0x4000);
-            else
-                return base.ReadPrg(0x4000 * Prg[1] + a % 0x4000);
+            return base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
         }
 
-        public override byte ReadChr(int a)
+        public override int ReadChr(int a)
         {
             if (Header.ChrBanks > 0)
                 return base.ReadChr(0x1000 * Chr[a >> 12] + a % 0x1000);
@@ -42,7 +25,7 @@
                 return Header.Mmu.Vram[a];
         }
 
-        public override void WritePrg(int a, byte v)
+        public override void WritePrg(int a, int v)
         {
             if (a < 0xc000)
                 base.WritePrg(0x4000 * Prg[0] + a % 0x4000, v);
@@ -50,48 +33,45 @@
                 base.WritePrg(0x4000 * Prg[1] + a % 0x4000, v);
         }
 
-        public override void Write(int a, byte v)
+        public override void Write(int a, int v)
         {
-            if (a <= 0xffff)
+            if ((v & 0x80) != 0)
             {
-                if ((v & 0x80) != 0)
-                {
-                    Control |= 0xc;
-                    Shift = 0x10;
-                    Reset();
-                }
-                else
-                {
-                    Shift = Shift >> 1 | (v & 0x01) << 4;
-                    Writes++;
-                }
+                Control |= 0xc;
+                Shift = 0x10;
+                Reset();
+            }
+            else
+            {
+                Shift = Shift >> 1 | (v & 0x01) << 4;
+                Writes++;
+            }
 
-                if (Writes == 5)
+            if (Writes == 5)
+            {
+                Control = (byte)Shift;
+                if (a <= 0x9fff)
                 {
-                    Control = (byte)Shift;
-                    if (a <= 0x9fff)
-                    {
-                        Header.Mirror = Control & 3;
-                        PrgMode = (Control >> 2) & 3;
-                        ChrMode = (Control >> 4) & 1;
+                    Header.Mirror = Control & 3;
+                    PrgMode = (Control >> 2) & 3;
+                    ChrMode = (Control >> 4) & 1;
 
-                        //UpdatePrg((byte)Shift);
-                    }
-                    else if (a <= 0xbfff)
-                    {
-                        UpdateChr((byte)Shift, 0);
-                    }
-                    else if (a <= 0xdfff)
-                    {
-                        UpdateChr((byte)Shift, 1);
-                    }
-                    else if (a <= 0xffff)
-                    {
-                        UpdatePrg((byte)Shift);
-                        SramEnabled = true;
-                    }
-                    Writes = 0;
+                    //UpdatePrg((byte)Shift);
                 }
+                else if (a <= 0xbfff)
+                {
+                    UpdateChr((byte)Shift, 0);
+                }
+                else if (a <= 0xdfff)
+                {
+                    UpdateChr((byte)Shift, 1);
+                }
+                else if (a <= 0xffff)
+                {
+                    UpdatePrg((byte)Shift);
+                    SramEnabled = true;
+                }
+                Writes = 0;
             }
 
             base.Write(a, v);

@@ -1,15 +1,17 @@
-﻿using static Gmulator.Core.Gbc.GbcCpu;
+﻿using Gmulator.Interfaces;
+using static Gmulator.Core.Gbc.GbcCpu;
 
 namespace Gmulator.Core.Gbc;
-public class GbcLogger(GbcCpu cpu)
+
+public class GbcLogger(ICpu cpu)
 {
     public StreamWriter Outfile { get; private set; }
     public bool Logging { get; private set; }
 
-    public delegate int Read(int a);
-    public event Read ReadByte;
+    public delegate int ReadDel(int a);
+    public event ReadDel ReadByte;
 
-    private readonly GbcCpu Cpu = cpu;
+    private readonly ICpu Cpu = cpu;
 
     public void Log(int pc)
     {
@@ -39,7 +41,7 @@ public class GbcLogger(GbcCpu cpu)
         Outfile?.Close();
     }
 
-    public (string, int, int) Disassemble(int pc, bool get_registers, bool gamedoctor = false)
+    public (string, int, int) Disassemble(int pc, bool get_registers, bool gamedoctor = false, bool isSa1 = false)
     {
         string data = string.Empty;
         string bytes = string.Empty;
@@ -66,7 +68,7 @@ public class GbcLogger(GbcCpu cpu)
                 else
                     data = $"{d.Name} {d.Oper}";
             }
-            bytes = $"{op:X2}";
+            //bytes = $"{op:X2}";
         }
         else if (d.Size == 2)
         {
@@ -99,8 +101,7 @@ public class GbcLogger(GbcCpu cpu)
                 else
                     data = $"{d.Name} ${b1.ToString(d.Format)}";
             }
-
-            bytes = $"{op:X2} {b1:X2}";
+            //bytes = $"{op:X2} {b1:X2}";
         }
 
         else if (d.Size == 3)
@@ -116,7 +117,7 @@ public class GbcLogger(GbcCpu cpu)
             }
             else
                 data = $"{d.Name} ${(b2 << 8 | b1).ToString(d.Format)}";
-            bytes = $"{op:X2} {b1:X2} {b2:X2}";
+            //bytes = $"{op:X2} {b1:X2} {b2:X2}";
         }
         else if (d.Size == 4)
         {
@@ -175,7 +176,7 @@ public class GbcLogger(GbcCpu cpu)
                 //regtext = emu.ppu.Cycle > 0 ? $"Cy:{Program.emu.ppu.Cycle + 2}" : "Cy:0";
             }
         }
-        data = $"{bytes,-8} {data}";
+        data = $"{bytes,0} {data}";
         return (data, op, d.Size);
     }
 }

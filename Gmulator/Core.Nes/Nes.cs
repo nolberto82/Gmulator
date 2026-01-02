@@ -22,45 +22,36 @@ public class Nes : Emulator
     public NesJoypad Joypad1;
     public NesJoypad Joypad2;
 
-    public Nes()
+    public Nes() : base(0x10000)
     {
-        CheatConverter = new(this);
+        CheatConverter = new(Cheats);
         Mmu = new(Cheats);
-        Cpu = new();
-        Apu = new();
+        Cpu = new(this);
+        Apu = new(this);
         Ppu = new();
         Logger = new(this);
-        Joypad1 = new(new bool[8]);
-        Joypad2 = new(new bool[8]);
+        Joypad1 = new();
+        Joypad2 = new();
         Ppu.Init(this);
-        Mmu.Init(Joypad1, Joypad2);
-        //Input.Init(NesJoypad.GetButtons());
-        Buttons = new bool[8];
 
-        Logger.ReadByte += Mmu.Read;
-
-        Mmu.StatusR = Ppu.StatusR;
-        Mmu.DataR = Ppu.DataR;
-        Mmu.ControlW = Ppu.ControlW;
-        Mmu.MaskW = Ppu.MaskW;
-        Mmu.OamAddressW = Ppu.OamAddressW;
-        Mmu.OamDataW = Ppu.OamDataW;
-        Mmu.ScrollW = Ppu.ScrollW;
-        Mmu.AddressDataW = Ppu.AddressDataW;
-        Mmu.DataW = Ppu.DataW;
-        Mmu.OamDamyCopy = Ppu.OamDamyCopy;
-        Mmu.ApuRead = Apu.Read;
-        Mmu.ApuWrite = Apu.Write;
+        Logger.ReadByte += Mmu.ReadByte;
         Cpu.PpuStep = Ppu.Step;
-        Cpu.ReadByte = Mmu.Read;
-        Cpu.WriteByte = Mmu.Write;
-        Cpu.ReadWord = Mmu.ReadWord;
         Apu.Dmc.Read = Cpu.ReadDmc;
+
+        Mmu.Init(this);
+
+        SetMemory(0x00, 0x00, 0x0000, 0x1fff, 0x07ff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 1);
+        SetMemory(0x00, 0x00, 0x2000, 0x2fff, 0x2007, Ppu.ReadRegister, Ppu.WriteRegister, RamType.Register, 1);
+        SetMemory(0x00, 0x00, 0x4015, 0x4015, 0xffff, Apu.Read, Apu.Write, RamType.Register, 1);
+        SetMemory(0x00, 0x00, 0x4014, 0x4014, 0xffff, (int a) => 0, Ppu.Write4014, RamType.Register, 1);
+        SetMemory(0x00, 0x00, 0x4016, 0x4016, 0xffff, Joypad1.Read, Joypad1.Write, RamType.Register, 1);
+        SetMemory(0x00, 0x00, 0x4017, 0x4017, 0xffff, Joypad2.Read, Apu.Write, RamType.Register, 1);
+
     }
 
-    public void LuaMemoryCallbacks()
+    public override void LuaMemoryCallbacks()
     {
-        LuaApi.InitMemCallbacks(Mmu.Read, Mmu.Write, Cpu.GetReg, Cpu.SetReg);
+        LuaApi.InitMemCallbacks(Cpu, Mmu);
     }
 
     public override void RunFrame(bool opened)
@@ -113,39 +104,44 @@ public class Nes : Emulator
             UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
 
             if (Cheats.Count > 0)
-                Mmu.ApplyRawCheats();
+                Mmu.ApplyParCheats();
         }
     }
 
     //public override void Update() => Input.Update(this, NesConsole, Ppu.FrameCounter);
     public override void Input()
     {
-        Joypad1.Update(IsScreenWindow);
+        if (Raylib.IsGamepadAvailable(0))
+            Joypad1.Update(IsScreenWindow, Ppu.FrameCounter);
     }
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
-    public override void Reset(string name, bool reset)
+    public override void Reset(string name, bool reset, uint[] pixels)
     {
         if (name != "")
             Mapper = Mmu.LoadRom(name);
 
         if (Mapper != null)
         {
-            GameName = name;
+            SetMemory(0x00, 0x00, 0x6000, 0x7fff, 0x1fff, Mapper.ReadSram, Mapper.WriteSram, RamType.Sram, 1);
+            SetMemory(0x00, 0x00, 0x8000, 0xffff, 0xffff, Mapper.ReadPrg, Mapper.Write, RamType.Rom, 1);
+
+            GameName = Mapper.Name;
             LastName = GameName;
-            Mmu.Ram.AsSpan(0x6000, 0x2000).ToArray();
             Cpu.Reset();
             Ppu.Reset();
             Apu.Reset(Header.Region, Header.Region == 0 ? NesNtscCpuClock : NesPalCpuClock);
             Mmu.Reset();
             Logger.Reset();
-            Cheat.Load(this);
+            LoadCheats(name);
             LoadBreakpoints(Mapper.Name);
-            base.Reset(name, true);
+            base.Reset(name, true, Ppu.ScreenBuffer);
 
 #if DEBUG || RELEASE
             DebugWindow ??= new NesDebugWindow(this, Cpu, Ppu, Mmu, Logger);
+            Cpu.AccessCheck = DebugWindow.AccessCheck;
+            Cpu.SetState = SetState;
 #endif
         }
     }
@@ -154,24 +150,21 @@ public class Nes : Emulator
     {
         if (Mapper == null) return;
 
-        lock (StateLock)
+        var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
+        if (name != "")
         {
-            var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Header.Name)}.gs";
-            if (name != "")
-            {
-                using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
+            using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-                bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
-                Mmu.Save(bw);
-                Cpu.Save(bw);
-                Ppu.Save(bw);
-                Apu.Save(bw);
-                Mapper.Save(bw);
-                base.SaveState(slot, StateResult.Success);
-            }
-            else
-                base.SaveState(slot, StateResult.Failed);
+            bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
+            Mmu.Save(bw);
+            Cpu.Save(bw);
+            Ppu.Save(bw);
+            Apu.Save(bw);
+            Mapper.Save(bw);
+            base.SaveState(slot, StateResult.Success);
         }
+        else
+            base.SaveState(slot, StateResult.Failed);
     }
 
     public override void LoadState(int slot, StateResult res)
@@ -206,7 +199,7 @@ public class Nes : Emulator
 
     public override void LoadBreakpoints(string name) => base.LoadBreakpoints(name);
 
-    public override void Close() => SaveBreakpoints(Mapper.Name);
+    public override void Close() => SaveBreakpoints(Mapper?.Name);
 
     public override void SetState(DebugState v)
     {

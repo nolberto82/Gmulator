@@ -2,9 +2,8 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
+public class SnesSpcLogger()
 {
-    private SnesCpu Cpu;
     private SnesSpc Spc;
     private SnesApu Apu;
     public bool Logging { get; private set; }
@@ -13,7 +12,6 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
 
     public void SetSnes(Snes snes)
     {
-        Cpu = snes.Cpu;
         Spc = snes.Spc;
         Apu = snes.Apu;
     }
@@ -26,9 +24,9 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
         [0xfc] = "T2TARGET", [0xfd] = "T0OUT", [0xfe] = "T1OUT", [0xff] = "T2OUT",
     };
 
-    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes)
+    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes, bool isSa1=false)
     {
-        byte op = Apu.Read(pc, true);
+        byte op = Apu.Read(pc);
 
         List<DisasmEntry> entry = [];
         Opcode dops = Spc.Disasm[op];
@@ -40,7 +38,7 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
 
         byte[] b = new byte[size];
         for (int i = 0; i < b.Length; i++)
-            b[i] = Spc.Read(pc + i, true);
+            b[i] = (byte)Spc.Read(pc + i);
 
         pc++;
         string oper = dops.Oper.ToLower();
@@ -166,5 +164,5 @@ public class SnesSpcLogger(SnesCpu cpu, SnesSpc spc, SnesApu apu)
 
     public void Reset() => Close();
 
-    public ushort ReadWord(int a) => (ushort)(Spc.Read(a, true) | Spc.Read(a + 1, true) << 8);
+    public ushort ReadWord(int a) => (ushort)(Spc.Read(a) | Spc.Read(a + 1) << 8);
 }

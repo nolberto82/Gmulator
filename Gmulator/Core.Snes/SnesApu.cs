@@ -1,5 +1,8 @@
-﻿namespace Gmulator.Core.Snes;
-public class SnesApu : EmuState
+﻿using Gmulator.Interfaces;
+
+namespace Gmulator.Core.Snes;
+
+public class SnesApu : ISaveState
 {
     public Timer[] Timers = new Timer[3];
     private ulong Cycles;
@@ -13,7 +16,7 @@ public class SnesApu : EmuState
     private int DspAddr;
     private byte[] ram;
 
-    public const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
+    private const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
 
     private Snes Snes;
     private SnesSpc Spc;
@@ -26,7 +29,7 @@ public class SnesApu : EmuState
     private Func<int, bool> ExecuteCheck;
     private Func<int, int, RamType, bool, bool> AccessCheckSpc;
 
-    public SnesApu()
+    public SnesApu(Snes snes)
     {
         Ram = new byte[0x10000];
         TimerOut = new int[3];
@@ -48,6 +51,7 @@ public class SnesApu : EmuState
             ExecuteCheck = snes.DebugWindow.ExecuteCheck;
             AccessCheckSpc = snes.DebugWindow.AccessCheckSpc;
         }
+
     }
 
     public void Step()
@@ -111,12 +115,12 @@ public class SnesApu : EmuState
 
     public void Idle() => Cycle();
 
-    public byte Read(int a, bool debug = false)
+    public byte Read(int a)
     {
         a &= 0xffff;
         Cycle();
 #if DEBUG || RELEASE
-        if (debug && AccessCheckSpc(a, -1, RamType.SpcRam, false))
+        if (Snes.Debug && AccessCheckSpc(a, -1, RamType.SpcRam, false))
             SetState(DebugState.Break);
 #endif
 
@@ -146,7 +150,7 @@ public class SnesApu : EmuState
         byte v = (byte)value;
 
 #if DEBUG || RELEASE
-        if (debug && AccessCheckSpc(a, v, RamType.SpcRam, true))
+        if (Snes.Debug && AccessCheckSpc(a, v, RamType.SpcRam, true))
             SetState(DebugState.Break);
 #endif
 
@@ -202,9 +206,17 @@ public class SnesApu : EmuState
         ram[a] = v;
     }
 
-    public byte ReadFromSpu(int a) => SpcIO[a & 3];
+    public int ReadFromSpu(int a)
+    {
+        Step();
+        return SpcIO[a & 3];
+    }
 
-    public void WriteToSpu(int a, int v) => CpuIO[a] = (byte)v;
+    public void WriteToSpu(int a, int v)
+    {
+        Step();
+        CpuIO[a & 3] = (byte)v;
+    }
 
     public void Reset()
     {
@@ -252,7 +264,7 @@ public class SnesApu : EmuState
         new("Port3","Spc",$"{CpuIO[3]:X2}"),
     ];
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         bw.Write(Cycles); WriteArray(bw, SpcIO);
         WriteArray(bw, CpuIO); WriteArray(bw, TimerOut);
@@ -268,7 +280,7 @@ public class SnesApu : EmuState
         }
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         Cycles = br.ReadUInt64(); SpcIO = ReadArray<byte>(br, SpcIO.Length);
         CpuIO = ReadArray<byte>(br, CpuIO.Length); TimerOut = ReadArray<int>(br, TimerOut.Length);

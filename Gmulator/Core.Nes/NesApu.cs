@@ -1,10 +1,12 @@
 ﻿using Gmulator;
 using Gmulator.Core.Nes.Sound;
+using Gmulator.Interfaces;
+using Gmulator.Shared;
 using Raylib_cs;
 
 namespace Gmulator.Core.Nes;
 
-public class NesApu : EmuState
+public class NesApu : ISaveState
 {
     public int Status { get; private set; }
     public int FrameCounter { get; private set; }
@@ -38,7 +40,7 @@ public class NesApu : EmuState
 
     private int Region;
 
-    public NesApu()
+    public NesApu(Nes nes)
     {
         SquareTable = new float[31];
         for (int i = 0; i < 31; i++)
@@ -48,11 +50,11 @@ public class NesApu : EmuState
         for (int i = 0; i < TndTable.Length; i++)
             TndTable[i] = 163.67f / (24329.0f / i + 100.0f);
 
-        Square1 = new();
-        Square2 = new();
-        Triangle = new();
-        Noise = new();
-        Dmc = new();
+        Square1 = new(nes);
+        Square2 = new(nes);
+        Triangle = new(nes);
+        Noise = new(nes);
+        Dmc = new(nes);
     }
 
     public void Reset(int region, int cpuclock)
@@ -211,86 +213,79 @@ public class NesApu : EmuState
 
     public int Read(int a)
     {
-        if (a == 0x4015)
+        switch (a)
         {
-            var res = 0;
-            if (Square1.LengthCounter > 0)
-                res |= 0x01;
-            if (Square2.LengthCounter > 0)
-                res |= 0x02;
-            if (Triangle.LengthCounter > 0)
-                res |= 0x04;
-            if (Noise.LengthCounter > 0)
-                res |= 0x08;
-            if (Dmc.LengthValue > 0)
-                res |= 0x10;
+            case 0x4015:
+            {
+                var res = 0;
+                if (Square1.LengthCounter > 0)
+                    res |= 0x01;
+                if (Square2.LengthCounter > 0)
+                    res |= 0x02;
+                if (Triangle.LengthCounter > 0)
+                    res |= 0x04;
+                if (Noise.LengthCounter > 0)
+                    res |= 0x08;
+                if (Dmc.LengthValue > 0)
+                    res |= 0x10;
 
-            if (IrqEnabled)
-                res |= 0x40;
-            IrqEnabled = false;
-            return res & 0xff;
+                if (IrqEnabled)
+                    res |= 0x40;
+                IrqEnabled = false;
+                return res & 0xff;
+            }
+            default:
+                return 0xff;
         }
-
-        return 0xff;
     }
 
     public void Write(int a, int v)
     {
-        if (a <= 0x4003)
-            Square1.Write(a, v);
-        else if (a <= 0x4007)
-            Square2.Write(a, v);
-        else if (a <= 0x400b)
-            Triangle.Write(a, v);
-        else if (a <= 0x400f)
-            Noise.Write(a, v);
-        else if (a <= 0x4013)
-            Dmc.Write(a, v);
-
-        else if (a == 0x4015)
+        switch (a)
         {
-            Square1.Enabled = (v & 0x01) != 0;
-            Square2.Enabled = (v & 0x02) != 0;
-            Triangle.Enabled = (v & 0x04) != 0;
-            Noise.Enabled = (v & 0x08) != 0;
-            Dmc.Enabled = (v & 0x10) != 0;
-
-            if (!Square1.Enabled)
-                Square1.LengthCounter = 0;
-            if (!Square2.Enabled)
-                Square2.LengthCounter = 0;
-            if (!Triangle.Enabled)
-                Triangle.LengthCounter = 0;
-            if (!Noise.Enabled)
-                Noise.LengthCounter = 0;
-
-            Dmc.OutputLevel = 0;
-
-            if (Dmc.Enabled)
+            case 0x4015:
             {
-                Dmc.Write(a, v);
+                Square1.Enabled = (v & 0x01) != 0;
+                Square2.Enabled = (v & 0x02) != 0;
+                Triangle.Enabled = (v & 0x04) != 0;
+                Noise.Enabled = (v & 0x08) != 0;
+                Dmc.Enabled = (v & 0x10) != 0;
+
+                if (!Square1.Enabled)
+                    Square1.LengthCounter = 0;
+                if (!Square2.Enabled)
+                    Square2.LengthCounter = 0;
+                if (!Triangle.Enabled)
+                    Triangle.LengthCounter = 0;
+                if (!Noise.Enabled)
+                    Noise.LengthCounter = 0;
+
+                Dmc.OutputLevel = 0;
+
+                if (Dmc.Enabled)
+                    Dmc.Write4015(a, v);
+
+                Status = v;
+                break;
             }
-
-            Status = v;
-        }
-
-        else if (a == 0x4017)
-        {
-            FrameCounter = v;
-
-            IrqEnabled = v == 0 && !((v & 0x40) == 0) && !((v & 0x80) == 0);
-
-            if ((v & 0x80) != 0)
+            case 0x4017:
             {
-                QuarterFrame();
-                HalfFrame();
+                FrameCounter = v;
 
-                //Dmc.LengthCounter = 0;
+                IrqEnabled = v == 0 && !((v & 0x40) == 0) && !((v & 0x80) == 0);
+
+                if ((v & 0x80) != 0)
+                {
+                    QuarterFrame();
+                    HalfFrame();
+                    //Dmc.LengthCounter = 0;
+                }
+                break;
             }
         }
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         bw.Write(FrameCounter);
         bw.Write(BufPos);
@@ -301,7 +296,7 @@ public class NesApu : EmuState
         Dmc.Save(bw);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         FrameCounter = br.ReadInt32();
         BufPos = br.ReadInt32();
@@ -312,8 +307,8 @@ public class NesApu : EmuState
         Dmc.Load(br);
     }
 
-    public List<RegisterInfo> GetState() => new()
-    {
+    public List<RegisterInfo> GetState() =>
+    [
         new("4000","Channel 1",""),
         new("0-3","Env Volume",$"{Square1.EnvVolume:X2}"),
         new("4","Env Constant",$"{Square1.ConstVolumeFlag}"),
@@ -391,5 +386,5 @@ public class NesApu : EmuState
         new("","Sample Length",$"{$"{Dmc.SampleLength:X4}"}"),
         new("","Timer",$"{Dmc.Timer:X4}"),
 
-    };
+    ];
 }

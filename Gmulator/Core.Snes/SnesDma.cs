@@ -1,33 +1,39 @@
-﻿namespace Gmulator.Core.Snes;
-public class SnesDma : EmuState
+﻿using Gmulator.Interfaces;
+
+namespace Gmulator.Core.Snes;
+
+public class SnesDma : ISaveState
 {
     private const int MaxChannels = 8;
-    private bool[] Enabled = new bool[MaxChannels];
-    private bool[] HdmaEnabled = new bool[MaxChannels];
-    private bool[] Direction = new bool[MaxChannels];// = true;
-    private int[] Step = new int[MaxChannels];
-    private int[] Mode = new int[MaxChannels];// 7;
-    private int[] Port = new int[MaxChannels];
-    private int[] ABank = new int[MaxChannels];
-    private int[] AAddress = new int[MaxChannels];// = 0xffff;
-    private int[] Size = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
-    private int[] BAddress = new int[MaxChannels];// { get => (byte)field; set => field = (byte)value; } = 0xff;
-    private int[] RamAddress = new int[MaxChannels];// { get; set; }
-    private int[] HBank = new int[MaxChannels];// = 0xff;
-    private int[] HAddress = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
-    private int[] HCounter = new int[MaxChannels];//= 0xff;
-    private bool[] Completed = new bool[MaxChannels];
-    private bool[] Indirect = new bool[MaxChannels];
-    private bool[] Repeat = new bool[MaxChannels];
-    private bool[] TransferEnabled = new bool[MaxChannels];
+    private readonly bool[] Enabled = new bool[MaxChannels];
+    private readonly bool[] HdmaEnabled = new bool[MaxChannels];
+    private readonly bool[] Direction = new bool[MaxChannels];// = true;
+    private readonly int[] Step = new int[MaxChannels];
+    private readonly int[] Mode = new int[MaxChannels];// 7;
+    private readonly int[] Port = new int[MaxChannels];
+    private readonly int[] ABank = new int[MaxChannels];
+    private readonly int[] AAddress = new int[MaxChannels];// = 0xffff;
+    private readonly int[] Size = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private readonly int[] BAddress = new int[MaxChannels];// { get => (byte)field; set => field = (byte)value; } = 0xff;
+    private readonly int[] RamAddress = new int[MaxChannels];// { get; set; }
+    private readonly int[] HBank = new int[MaxChannels];// = 0xff;
+    private readonly int[] HAddress = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private readonly int[] HCounter = new int[MaxChannels];//= 0xff;
+    private readonly bool[] Completed = new bool[MaxChannels];
+    private readonly bool[] Indirect = new bool[MaxChannels];
+    private readonly bool[] Repeat = new bool[MaxChannels];
+    private readonly bool[] TransferEnabled = new bool[MaxChannels];
 
-    private Action Idle8;
+    private readonly Action Idle8;
+
+    private Snes Snes;
 
     public SnesDma(Snes snes)
     {
         Idle8 = snes.Cpu.Idle8;
         ReadCpu = snes.ReadMemory;
         WriteCpu = snes.WriteMemory;
+        Snes = snes;
     }
 
     public void Reset()
@@ -221,7 +227,24 @@ public class SnesDma : EmuState
         return 0;
     }
 
-    public void Write(int a, byte v, int ramaddr)
+    public void WriteDma(int a, int v)
+    {
+        switch (a & 0xffff)
+        {
+            case 0x420b:
+                DmaEnabled = v != 0;
+                DmaState = DmaEnabled ? 1 : 0;
+                for (int i = 0; i < 8; i++)
+                    Enabled[i] = ((v >> i) & 1) != 0;
+                return;
+            case 0x420c:
+                for (int i = 0; i < MaxChannels; i++)
+                    HdmaEnabled[i] = ((v >> i) & 1) != 0;
+                return;
+        }
+    }
+
+    public void Write(int a, int v)
     {
         var i = (a & 0xf0) / 0x10;
 
@@ -232,7 +255,8 @@ public class SnesDma : EmuState
                 Indirect[i] = (v & 0x40) != 0;
                 Step[i] = (v >> 3) & 3;
                 Mode[i] = v & 7;
-                RamAddress[i] = ramaddr; break;
+                RamAddress[i] = Snes.Mmu.RamAddr;
+                break;
             case 0x01: BAddress[i] = v; break;
             case 0x02: AAddress[i] = (AAddress[i] & 0xff00) | v; break;
             case 0x03: AAddress[i] = (AAddress[i] & 0x00ff) | v << 8; break;
@@ -247,20 +271,6 @@ public class SnesDma : EmuState
                 Repeat[i] = (v & 0x80) != 0;
                 break;
         }
-    }
-
-    public void StatusDma(int v)
-    {
-        DmaEnabled = v != 0;
-        DmaState = DmaEnabled ? 1 : 0;
-        for (int i = 0; i < 8; i++)
-            Enabled[i] = ((v >> i) & 1) != 0;
-    }
-
-    public void StatusHdma(int v)
-    {
-        for (int i = 0; i < MaxChannels; i++)
-            HdmaEnabled[i] = ((v >> i) & 1) != 0;
     }
 
     public List<RegisterInfo> GetIoRegs(int i) =>
@@ -278,10 +288,10 @@ public class SnesDma : EmuState
         new($"43{i * 16 + 7:X2}","Bank",$"{HBank[i]:X2}"),
         new($"43{i * 16 + 8:X2}/9","HAddress",$"{HAddress[i]:X4}"),
         new($"43{i * 16 + 10:X2}","LineCounter",$"{HCounter[i]:X2}"),
-        new($"","RamAddress",$"{RamAddress[i]:X4}"),
+        new($"","RamAddress",$"{RamAddress[i]:X6}"),
     ];
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
         for (int i = 0; i < 8; i++)
         {
@@ -297,7 +307,7 @@ public class SnesDma : EmuState
         }
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
         for (int i = 0; i < 8; i++)
         {

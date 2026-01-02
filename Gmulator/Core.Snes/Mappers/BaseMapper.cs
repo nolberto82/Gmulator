@@ -1,7 +1,7 @@
 ﻿using Timer = System.Threading.Timer;
 
 namespace Gmulator.Core.Snes.Mappers;
-public class BaseMapper : Emulator
+public class BaseMapper
 {
     public string Name { get; set; }
     public int Mode { get; set; }
@@ -16,9 +16,11 @@ public class BaseMapper : Emulator
     private Timer Timer;
 
     public byte[] Sram { get; set; }
+    public byte[] Prg { get; set; }
+    public SnesMmu Mmu { get; set; }
 
-    public const int CoprocessorGsu = 1;
-    public const int CoprocessorSa1 = 2;
+    public const int Gsu = 1;
+    public const int Sa1 = 3;
 
     public BaseMapper()
     {
@@ -42,12 +44,14 @@ public class BaseMapper : Emulator
         Banks = header.Rom.Length / 0x8000;
     }
 
-    public virtual byte Read(int bank, int a)
+    public virtual int Read(int a)
     {
         return Rom[a % Rom.Length];
     }
 
-    public virtual void Write(int bank, int a, int v)
+    public virtual int ReadSram(int a) => Sram[a & Sram.Length - 1];
+
+    public virtual void Write(int a, int v)
     {
         Sram[a % Sram.Length] = (byte)v;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
@@ -67,14 +71,16 @@ public class BaseMapper : Emulator
         }
     }
 
-    public byte ReadBwRam(int a)
+    public int ReadBwRam(int a)
     {
-        return Sram[a % Sram.Length];
+        a &= Sram.Length - 1;
+        return Sram[a & (Sram.Length - 1)];
     }
 
-    public void WriteBwRam(int a, byte v)
+    public void WriteBwRam(int a, int v)
     {
-        Sram[a % Sram.Length] = v;
+        a &= Sram.Length - 1;
+        Sram[a] = (byte)v;
     }
 
     public void LoadSram()
@@ -90,12 +96,12 @@ public class BaseMapper : Emulator
 
     private readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
 
-    public BaseMapper LoadRom(string name)
+    public BaseMapper LoadRom(string name, Snes snes)
     {
-        return Set(File.ReadAllBytes(name), name);
+        return Set(File.ReadAllBytes(name), name, snes);
     }
 
-    public BaseMapper Set(byte[] rom, string name)
+    public BaseMapper Set(byte[] rom, string name, Snes snes)
     {
         int highscore = -1;
         BaseMapper Mapper = null;
@@ -115,7 +121,8 @@ public class BaseMapper : Emulator
                 Sram = rom[o + 0x7fd6] != 0,
                 CoProcessor = (rom[o + 0x7fd6] & 0xf0) >> 4,
                 Romsize = 0x400 << rom[o + 0x7fd7],
-                Ramsize = 0x400 << rom[o + 0x7fd8]
+                Ramsize = 0x400 << rom[o + 0x7fd8],
+                Mmu = snes.Mmu,
             };
 
             var map = header.Map & 0x37;
@@ -175,6 +182,7 @@ public class BaseMapper : Emulator
         public int Romsize { get; set; }
         public int Ramsize { get; set; }
         public byte[] Rom { get; set; }
+        public SnesMmu Mmu { get; set; }
     }
 
     public enum Mapmode

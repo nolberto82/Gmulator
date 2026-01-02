@@ -1,7 +1,9 @@
-﻿using Gmulator.Shared;
+﻿using Gmulator.Interfaces;
+using Gmulator.Shared;
+using System.Threading.Channels;
 
 namespace Gmulator.Core.Gbc.Sound;
-public abstract class BaseChannel : EmuState
+public abstract class BaseChannel
 {
     public bool Enabled { get; set; }
 
@@ -29,12 +31,8 @@ public abstract class BaseChannel : EmuState
     public int CurrentVolume { get; set; }
     public int EnvVolume { get; set; }
 
-    public int Wave { get; private set; }
-    public int VolumeShift { get; set; }
 
-    public int Width { get; set; }
-    public int Divisor { get; set; }
-    public int LFSR { get; set; } = 0x7fff;
+    public int VolumeShift { get; set; }
 
     public float Sample { get; set; }
 
@@ -42,11 +40,13 @@ public abstract class BaseChannel : EmuState
     public int FrameSequencer { get; set; }
 
     public bool Play = true;
+    public int Wave { get; set; }
+    public int Divisor { get; set; }
+    public int LFSR { get; set; }
+    public int Width { get; set; }
 
     public byte[] WaveRam { get; set; }
 
-    public abstract void Write(int a, byte v);
-    public abstract byte Read(int a);
     public abstract void Reset();
 
     public readonly int[][] WaveDuty =
@@ -56,6 +56,7 @@ public abstract class BaseChannel : EmuState
         [1, 0, 0, 0, 0, 1, 1, 1], //50%
         [0, 1, 1, 1, 1, 1, 1, 0]  //75%
     ];
+
     private readonly byte[] shifts = [4, 0, 1, 2];
 
     public virtual short GetSample(int channel)
@@ -80,7 +81,7 @@ public abstract class BaseChannel : EmuState
         return 0;
     }
 
-    public virtual void Step(int channel, int cycles)
+    public virtual void Step(int channel,int cycles)
     {
         if (Dac && Enabled)
         {

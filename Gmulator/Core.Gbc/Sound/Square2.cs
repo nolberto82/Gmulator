@@ -1,56 +1,60 @@
 ﻿
+using Gmulator.Interfaces;
+
 namespace Gmulator.Core.Gbc.Sound;
-public class Square2 : BaseChannel
+
+public class Square2 : BaseChannel, ISaveState
 {
-    public byte NR21 { get; private set; }
-    public byte NR22 { get; private set; }
-    public byte NR23 { get; private set; }
-    public byte NR24 { get; private set; }
+    private int _nr21;
+    private int _nr22;
+    private int _nr23;
+    private int _nr24;
 
-    public Square2() { }
-
-    public override void Write(int a, byte v)
+    public Square2(Gbc gbc)
     {
-        if (a == 0x16)
-        {
-            Duty = (v & 0xc0) >> 6;
-            LengthCounter = 64 - (v & 0x3f);
-            NR21 = v;
-        }
-        else if (a == 0x17)
-        {
-            EnvVolume = (v & 0xf0) >> 4;
-            EnvDirection = (v & 0x08) > 0;
-            EnvPeriod = v & 0x07;
-            Dac = (v & 0xf8) > 0;
-            NR22 = v;
-        }
-        else if (a == 0x18)
-        {
-            Frequency = Frequency & 0xff00 | v;
-            NR23 = v;
-        }
-        else if (a == 0x19)
-        {
-            Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-            LengthEnabled = (v & 0x40) != 0;
-            if ((v & 0x80) != 0)
-                Trigger(64, 4);
-            NR24 = v;
-        }
+        gbc.SetMemory(0x00, 0x01, 0xff16, 0xff19, 0xffff, Read, Write, RamType.Register, 1);
     }
 
-    public override byte Read(int a)
+    public int Read(int a)
     {
-        if (a == 0x16)
-            return (byte)(NR21 | 0x3f);
-        else if (a == 0x17)
-            return NR22;
-        else if (a == 0x18)
-            return (byte)(NR23 | 0xff);
-        else if (a == 0x19)
-            return (byte)(NR24 | 0xbf);
-        return 0xff;
+        return a switch
+        {
+            0xff16 => _nr21 | 0x3f,
+            0xff17 => _nr22,
+            0xff18 => _nr23 | 0xff,
+            0xff19 => _nr24 | 0xbf,
+            _ => 0xff,
+        };
+    }
+
+    public void Write(int a, int v)
+    {
+        switch (a)
+        {
+            case 0xff16:
+                Duty = (v & 0xc0) >> 6;
+                LengthCounter = 64 - (v & 0x3f);
+                _nr21 = v;
+                break;
+            case 0xff17:
+                EnvVolume = (v & 0xf0) >> 4;
+                EnvDirection = (v & 0x08) > 0;
+                EnvPeriod = v & 0x07;
+                Dac = (v & 0xf8) > 0;
+                _nr22 = v;
+                break;
+            case 0xff18:
+                Frequency = Frequency & 0xff00 | v;
+                _nr23 = v;
+                break;
+            case 0xff19:
+                Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
+                LengthEnabled = (v & 0x40) != 0;
+                if ((v & 0x80) != 0)
+                    Trigger(64, 4);
+                _nr24 = v;
+                break;
+        }
     }
 
     public override void Reset()
@@ -61,40 +65,26 @@ public class Square2 : BaseChannel
         EnvVolume = 0;
         Timer = 0;
 
-        NR21 = 0x3f;
-        NR22 = 0x00;
-        NR23 = 0xff;
-        NR24 = 0xbf;
+        _nr21 = 0x3f;
+        _nr22 = 0x00;
+        _nr23 = 0xff;
+        _nr24 = 0xbf;
         Dac = false;
         Enabled = false;
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
-        bw.Write(Frequency);
-        bw.Write(LengthCounter);
-        bw.Write(Duty);
-        bw.Write(EnvVolume);
-        bw.Write(CurrentVolume);
-        bw.Write(Timer);
-        bw.Write(NR21);
-        bw.Write(NR22);
-        bw.Write(NR23);
-        bw.Write(NR24);
+        bw.Write(Frequency); bw.Write(LengthCounter); bw.Write(Duty); bw.Write(EnvVolume);
+        bw.Write(CurrentVolume); bw.Write(Timer); bw.Write(_nr21); bw.Write(_nr22);
+        bw.Write(_nr23); bw.Write(_nr24);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
-        Frequency = br.ReadInt32();
-        LengthCounter = br.ReadInt32();
-        Duty = br.ReadInt32();
-        EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32();
-        Timer = br.ReadInt32();
-        NR21 = br.ReadByte();
-        NR22 = br.ReadByte();
-        NR23 = br.ReadByte();
-        NR24 = br.ReadByte();
+        Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32();
+        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); _nr21 = br.ReadInt32(); _nr22 = br.ReadInt32();
+        _nr23 = br.ReadInt32(); _nr24 = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() =>

@@ -33,11 +33,11 @@ namespace Gmulator.Core.Snes
             [0x0e] = GamepadButton.RightFaceLeft, [0x0f] = GamepadButton.RightFaceDown,
         };
 
-        private bool[] _buttons;
+        private readonly bool[] _buttons;
 
-        public SnesJoypad(bool[] Buttons)
+        public SnesJoypad()
         {
-            _buttons= new bool[16];
+            _buttons = new bool[16];
         }
 
         public int Read(int min, int max)

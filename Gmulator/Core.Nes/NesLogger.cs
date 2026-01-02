@@ -6,8 +6,8 @@ public class NesLogger(Nes nes)
 {
     private StreamWriter _outFile;
     public bool Logging;
-    private NesCpu Cpu = nes.Cpu;
-    private NesPpu Ppu = nes.Ppu;
+    private readonly NesCpu Cpu = nes.Cpu;
+    private readonly NesPpu Ppu = nes.Ppu;
 
     public Func<int, int> ReadByte;
 
@@ -33,7 +33,7 @@ public class NesLogger(Nes nes)
             _outFile?.Close();
     }
 
-    public (string, int, int) Disassemble(int pc, bool get_registers, bool getbytes)
+    public (string, int, int) Disassemble(int pc, bool get_registers, bool getbytes, bool isSa1 = false)
     {
         if (pc + 2 >= 0x10000)
             return ("", 0, 1);

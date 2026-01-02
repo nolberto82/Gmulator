@@ -1,172 +1,99 @@
 ﻿using Gmulator.Core.Nes.Mappers;
-using System.Xml.Linq;
-using System.Runtime.Intrinsics.Arm;
+using Gmulator.Core.Snes;
+using Gmulator.Interfaces;
+using System.Text;
+using static Gmulator.Interfaces.IMmu;
 
 namespace Gmulator.Core.Nes;
 
-public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
+public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
 {
     private NesJoypad Joypad1;
     private NesJoypad Joypad2;
+    private NesApu Apu;
 
-    public byte[] Ram { get; private set; } = new byte[0x10000];
-    public byte[] Vram { get; private set; } = new byte[0x4000];
-    public byte[] Oram { get; private set; } = new byte[0x100];
+    public byte[] Wram { get; private set; } = new byte[0x800];
+    public byte[] Vram { get; private set; }
+    public byte[] Oram { get; private set; }
+
+    private List<MemoryHandler> MemoryHandlers;
 
     public BaseMapper Mapper { get; private set; }
 
     public bool RomLoaded { get; private set; }
     public string RomName { get; internal set; }
     public Dictionary<int, Cheat> Cheats { get; private set; } = cheats;
+    public RamType RamType { get; private set; }
+    public int RamMask { get; private set; }
+    public ReadDel[] Read { get; set; }
+    public WriteDel[] Write { get; set; }
+    public RamType[] RamTypes { get; set; }
 
-    public Func<int> StatusR;
-    public Func<int> DataR;
-    public Action<int> ControlW;
-    public Action<int> MaskW;
-    public Action<int> OamAddressW;
-    public Action<int> OamDataW;
-    public Action<int> ScrollW;
-    public Action<int> AddressDataW;
-    public Action<int> DataW;
-    public Action<int> OamDamyCopy;
-    public Func<int, int> ApuRead;
-    public Action<int, int> ApuWrite;
-
-    public void Init(NesJoypad joy1, NesJoypad joy2)
+    public void Init(Nes nes)
     {
-        Joypad1 = joy1;
-        Joypad2 = joy2;
+        Apu = nes.Apu;
+        Joypad1 = nes.Joypad1;
+        Joypad2 = nes.Joypad2;
+        Vram = nes.Ppu.Vram;
+        Oram = nes.Ppu.Oram;
+        MemoryHandlers = nes.MemoryHandlers;
     }
 
     public void Reset()
     {
-        Array.Fill<byte>(Ram, 0x00, 0x0000, 0x6000);
-        Array.Fill<byte>(Vram, 0x00);
+        Array.Fill<byte>(Wram, 0x00);
         Mapper.Reset();
     }
 
-    private byte ApplyGameGenieCheats(int ba, byte v)
+    private byte ApplyGameGenieCheats(int a, byte v)
     {
-        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled && Cheats[ba].Type == GameGenie;
-        if (cht)
-            return Cheats[ba].Value;
+        if (Cheats.Count == 0) return v;
+        if (Cheats.TryGetValue(a, out Cheat value) && value.Enabled && value.Type == GameGenie)
+        {
+            if (v == Cheats[a].Compare)
+                return Cheats[a].Value;
+        }
         return v;
     }
 
-    public void ApplyRawCheats()
+    public void ApplyParCheats()
     {
         foreach (var c in from c in Cheats
                           where c.Value.Enabled && c.Value.Type == ProAction
                           select c)
         {
-            Ram[c.Value.Address & 0xffff] = c.Value.Value;
+            Wram[c.Value.Address & 0xffff] = c.Value.Value;
         }
     }
 
-    public byte[] ReadWram() => Ram;
-    public byte[] ReadSram() => Mapper.Sram;
-    public byte[] ReadVram() => Vram;
-    public byte[] ReadOram() => Oram;
-    public byte[] ReadPrg() => Mapper.Prom;
-    public byte[] ReadChr() => Mapper.Vrom;
-    public void WriteWram(int a, int v) => Ram[a & 0xffff] = (byte)v;
+    public int ReadWram(int a) => Wram[a & 0x7ff];
+    public void WriteWram(int a, int v) => Wram[a & 0x7ff] = (byte)v;
+    public int ReadSram(int a) => Mapper.Sram[a & 0x1fff];
+    public void WriteSram(int a, int v) => Wram[a & 0xffff] = (byte)v;
+    public static int ReadNone(int a) => 0;
+    public static void WriteNone(int a, int v) { }
 
-    public int Read(int a)
+    public int ReadByte(int a)
     {
-        byte v = 0;
-        if (a < 0x2000)
-            v = Ram[a & 0x7ff];
-        else if (a >= 0x2000 && a <= 0x3fff)
-        {
-            if ((a & 0x7) == 0x02)
-                return StatusR();
-            else if ((a & 0x7) == 0x07)
-                return DataR();
-        }
-        else if (a <= 0x4015)
-            return ApuRead(a);
-        else if (a == 0x4016)
-            v = Joypad1.Read();
-        else if (a == 0x4017)
-            v = 0;
-        else if (a <= 0x5fff)
-            v = 0xff;
-        else if (a <= 0x7fff && Mapper.SramEnabled)
-            v = (byte)Mapper.ReadSram(a);
-        else if (a >= 0x8000)
-            v = Mapper.ReadPrg(a);
-        else
-            v = Ram[a & 0x7ff];
-
-        v = ApplyGameGenieCheats(a, v);
-        return v & 0xff;
+        RamType = MemoryHandlers[a].Type;
+        int v = MemoryHandlers[a].Read(a);
+        if (Cheats.Count > 0 && RamType == RamType.Rom)
+            return ApplyGameGenieCheats(a, (byte)v);
+        return v;
     }
 
-    public void Write(int a, int val)
+    public void WriteByte(int a, int v)
     {
-        byte v = (byte)val;
-        if (a >= 0x0000 && a <= 0x1fff)
-            Ram[a & 0x7ff] = v;
-        else if (a >= 0x2000 && a <= 0x3fff)
-        {
-            if (a == 0x2000)
-                ControlW(v);
-            else if (a == 0x2001)
-                MaskW(v);
-            else if (a == 0x2003)
-                OamAddressW(v);
-            else if (a == 0x2004)
-                OamDataW(v);
-            else if (a == 0x2005)
-                ScrollW(v);
-            else if (a == 0x2006)
-                AddressDataW(v);
-            else if (a == 0x2007)
-                DataW(v);
-        }
-        else if (a == 0x4014)
-            OamDamyCopy(v);
-        else if ((a >= 0x4000 && a <= 0x4013) || a == 0x4015 || a == 0x4017)
-        {
-            ApuWrite(a, v);
-            Ram[a] = v;
-        }
-        else if (a == 0x4016)
-        {
-            Joypad1.Write(v);
-            //Joypad2.Write(v);
-        }
-        //else if (a == 0x4017)
-
-        else if (a <= 0x5fff)
-            Mapper.Write(a, v);
-        else if (a <= 0x7fff && Mapper.SramEnabled)
-        {
-            Ram[a] = v;
-            Mapper.WriteSram(a, v);
-        }
-        else if (a >= 0x8000)
-            Mapper.Write(a, v);
+        RamType = MemoryHandlers[a].Type;
+        MemoryHandlers[a].Write(a, v);
     }
 
-    public byte ReadDebug(int addr) => Ram[addr];
+    public byte ReadDebug(int addr) => Wram[addr];
 
     public int ReadWord(int addr)
     {
-        if (addr >= 0x8000)
-            return (ushort)(Mapper.ReadPrg(addr) | Mapper.ReadPrg(addr + 1) << 8);
-        return (ushort)(ReadDebug(addr + 0) | ReadDebug(addr + 1) << 8);
+        return ReadByte(addr) | ReadByte(addr + 1) << 8;
     }
-
-    public void CopyRam(byte[] src, int dstoffset, int size)
-    {
-        Span<byte> dst = new(Ram, dstoffset, size);
-        if (dst.Length > 0)
-            src.CopyTo(dst);
-    }
-
-    public void CopyVram(byte[] src, int dstoffset, int size) =>
-        src.CopyTo(new Span<byte>(Vram, dstoffset, size));
 
     public BaseMapper LoadRom(string filename)
     {
@@ -174,60 +101,54 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
             return null;
 
         Header header = new();
+        var data = File.ReadAllBytes(filename).Take(16).ToArray();
 
-        using (var fs = new FileStream(filename, FileMode.Open, FileAccess.Read))
+        string nes = Encoding.Default.GetString([.. data.Take(4)]);
+
+        if (nes != "NES\u001a")
+            return null;
+
+        bool mapper20 = (data[7] & 0x0c) == 8;
+
+        header.Name = filename;
+        header.PrgBanks = data[4];
+        header.ChrBanks = data[5];
+        Header.MapperId = (data[6] & 0xf0) >> 4 | (data[7] & 0xf0);
+        Header.Mirror = (data[6] & 0x01) != 0 ? Vertical : Horizontal;
+        header.Battery = (data[6] & 0x02) != 0;
+        header.Trainer = (data[6] & 0x04) != 0;
+        var b12 = data[12] & 3;
+        if (b12 > 0)
         {
-            using var reader = new BinaryReader(fs);
-            char[] c = new char[4];
-            reader.Read(c, 0, 4);
-            string nes = new(c);
-
-            if (nes != "NES\u001a")
-                return null;
-
-            header.Name = filename;
-            header.PrgBanks = reader.Read();
-            header.ChrBanks = reader.Read();
-            var b6 = reader.Read();
-            var b7 = reader.Read();
-            Header.MapperId = (b6 & 0xf0) >> 4 | (b7 & 0xf0);
-            Header.Mirror = (b6 & 0x01) != 0 ? Vertical : Horizontal;
-            header.Battery = (b6 & 0x02) != 0;
-            header.Trainer = (b6 & 0x04) != 0;
-            reader.BaseStream.Seek(9, SeekOrigin.Begin);
-            var b9 = reader.Read() & 1;
-            reader.BaseStream.Seek(12, SeekOrigin.Begin);
-            var b12 = BitConverter.ToInt32(reader.ReadBytes(4)) & 3;
-            if (b12 > 0)
-            {
-                if (b12 == 0 || b12 == 2)
-                    Header.Region = 0;
-                else
-                    Header.Region = 1;
-            }
+            if (b12 == 0 || b12 == 2)
+                Header.Region = 0;
             else
-                Header.Region = b9 & 1;
-            Header.Region = 0;
-
-            header.Mmu = this;
+                Header.Region = 1;
         }
+        else
+            Header.Region = data[9] & 1;
+        Header.Region = 0;
+
+        header.Mmu = this;
+
 
         var rom = File.ReadAllBytes(filename);
         rom = new Patch().Run(rom, filename);
 
-        header.Prom = [.. rom.Take(header.PrgBanks * 0x4000 + 0x10).Skip(0x10)];
-        header.Vrom = [.. rom.Skip(header.Prom.Length + 0x10).Take(header.ChrBanks * 0x2000)];
+        header.PrgRom = [.. rom.Take(header.PrgBanks * 0x4000 + 0x10).Skip(0x10)];
+        header.CharRom = [.. rom.Skip(header.PrgRom.Length + 0x10).Take(header.ChrBanks * 0x2000)];
 
         Mapper = Header.MapperId switch
         {
-            0 => Mapper = new Mapper000(header),
-            1 => Mapper = new Mapper001(header),
-            2 => Mapper = new Mapper002(header),
-            3 => Mapper = new Mapper003(header),
-            4 => Mapper = new Mapper004(header),
-            5 => Mapper = new Mapper005(header),
-            7 => Mapper = new Mapper007(header),
-            15 => Mapper = new Mapper009(header),
+            0 => Mapper = new Mapper000(header, this),
+            1 => Mapper = new Mapper001(header, this),
+            2 => Mapper = new Mapper002(header, this),
+            3 => Mapper = new Mapper003(header, this),
+            4 => Mapper = new Mapper004(header, this),
+            5 => Mapper = new Mapper005(header, this),
+            7 => Mapper = new Mapper007(header, this),
+            9 => Mapper = new Mapper009(header, this),
+            30 => Mapper = new Mapper030(header, this),
             _ => null
         };
         LoadRam();
@@ -248,28 +169,22 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : EmuState
         }
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
-        bw.Write(Vram);
-        bw.Write(Mapper.Sram);
-        bw.Write(Oram);
-        bw.Write(Ram);
+        WriteArray(bw, Wram); WriteArray(bw, Vram); WriteArray(bw, Oram);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
-        br.ReadBytes(Vram.Length).CopyTo(Vram, 0x0000);
-        br.ReadBytes(Mapper.Sram.Length).CopyTo(Mapper.Sram, 0x0000);
-        br.ReadBytes(Oram.Length).CopyTo(Oram, 0x0000);
-        br.ReadBytes(Ram.Length).CopyTo(Ram, 0x0000);
+        Wram = ReadArray<byte>(br, Wram.Length); Vram = ReadArray<byte>(br, Vram.Length); Oram = ReadArray<byte>(br, Oram.Length);
     }
 }
 
 public struct Header
 {
     public NesMmu Mmu { get; set; }
-    public byte[] Prom { get; set; }
-    public byte[] Vrom { get; set; }
+    public byte[] PrgRom { get; set; }
+    public byte[] CharRom { get; set; }
 
     public int PrgBanks { get; set; }
     public int ChrBanks { get; set; }

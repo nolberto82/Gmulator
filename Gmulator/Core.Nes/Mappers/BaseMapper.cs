@@ -1,12 +1,14 @@
-﻿
+﻿using Gmulator.Interfaces;
+
 namespace Gmulator.Core.Nes.Mappers;
-public class BaseMapper(Header Header) : EmuState
+
+public class BaseMapper : ISaveState
 {
-    public byte[] Prg { get; set; }
-    public byte[] Chr { get; set; }
-    public byte[] LChr { get; set; } = [];
-    public byte[] Prom { get; set; }
-    public byte[] Vrom { get; set; }
+    public int[] Prg { get; set; }
+    public int[] Chr { get; set; }
+    public int[] LChr { get; set; } = [];
+    public byte[] PrgRom { get; set; }
+    public byte[] CharRom { get; set; }
     public byte[] Sram { get; set; }
     public int PrgMode { get; set; }
     public int ChrMode { get; set; }
@@ -16,19 +18,37 @@ public class BaseMapper(Header Header) : EmuState
     public static bool Fire { get; set; }
     public int Counter { get; set; }
     public bool SpriteSize { get; set; }
-    public string Name { get; set; } = Header.Name;
+    public string Name { get; set; }
     private Timer Timer;
 
-    public Header Header { get; set; } = Header;
+    public BaseMapper(Header header, NesMmu mmu)
+    {
+        Name = header.Name;
+        SramEnabled = header.Battery;
+        Header = header;
+        Mmu = mmu;
+
+        PrgSize = Header.PrgBanks * 0x4000;
+        ChrSize = Header.ChrBanks * 0x2000;
+        PrgRom = Header.PrgRom;
+        CharRom = Header.CharRom;
+        Sram = new byte[0x2000];
+    }
+
+    public Header Header { get; set; }
+
+    public NesMmu Mmu { get; set; }
 
     public int ReadSram(int a)
     {
-        return Sram[a - 0x6000];
+        if (!SramEnabled) return 0;
+        return Sram[a & 0x1fff];
     }
 
     public void WriteSram(int a, int v)
     {
-        Sram[a - 0x6000] = (byte)v;
+        if (!SramEnabled) return;
+        Sram[a & 0x1fff] = (byte)v;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
@@ -46,17 +66,17 @@ public class BaseMapper(Header Header) : EmuState
         }
     }
 
-    public virtual byte ReadPrg(int a) => Prom[a % Prom.Length];
+    public virtual int ReadPrg(int a) => PrgRom[a % PrgRom.Length];
 
-    public virtual byte ReadChr(int a)
+    public virtual int ReadChr(int a)
     {
-        if (Vrom.Length == 0) return 0;
-        return Vrom[a % Vrom.Length];
+        if (CharRom.Length == 0) return 0;
+        return CharRom[a % CharRom.Length];
     }
 
-    public virtual void WritePrg(int a, byte v) => Prom[a % Prom.Length] = v;
+    public virtual void WritePrg(int a, int v) => PrgRom[a % PrgRom.Length] = (byte)v;
 
-    public virtual void Write(int a, byte v)
+    public virtual void Write(int a, int v)
     {
 
     }
@@ -73,9 +93,7 @@ public class BaseMapper(Header Header) : EmuState
         PrgMode = 0;
         ChrMode = 0;
         Counter = 0;
-        SramEnabled = false;
         Fire = false;
-        SramEnabled = true;
     }
 
     public virtual void Scanline()
@@ -85,31 +103,30 @@ public class BaseMapper(Header Header) : EmuState
 
     public static void SetFire(bool v) => Fire = v;
 
-    public override void Save(BinaryWriter bw)
+    public Dictionary<string, string> GetInfo()
     {
-        bw.Write(Prg);
-        bw.Write(Chr);
-        bw.Write(LChr);
-        bw.Write(PrgMode);
-        bw.Write(ChrMode);
-        bw.Write(PrgSize);
-        bw.Write(ChrSize);
-        bw.Write(SramEnabled);
-        bw.Write(Fire);
-        bw.Write(Counter);
+        return new Dictionary<string, string>
+        {
+            { "Game",Path.GetFileName(Name) },
+            { "Mapper", $"{Header.MapperId:X3}" },
+            { "Prg Size", $"{PrgSize}" },
+            { "Chr Size", $"{ChrSize}" },
+        };
     }
 
-    public override void Load(BinaryReader br)
+    public void Save(BinaryWriter bw)
     {
-        Prg = br.ReadBytes(Prg.Length);
-        Chr = br.ReadBytes(Chr.Length);
-        LChr = br.ReadBytes(LChr.Length);
-        PrgMode = br.ReadInt32();
-        ChrMode = br.ReadInt32();
-        PrgSize = br.ReadInt32();
-        ChrSize = br.ReadInt32();
-        SramEnabled = br.ReadBoolean();
-        Fire = br.ReadBoolean();
-        Counter = br.ReadInt32();
+        WriteArray(bw, Prg); WriteArray(bw, Chr); WriteArray(bw, LChr); WriteArray(bw, PrgRom);
+        WriteArray(bw, CharRom); WriteArray(bw, Sram); bw.Write(PrgMode); bw.Write(ChrMode);
+        bw.Write(PrgSize); bw.Write(ChrSize); bw.Write(SramEnabled); bw.Write(Fire);
+        bw.Write(Counter); bw.Write(SpriteSize);
+    }
+
+    public void Load(BinaryReader br)
+    {
+        Prg = ReadArray<int>(br, Prg.Length); Chr = ReadArray<int>(br, Chr.Length); LChr = ReadArray<int>(br, LChr.Length); PrgRom = ReadArray<byte>(br, PrgRom.Length);
+        CharRom = ReadArray<byte>(br, CharRom.Length); Sram = ReadArray<byte>(br, Sram.Length); PrgMode = br.ReadInt32(); ChrMode = br.ReadInt32();
+        PrgSize = br.ReadInt32(); ChrSize = br.ReadInt32(); SramEnabled = br.ReadBoolean(); Fire = br.ReadBoolean();
+        Counter = br.ReadInt32(); SpriteSize = br.ReadBoolean();
     }
 }

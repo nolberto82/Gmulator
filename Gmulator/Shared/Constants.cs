@@ -20,6 +20,7 @@ public static class Constants
     {
         Break,
         StepMain,
+        StepSa1,
         StepSpc,
         StepGsu,
         StepOverMain,
@@ -29,13 +30,12 @@ public static class Constants
         Stopped,
     };
 
-
     public const int Horizontal = 3;
     public const int Vertical = 2;
     public const int SingleNt0 = 0;
     public const int SingleNt1 = 1;
 
-    public const int ScreenWidth = 1280;
+    public const int ScreenWidth = 1024;
     public const int ScreenHeight = 900;
     public const int DeckWidth = 1280;
     public const int DeckHeight = 800;
@@ -58,6 +58,8 @@ public static class Constants
     public const int NesHeight = 240;
     public const int SnesWidth = 256;
     public const int SnesHeight = 240;
+    public const int SmsWidth = 256;
+    public const int SmsHeight = 192;
 
     public const int GbcAudioFreq = 44100;
     public const int NesAudioFreq = 44100;

@@ -10,26 +10,12 @@ namespace Gmulator.Core.Nes.Mappers
     {
         private int NametableBank { get; set; }
 
-        public Mapper005(Header cart) : base(cart)
+        public Mapper005(Header header, NesMmu mmu) : base(header, mmu)
         {
-            Header = cart;
-            var Mmu = Header.Mmu;
-            int prgsize = Header.PrgBanks * 0x4000;
-            int chrsize = Header.ChrBanks * 0x2000;
-
-            Prom = Header.Prom;
-            Vrom = cart.Vrom;
-
-            Buffer.BlockCopy(Prom, 0, Mmu.Ram, 0x8000, prgsize / Header.PrgBanks);
-            Buffer.BlockCopy(Prom, prgsize - prgsize / Header.PrgBanks, Mmu.Ram, 0xc000, prgsize / Header.PrgBanks);
-
-            if (Header.ChrBanks > 0)
-                Buffer.BlockCopy(Vrom, 0, Mmu.Vram, 0x0000, chrsize / Header.ChrBanks);
-
             Reset();
         }
 
-        public override void Write(int a, byte v)
+        public override void Write(int a, int v)
         {
             if (a == 0x5100)
                 PrgMode = v & 3;
@@ -71,7 +57,7 @@ namespace Gmulator.Core.Nes.Mappers
             }
         }
 
-        public override byte ReadPrg(int a)
+        public override int ReadPrg(int a)
         {
             if (PrgMode == 1)
                 return base.ReadPrg(a);
@@ -88,7 +74,7 @@ namespace Gmulator.Core.Nes.Mappers
             return base.ReadPrg(0x10000 * Prg[a >> 14] + a % 0x10000);
         }
 
-        public override byte ReadChr(int a)
+        public override int ReadChr(int a)
         {
             if (a >= 0x2000) return 0;
             if (ChrMode == 1)
@@ -108,7 +94,7 @@ namespace Gmulator.Core.Nes.Mappers
             return base.ReadChr(0x0400 * Chr[a >> 10] + a % 0x0400);
         }
 
-        public override void WritePrg(int a, byte v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
+        public override void WritePrg(int a, int v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
 
         public override byte ReadVram(int a) => base.ReadVram(0x400 * NametableBank + a % 0x400 + 0x2000);
 
@@ -123,7 +109,7 @@ namespace Gmulator.Core.Nes.Mappers
 
         public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
 
-        private void UpdatePrgBanks(int a, byte v)
+        private void UpdatePrgBanks(int a, int v)
         {
             switch (PrgMode)
             {

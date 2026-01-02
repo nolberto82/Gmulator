@@ -1,14 +1,17 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
+using Gmulator.Interfaces;
 using ImGuiNET;
 using KeraLua;
 using NLua;
 using NLua.Event;
 using NLua.Exceptions;
 using Raylib_cs;
+using System.Collections;
 using System.Numerics;
 using System.Xml.Linq;
+using static Gmulator.Interfaces.IMmu;
 using Color = Raylib_cs.Color;
 using Lua = NLua.Lua;
 using LuaFunction = NLua.LuaFunction;
@@ -33,10 +36,10 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
     private float OldLeftThumbY;
     private bool FileChanged;
 
-    public Func<int, int> Read;
-    public Action<int, int> Write;
-    public Func<string, int> GetRegister;
-    public Action<string, int> SetRegister;
+    private Func<int,int> Read;
+    private Action<int,int> Write;
+    private Func<string, int> GetRegister;
+    private Action<string, int> SetRegister;
 
     public void Init()
     {
@@ -110,12 +113,12 @@ public class LuaApi(Texture2D screen, ImFontPtr[] consolas, Font font, float men
         EventCallbacks.Clear();
     }
 
-    public void InitMemCallbacks(Func<int, int> read, Action<int, int> write, Func<string, int> getreg, Action<string, int> setreg)
+    public void InitMemCallbacks(ICpu cpu, IMmu mmu)
     {
-        Read = read;
-        Write = write;
-        GetRegister = getreg;
-        SetRegister = setreg;
+        Read = mmu.ReadByte;
+        Write = mmu.WriteByte;
+        GetRegister = cpu.GetReg;
+        SetRegister = cpu.SetReg;
     }
 
     private void OnChanged(object sender, FileSystemEventArgs e)

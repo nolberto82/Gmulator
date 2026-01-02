@@ -1,107 +1,109 @@
-﻿
+﻿using Gmulator.Interfaces;
+using System.ComponentModel;
+using static Gmulator.Interfaces.IMmu;
+
 namespace Gmulator.Core.Gbc.Sound;
 
-public class Square1 : BaseChannel
+public class Square1 : BaseChannel, ISaveState
 {
-    public int SweepPeriod { get; private set; }
-    public int SweepNegate { get; private set; }
-    public int SweepShift { get; private set; }
-    public int SweepTimer { get; set; }
-    public bool SweepEnabled { get; private set; }
-    public int ShadowFrequency { get; set; }
+    private int _sweepPeriod;
+    private int _sweepNegate;
+    private int _sweepShift;
+    private int _sweepTimer;
+    private bool _sweepEnabled;
+    private int _shadowFrequency;
 
-    public byte NR10 { get; private set; }
-    public byte NR11 { get; private set; }
-    public byte NR12 { get; private set; }
-    public byte NR13 { get; private set; }
-    public byte NR14 { get; private set; }
+    private int _nr10;
+    private int _nr11;
+    private int _nr12;
+    private int _nr13;
+    private int _nr14;
 
-    public Square1() { }
+    public Square1(Gbc gbc)
+    {
+        gbc.SetMemory(0x00, 0x01, 0xff10, 0xff14, 0xffff, Read, Write, RamType.Register, 1);
+    }
+
+    public int Read(int a)
+    {
+        return a switch
+        {
+            0xff10 => _nr10 | 0x80,
+            0xff11 => _nr11 | 0x3f,
+            0xff12 => _nr12,
+            0xff13 => _nr13 | 0xff,
+            0xff14 => _nr14 | 0xbf,
+            _ => 0xff,
+        };
+    }
+
+    public void Write(int a, int v)
+    {
+        switch (a)
+        {
+            case 0xff10:
+                _sweepPeriod = (v & 0x70) >> 4;
+                _sweepNegate = (v & 0x08) > 0 ? -1 : 1;
+                _sweepShift = v & 0x07;
+                _nr10 = v;
+                break;
+            case 0xff11:
+                Duty = (v & 0xc0) >> 6;
+                LengthCounter = 64 - (v & 0x3f);
+                _nr11 = v;
+                break;
+            case 0xff12:
+                EnvVolume = (v & 0xf0) >> 4;
+                EnvDirection = (v & 0x08) > 0;
+                EnvPeriod = v & 0x07;
+                Dac = (v & 0xf8) > 0;
+                _nr12 = v;
+                break;
+            case 0xff13:
+                Frequency = Frequency & 0x0700 | v;
+                _nr13 = v;
+                break;
+            case 0xff14:
+                Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
+                _shadowFrequency = Frequency;
+                LengthEnabled = (v & 0x40) != 0;
+                _sweepEnabled = _sweepPeriod > 0 || _sweepShift > 0;
+
+                if (_sweepShift > 0)
+                    UpdateFrequency();
+
+                if ((v & 0x80) != 0)
+                    Trigger(64, 4);
+                _nr14 = v;
+                break;
+        }
+    }
 
     public void Sweep()
     {
-        if (SweepTimer > 0)
-            SweepTimer--;
+        if (_sweepTimer > 0)
+            _sweepTimer--;
 
-        if (SweepTimer == 0)
+        if (_sweepTimer == 0)
         {
             if (PeriodTimer > 0)
-                SweepTimer = SweepPeriod;
+                _sweepTimer = _sweepPeriod;
             else
-                SweepTimer = 8;
+                _sweepTimer = 8;
 
-            if (SweepEnabled && SweepPeriod > 0)
+            if (_sweepEnabled && _sweepPeriod > 0)
             {
                 UpdateFrequency();
                 var freq = UpdateFrequency();
-                if (freq < 2048 && SweepShift > 0)
-                    Frequency = ShadowFrequency = freq;
+                if (freq < 2048 && _sweepShift > 0)
+                    Frequency = _shadowFrequency = freq;
             }
-        }
-    }
-
-    public override byte Read(int a)
-    {
-        if (a == 0x10)
-            return (byte)(NR10 | 0x80);
-        else if (a == 0x11)
-            return (byte)(NR11 | 0x3f);
-        else if (a == 0x12)
-            return NR12;
-        else if (a == 0x13)
-            return (byte)(NR13 | 0xff);
-        else if (a == 0x14)
-            return (byte)(NR14 | 0xbf);
-        return 0xff;
-    }
-
-    public override void Write(int a, byte v)
-    {
-        if (a == 0x10)
-        {
-            SweepPeriod = (v & 0x70) >> 4;
-            SweepNegate = (v & 0x08) > 0 ? -1 : 1;
-            SweepShift = v & 0x07;
-            NR10 = v;
-        }
-        else if (a == 0x11)
-        {
-            Duty = (v & 0xc0) >> 6;
-            LengthCounter = 64 - (v & 0x3f);
-            NR11 = v;
-        }
-        else if (a == 0x12)
-        {
-            EnvVolume = (v & 0xf0) >> 4;
-            EnvDirection = (v & 0x08) > 0;
-            EnvPeriod = v & 0x07;
-            Dac = (v & 0xf8) > 0;
-            NR12 = v;
-        }
-        else if (a == 0x13)
-        {
-            Frequency = Frequency & 0x0700 | v;
-            NR13 = v;
-        }
-        else if (a == 0x14)
-        {
-            Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-            ShadowFrequency = Frequency;
-            LengthEnabled = (v & 0x40) != 0;
-            SweepEnabled = SweepPeriod > 0 || SweepShift > 0;
-
-            if (SweepShift > 0)
-                UpdateFrequency();
-
-            if ((v & 0x80) != 0)
-                Trigger(64, 4);
-            NR14 = v;
         }
     }
 
     private int UpdateFrequency()
     {
-        var freq = ShadowFrequency + SweepNegate * (ShadowFrequency >> SweepShift);
+        var freq = _shadowFrequency + _sweepNegate * (_shadowFrequency >> _sweepShift);
         if (freq > 2047)
             Enabled = false;
         return freq;
@@ -114,63 +116,38 @@ public class Square1 : BaseChannel
         Duty = 0;
         EnvVolume = 0;
         Timer = 0;
-        NR10 = 0x80;
-        NR11 = 0x3f;
-        NR12 = 0x00;
-        NR13 = 0xff;
-        NR14 = 0xbf;
+        _nr10 = 0x80;
+        _nr11 = 0x3f;
+        _nr12 = 0x00;
+        _nr13 = 0xff;
+        _nr14 = 0xbf;
         Dac = false;
         Enabled = false;
     }
 
-    public override void Save(BinaryWriter bw)
+    public void Save(BinaryWriter bw)
     {
-        bw.Write(SweepPeriod);
-        bw.Write(SweepNegate);
-        bw.Write(SweepShift);
-        bw.Write(SweepTimer);
-        bw.Write(SweepEnabled);
-        bw.Write(ShadowFrequency);
-        bw.Write(Frequency);
-        bw.Write(LengthCounter);
-        bw.Write(Duty);
-        bw.Write(EnvVolume);
-        bw.Write(CurrentVolume);
-        bw.Write(Timer);
-        bw.Write(NR10);
-        bw.Write(NR11);
-        bw.Write(NR12);
-        bw.Write(NR13);
-        bw.Write(NR14);
+        bw.Write(_sweepPeriod); bw.Write(_sweepNegate); bw.Write(_sweepShift); bw.Write(_sweepTimer);
+        bw.Write(_sweepEnabled); bw.Write(_shadowFrequency); bw.Write(Frequency); bw.Write(LengthCounter);
+        bw.Write(Duty); bw.Write(EnvVolume); bw.Write(CurrentVolume); bw.Write(Timer);
+        bw.Write(_nr10); bw.Write(_nr11); bw.Write(_nr12); bw.Write(_nr13);
+        bw.Write(_nr14);
     }
 
-    public override void Load(BinaryReader br)
+    public void Load(BinaryReader br)
     {
-        SweepPeriod = br.ReadInt32();
-        SweepNegate = br.ReadInt32();
-        SweepShift = br.ReadInt32();
-        SweepTimer = br.ReadInt32();
-        SweepEnabled = br.ReadBoolean();
-        ShadowFrequency = br.ReadInt32();
-        Frequency = br.ReadInt32();
-        LengthCounter = br.ReadInt32();
-        Duty = br.ReadInt32();
-        EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32();
-        Timer = br.ReadInt32();
-        NR10 = br.ReadByte();
-        NR11 = br.ReadByte();
-        NR12 = br.ReadByte();
-        NR13 = br.ReadByte();
-        NR14 = br.ReadByte();
+        _sweepPeriod = br.ReadInt32(); _sweepNegate = br.ReadInt32(); _sweepShift = br.ReadInt32(); _sweepTimer = br.ReadInt32();
+        _sweepEnabled = br.ReadBoolean(); _shadowFrequency = br.ReadInt32(); Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32();
+        Duty = br.ReadInt32(); EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32();
+        _nr10 = br.ReadInt32(); _nr11 = br.ReadInt32(); _nr12 = br.ReadInt32(); _nr13 = br.ReadInt32();
+        _nr14 = br.ReadInt32();
     }
 
-    public List<RegisterInfo> GetState() =>
-    [
+    public List<RegisterInfo> GetState() => [
         new("FF10", "Channel 1", ""),
-        new("0-2", "Sweep Shift", $"{SweepShift}"),
-        new("3", "Sweep Negate", $"{SweepNegate}"),
-        new("4-7", "Sweep Period", $"{SweepPeriod}"),
+        new("0-2", "Sweep Shift", $"{_sweepShift}"),
+        new("3", "Sweep Negate", $"{_sweepNegate}"),
+        new("4-7", "Sweep Period", $"{_sweepPeriod}"),
         new("FF11", "", ""),
         new("0-5", "Length", $"{LengthCounter}"),
         new("6-7", "Duty", $"{Duty}"),
@@ -185,9 +162,9 @@ public class Square1 : BaseChannel
         new("7", "Enabled", $"{Enabled}"),
         new("", "Timer", $"{Timer}"),
         new("", "Duty Position", $"{Position}"),
-        new("", "Sweep Enabled", $"{SweepPeriod > 0}"),
-        new("", "Sweep Frequency", $"{ShadowFrequency}"),
-        new("", "Sweep Timer", $"{SweepTimer}"),
+        new("", "Sweep Enabled", $"{_sweepPeriod > 0}"),
+        new("", "Sweep Frequency", $"{_shadowFrequency}"),
+        new("", "Sweep Timer", $"{_sweepTimer}"),
         new("", "Env Timer", $"{Duty}"),
     ];
 }

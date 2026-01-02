@@ -1,4 +1,4 @@
-﻿
+﻿global using static Gmulator.Shared.EmuState;
 global using static Gmulator.Shared.Constants;
 global using static Gmulator.GuiUtils;
 global using static Gmulator.ByteExtensions;

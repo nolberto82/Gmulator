@@ -40,10 +40,13 @@ internal class Input
             }
         }
 
-        if (newrightstickY < 0 && OldRightThumbY == 0)
-            emu.SaveState(0, 0);
-        else if (newrightstickY > 0 && OldRightThumbY == 0)
-            emu.LoadState(0, 0);
+        //if (!emu.FastForward)
+        {
+            if (newrightstickY < 0 && OldRightThumbY == 0)
+                emu.SaveState(0, 0);
+            else if (newrightstickY > 0 && OldRightThumbY == 0)
+                emu.LoadState(0, 0);
+        }
 
         var shift = Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift);
         if (shift)
