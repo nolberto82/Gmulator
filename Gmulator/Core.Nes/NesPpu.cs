@@ -147,7 +147,7 @@ namespace Gmulator.Core.Nes
             //else
             //    ScanlineFrameEnd = 311;
 
-
+            Array.Fill<byte>(Vram, 0x00);
             for (int i = 0; i < palBuffer.Length; i += 3)
                 pixPalettes[i / 3] = (uint)(palBuffer[i] | palBuffer[i + 1] << 8 | palBuffer[i + 2] << 16 | 0xff000000);
 

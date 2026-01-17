@@ -203,8 +203,6 @@ public class Nes : Emulator
 
     public override void SetState(DebugState v)
     {
-        if (v == DebugState.Running)
-            Run = true;
         base.SetState(v);
     }
 }

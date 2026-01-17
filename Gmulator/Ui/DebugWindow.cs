@@ -307,7 +307,7 @@ namespace Gmulator.Ui
         public virtual void Continue(DebugState type) => FollowPc = true;
         public virtual void StepInto(DebugState type)
         {
-            SetState(type);
+            SetState(DebugState.StepMain);
             FollowPc = true;
         }
 
