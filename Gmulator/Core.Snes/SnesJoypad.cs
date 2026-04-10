@@ -1,7 +1,4 @@
-﻿using Gmulator.Shared;
-using Raylib_cs;
-
-namespace Gmulator.Core.Snes
+﻿namespace Gmulator.Core.Snes
 {
     public class SnesJoypad
     {

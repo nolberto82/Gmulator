@@ -3,7 +3,7 @@
 namespace Gmulator.Shared;
 public abstract class EmuState
 {
-    public const string Version = "1.17";
+    public const string Version = "1.18";
 
     public static int SetInt(BinaryReader br, BinaryWriter bw, int v, bool save)
     {
@@ -18,7 +18,7 @@ public abstract class EmuState
         }
     }
 
-    public static int WriteInt(BinaryReader br, BinaryWriter bw, Stream st, bool save, int v)
+    public static int WriteInt(BinaryReader br, BinaryWriter bw, bool save, int v)
     {
         if (save)
         {

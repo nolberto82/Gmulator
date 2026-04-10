@@ -13,22 +13,13 @@ internal class Mapper002 : BaseMapper
         Reset();
     }
 
-    public override int ReadPrg(int a)
-    {
-        return base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
-    }
+    public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
 
     public override int ReadChr(int a) => base.ReadChr(0x4000 * Prg[0] + a % 0x4000);
 
-    public override void WritePrg(int a, int v)
-    {
-        base.WritePrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000, v);
-    }
+    public override void WritePrg(int a, int v) => base.WritePrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000, v);
 
-    public override void Write(int a, int v)
-    {
-        Prg[0] = (byte)(v & 7);
-    }
+    public override void Write(int a, int v) => Prg[0] = (byte)(v & 7);
 
     public override void Reset()
     {

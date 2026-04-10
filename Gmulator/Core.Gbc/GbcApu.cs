@@ -40,7 +40,7 @@ public class GbcApu : ISaveState
         Noise = new(gbc);
         SamplesCpu = cpuclock / SampleRate;
 
-        gbc.SetMemory(0x00, 0x01, 0xff24, 0xff26, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff24, 0xff26, Read, Write, RamType.Register, 1);
     }
 
     public void Step(int cycles)
@@ -125,24 +125,21 @@ public class GbcApu : ISaveState
         }
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff24 => _nr50,
-            0xff25 => _nr51,
-            0xff26 => _nr52 | 0x70,
-            _ => 0,
-        };
-    }
+        0xff24 => _nr50,
+        0xff25 => _nr51,
+        0xff26 => _nr52 | 0x70,
+        _ => 0,
+    };
 
     public void Write(int a, int v)
     {
         switch (a)
         {
             case 0xff24:
-                _volumeRight = (v & 0x07);
-                _volumeLeft = ((v & 0x70) >> 4);
+                _volumeRight = v & 0x07;
+                _volumeLeft = (v & 0x70) >> 4;
                 _nr50 = v;
                 break;
             case 0xff25:

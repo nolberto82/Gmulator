@@ -8,10 +8,7 @@ public class Mapper3 : BaseMapper
 
     public override void Reset() => base.Reset();
 
-    public override void Init(byte[] rom, string filename)
-    {
-        base.Init(rom, filename);
-    }
+    public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
     public override int ReadRom(int a)
     {

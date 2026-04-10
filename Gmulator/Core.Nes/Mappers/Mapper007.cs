@@ -23,7 +23,7 @@ internal class Mapper007 : BaseMapper
     {
         Prg[0] = (byte)(v & 7);
         Chr[0] = (byte)(v >> 4);
-        Header.Mirror = ((v >> 4) & 1);
+        Header.Mirror = (v >> 4) & 1;
         base.Write(a, v);
     }
 

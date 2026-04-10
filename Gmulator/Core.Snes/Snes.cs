@@ -1,13 +1,11 @@
-﻿using Gmulator.Core.Nes;
-using Gmulator.Core.Snes.Mappers;
+﻿using Gmulator.Core.Snes.Mappers;
+using Gmulator.Core.Snes.Sa1;
 using Gmulator.Interfaces;
 using Gmulator.Ui;
-using Raylib_cs;
-using System.Text;
 
 namespace Gmulator.Core.Snes;
 
-public class Snes : Emulator
+public class Snes : Emulator, IConsole
 {
     public SnesCpu Cpu;
     public SnesPpu Ppu;
@@ -21,21 +19,29 @@ public class Snes : Emulator
     public readonly SnesJoypad Joypad;
     public SnesLogger Logger;
     public SnesSpcLogger SpcLogger;
-    public readonly Breakpoint Breakpoint;
+    public MemoryMap CpuMap;
 
     private readonly List<float> AudioSamples = [];
 
-    public bool IsSpc { get; set; }
+    public bool IsSpc => field;
+    ICpu IConsole.Cpu => Cpu;
+    IPpu IConsole.Ppu => Ppu;
+    IMmu IConsole.Mmu => Mmu;
 
-    public Snes() : base(0x1000)
+    public Debugger Debugger { get; set; }
+    public DebugState EmuState { get; set; }
+
+    public Snes()
     {
+        CpuMap = new(0x1000);
+        Console = this;
         CheatConverter = new(Cheats);
-        Breakpoint = new();
+        Debugger = new(this);
         Mmu = new(this);
         Cpu = new();
-        Ppu = new(this);
+        Ppu = new();
         Spc = new();
-        Apu = new(this);
+        Apu = new();
         Dsp = new();
         Dma = new(this);
         Logger = new(this);
@@ -45,93 +51,62 @@ public class Snes : Emulator
         Joypad = new();
 
 
-
 #if DEBUG || DECKDEBUG
         //Debugger.Launch();
 #endif
     }
 
-    public override void LuaMemoryCallbacks()
-    {
-        LuaApi.InitMemCallbacks(Cpu, Mmu);
-    }
+    public override void LuaMemoryCallbacks() => LuaApi.InitMemCallbacks(Cpu, Mmu);
 
     public override void RunFrame(bool opened)
     {
         if (Mapper == null) return;
-        if (!opened && (State == DebugState.Running || State == DebugState.StepMain || State == DebugState.StepSa1))
+        if (!opened && (EmuState == DebugState.Running || EmuState == DebugState.StepMain || EmuState == DebugState.StepSa1 || EmuState == DebugState.StepSpc))
         {
             bool frameready = Ppu.FrameReady;
             SnesPpu ppu = Ppu;
             LuaApi lua = LuaApi;
-            SnesCpu cpu = Cpu;
             SnesSpc spc = Spc;
             BaseMapper mapper = Mapper;
+            //Sa1?.State = DebugState.Running;
             while (!ppu.FrameReady)
             {
-                int pc = cpu.PB << 16 | cpu.PC;
+                int pc = Cpu.PBPC;
 #if DEBUG || DECKDEBUG || RELEASE
                 if (Debug)
                 {
-                    int s_pc = spc.PC;
-                    if (cpu.StepOverAddr == pc)
+                    if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
                     {
-                        SetState(DebugState.Break);
-                        cpu.StepOverAddr = -1;
-                        break;
-                    }
-
-                    if (spc.StepOverAddr == s_pc)
-                    {
-                        SetState(DebugState.Break);
-                        spc.StepOverAddr = -1;
+                        EmuState = DebugState.Break;
                         break;
                     }
 
                     Logger.Log(ppu.HPos);
 
-                    if (State == DebugState.StepMain)
-                    {
-                        cpu.Step();
-                        SetState(DebugState.Break);
-                        break;
-                    }
-                    else if (State == DebugState.StepSa1)
-                    {
-                        Sa1?.Step();
-                        SetState(DebugState.Break);
-                        break;
-                    }
-                    else if (State == DebugState.StepSpc)
-                    {
-                        cpu.Step();
-                        spc.Step();
-                        SetState(DebugState.Break);
-                        break;
-                    }
-                    else if (mapper.CoProcessor == BaseMapper.Gsu && State == DebugState.StepGsu)
+                    if (mapper.CoProcessor == BaseMapper.Gsu && EmuState == DebugState.StepGsu)
                     {
                         //Gsu.Exec(state, Debug);
-                        SetState(DebugState.Break);
+                        EmuState = DebugState.Break;
                         break;
                     }
 
-                    if (!Run && Breakpoints.Count > 0 && State == DebugState.Running)
+                    if (!Run && Breakpoints.Count > 0 && EmuState == DebugState.Running)
                     {
-                        if (DebugWindow.ExecuteCheck(pc))
+                        if (Debugger.Execute(pc))
                         {
-                            SetState(DebugState.Break);
+                            EmuState = DebugState.Break;
                             break;
                         }
                     }
-                    Run = false;
                 }
-#endif
-                lua?.OnExec(pc);
-                cpu.Step();
 
-                if (State == DebugState.Break)
+                if (EmuState == DebugState.Break)
                     break;
+#endif
+
+                lua?.OnExec(pc);
+                Cpu.Step();
+                Run = false;
             }
 
             ppu.FrameReady = false;
@@ -165,8 +140,9 @@ public class Snes : Emulator
 
     public int ReadMemory(int a)
     {
+        a &= 0xffffff;
         int v = Mmu.ReadByte(a);
-        CheckAccess(a, v, Mmu.RamType, Mmu.RamMask, false);
+        Debugger.Access(a, v, CpuMap.Handlers[a >> 12], false);
         if (Cheats.Count > 0 && Mmu.RamType == RamType.Rom)
         {
             lock (Cheats)
@@ -178,29 +154,20 @@ public class Snes : Emulator
     internal void WriteMemory(int a, int v)
     {
         Mmu.WriteByte(a, v);
-        CheckAccess(a, v, Mmu.RamType, Mmu.RamMask, true);
+        Debugger.Access(a, v, CpuMap.Handlers[a >> 12], true);
     }
 
-    public void HandleDma()
-    {
-        Dma.HandleDma();
-    }
+    public void HandleDma() => Dma.HandleDma();
 
     public int ReadWord(int a) => (ushort)(ReadOp(a) | ReadOp(a + 1) << 8);
     public int ReadLong(int a) => ReadOp(a) | ReadOp(a + 1) << 8 | ReadOp(a + 2) << 16;
     public int ReadVram(int a) => Ppu.Read(a) & 0xff;
-
-    public override void CheckAccess(int a, int v, RamType type, int mask, bool write)
-    {
-        base.CheckAccess(a, v, type, mask, write);
-    }
 
     public override void Reset(string name, bool reset, uint[] pixels)
     {
         if (name != "")
         {
             Cpu.SetSnes(this);
-            Mmu.SetSnes(this);
 
             Mapper = new BaseMapper().LoadRom(name, this);
             if (Mapper != null)
@@ -212,58 +179,32 @@ public class Snes : Emulator
             }
             LastName = GameName;
             GameName = name;
-
-            SetMemory(0x00, 0x3f, 0x0000, 0x1fff, 0x1fff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 0x1000);
-            SetMemory(0x80, 0xbf, 0x0000, 0x1fff, 0x1fff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 0x1000);
-            SetMemory(0x7e, 0x7f, 0x0000, 0xffff, 0x1ffff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 0x1000);
-
-            if (Mapper.CoProcessor == BaseMapper.Sa1)
-            {
-                Sa1 = new(this);
-                SetMemory(0x00, 0x3f, 0x2000, 0x3fff, 0xffff, Ppu.Read, Ppu.Write, RamType.Register, 0x1000);
-                SetMemory(0x80, 0xbf, 0x2000, 0x3fff, 0xffff, Ppu.Read, Ppu.Write, RamType.Register, 0x1000);
-            }
-            else
-            {
-                SetMemory(0x00, 0x3f, 0x2100, 0x21ff, 0xffff, Ppu.Read, Ppu.Write, RamType.Register, 0x1000);
-                SetMemory(0x80, 0xbf, 0x2100, 0x21ff, 0xffff, Ppu.Read, Ppu.Write, RamType.Register, 0x1000);
-            }
-
-            SetMemory(0x00, 0x3f, 0x4200, 0x42ff, 0xffff, Ppu.ReadIO, Ppu.WriteIO, RamType.Register, 0x1000);
-            SetMemory(0x80, 0xbf, 0x4200, 0x42ff, 0xffff, Ppu.ReadIO, Ppu.WriteIO, RamType.Register, 0x1000);
-
-            if (Mapper is LoRom || Mapper is Sa1Rom)
-            {
-                SetMemory(0x70, 0x7d, 0x0000, 0x7fff, 0x1fff, Mapper.ReadSram, Mapper.Write, RamType.Sram, 0x1000);
-                SetMemory(0x00, 0x7d, 0x8000, 0xffff, 0x7fff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                SetMemory(0x80, 0xff, 0x8000, 0xffff, 0x7fff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-
-                if (Mapper is Sa1Rom)
-                {
-                    SetMemory(0xc0, 0xcf, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                    SetMemory(0xd0, 0xdf, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                    SetMemory(0xe0, 0xef, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                    SetMemory(0xf0, 0xff, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                    SetMemory(0x00, 0x3f, 0x6000, 0x7fff, 0xffff, Mapper.ReadBwRam, Mapper.WriteBwRam, RamType.Sram, 0x1000);
-                    SetMemory(0x40, 0x4f, 0x0000, 0x7fff, 0xffff, Mapper.ReadBwRam, Mapper.WriteBwRam, RamType.Sram, 0x1000);
-                    SetMemory(0x60, 0x6f, 0x0000, 0x7fff, 0xffff, Mapper.ReadBwRam, Mapper.WriteBwRam, RamType.Sram, 0x1000);
-                }
-            }
-            else if (Mapper is HiRom)
-            {
-                SetMemory(0x00, 0x3f, 0x8000, 0xffff, 0x7fff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                SetMemory(0x80, 0xbf, 0x8000, 0xffff, 0x7fff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                SetMemory(0x40, 0x7d, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                SetMemory(0xc0, 0xff, 0x0000, 0xffff, 0xffff, Mapper.Read, Mapper.Write, RamType.Rom, 0x1000);
-                SetMemory(0x20, 0x3f, 0x6000, 0x7fff, 0x1fff, Mapper.ReadSram, Mapper.Write, RamType.Sram, 0x1000);
-                SetMemory(0xa0, 0xbf, 0x6000, 0x7fff, 0x1fff, Mapper.ReadSram, Mapper.Write, RamType.Sram, 0x1000);
-            }
         }
 
         if (Mapper != null)
         {
+            CpuMap.Register(0x00, 0x3f, 0x2000, 0x21ff, Ppu.Read, Ppu.Write);
+            CpuMap.Register(0x80, 0xbf, 0x2000, 0x21ff, Ppu.Read, Ppu.Write);
+            CpuMap.Register(0x00, 0x3f, 0x4200, 0x42ff, Ppu.ReadIO, Ppu.WriteIO);
+            CpuMap.Register(0x80, 0xbf, 0x4200, 0x42ff, Ppu.ReadIO, Ppu.WriteIO);
+
+            CpuMap.Wram(0x00, 0x3f, 0x0000, 0x1fff, Mmu.ReadWram, Mmu.WriteWram);
+            CpuMap.Wram(0x80, 0xbf, 0x0000, 0x1fff, Mmu.ReadWram, Mmu.WriteWram);
+            CpuMap.Wram(0x7e, 0x7f, 0x0000, 0xffff, Mmu.ReadWram, Mmu.WriteWram);
+
+            if (Mapper.CoProcessor == BaseMapper.Sa1)
+                Sa1 ??= new(this);
+
+            Mapper.Reset(this);
+
+
 #if DEBUG || RELEASE
-            DebugWindow ??= new SnesDebugWindow(this);
+            if (DebugWindow == null)
+            {
+                DebugWindow = new SnesDebugWindow(this);
+                Sa1?.DebugWindow = DebugWindow;
+                DebugWindow.Reset(this);
+            }
 #endif
             SetActions();
             Mapper?.LoadSram();
@@ -275,6 +216,7 @@ public class Snes : Emulator
             Sa1?.Reset2();
             Spc.Reset();
             Dma.Reset();
+
             if (Mapper.CoProcessor == BaseMapper.Gsu)
             {
                 //Gsu = new(this);
@@ -302,7 +244,7 @@ public class Snes : Emulator
             if (name != "")
             {
                 using BinaryWriter bw = new(new FileStream(name, FileMode.Create, FileAccess.Write));
-                bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
+                bw.Write(Encoding.ASCII.GetBytes(Shared.EmuState.Version));
                 Cpu.Save(bw);
                 Ppu.Save(bw);
                 Mmu.Save(bw);
@@ -310,6 +252,9 @@ public class Snes : Emulator
                 Apu.Save(bw);
                 Dsp.Save(bw);
                 Dma.Save(bw);
+                Sa1?.Save(bw);
+                Sa1?.Cpu.Save(bw);
+                Sa1?.Mmu.Save(bw);
                 bw.Write(Mapper.Sram);
                 base.SaveState(slot, StateResult.Success);
             }
@@ -331,7 +276,7 @@ public class Snes : Emulator
                 using Stream stream = fs;
                 using BinaryReader br = new(fs);
 
-                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == EmuState.Version)
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == Shared.EmuState.Version)
                 {
                     Cpu.Load(br);
                     Ppu.Load(br);
@@ -340,6 +285,9 @@ public class Snes : Emulator
                     Apu.Load(br);
                     Dsp.Load(br);
                     Dma.Load(br);
+                    Sa1?.Load(br);
+                    Sa1?.Cpu.Load(br);
+                    Sa1?.Mmu.Load(br);
                     Mapper.Sram = ReadArray<byte>(br, Mapper.Sram.Length);
                     base.LoadState(slot, StateResult.Success);
                 }
@@ -363,11 +311,7 @@ public class Snes : Emulator
         base.Input();
     }
 
-    public override void Close()
-    {
-        Mmu.Close();
-        SaveBreakpoints(Mapper?.Name);
-    }
+    public override void Close() => SaveBreakpoints(Mapper?.Name);
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
@@ -380,7 +324,7 @@ public class Snes : Emulator
         Dsp.SetSnes(this);
 
         Ppu.SetNmi = Cpu.SetNmi;
-        Ppu.SetIRQ = Cpu.SetIRQ;
+        Ppu.SetIRQ = Cpu.SetIrq;
         Ppu.AutoJoyRead = Joypad.AutoRead;
 
         SpcLogger.GetDp = Spc.GetPage;
@@ -388,8 +332,6 @@ public class Snes : Emulator
         Joypad.SetJoy1L = Ppu.SetJoy1L;
         Joypad.SetJoy1H = Ppu.SetJoy1H;
     }
-
-    public override void SetState(DebugState v) => base.SetState(v);
 
     private int ApplyGameGenieCheats(int a, int v)
     {

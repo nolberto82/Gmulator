@@ -6,14 +6,17 @@ public class SnesSpcLogger()
 {
     private SnesSpc Spc;
     private SnesApu Apu;
+    private CpuState _state;
     public bool Logging { get; private set; }
     public StreamWriter Outfile { get; private set; }
     public Func<ushort> GetDp;
+
 
     public void SetSnes(Snes snes)
     {
         Spc = snes.Spc;
         Apu = snes.Apu;
+        _state = Spc.State;
     }
 
     private readonly Dictionary<int, string> Labels = new()
@@ -24,43 +27,36 @@ public class SnesSpcLogger()
         [0xfc] = "T2TARGET", [0xfd] = "T0OUT", [0xfe] = "T1OUT", [0xff] = "T2OUT",
     };
 
-    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes, bool isSa1=false)
+    public (string, string, int, int) Disassemble(int pc, bool getRegisters)
     {
-        byte op = Apu.Read(pc);
-
-        List<DisasmEntry> entry = [];
+        int op = Apu.ReadDebug(pc);
         Opcode dops = Spc.Disasm[op];
 
         string name = dops.Name;
         int size = dops.Size;
 
         string data = string.Empty;
+        string access = string.Empty;
 
         byte[] b = new byte[size];
         for (int i = 0; i < b.Length; i++)
-            b[i] = (byte)Spc.Read(pc + i);
+            b[i] = (byte)Spc.ReadDebug(pc + i);
 
         pc++;
         string oper = dops.Oper.ToLower();
-        string format = dops.Format;
-
         for (int i = 0; i < b.Length; i++)
         {
             if (i == size - 1)
             {
                 if (size == 1)
                 {
-                    if (getbytes)
-                        data += $"{b[0],-8:X2}  ";
                     data += $"{name} ";
                     data += oper;
                 }
                 else if (size == 2)
                 {
-                    if (getbytes)
-                        data += $"{b[1],-5:X2}  ";
                     data += $"{name} ";
-                    if (name.StartsWith("b"))
+                    if (name.StartsWith('b'))
                         data += string.Format(oper, pc + (sbyte)b[1] + 1);
                     else if (name.StartsWith("db"))
                     {
@@ -75,8 +71,6 @@ public class SnesSpcLogger()
                 }
                 else if (size == 3)
                 {
-                    if (getbytes)
-                        data += $"{b[2]:X2}  ";
                     data += $"{name} ";
                     if (name.StartsWith("db"))
                         data += string.Format(oper, b[1], pc + (sbyte)b[2] + 2);
@@ -98,12 +92,6 @@ public class SnesSpcLogger()
                     }
                 }
             }
-            else
-            {
-                if (getbytes)
-                    data += $"{b[i]:X2} ";
-            }
-
         }
 
         //if (dops.Name == "mov")
@@ -116,11 +104,11 @@ public class SnesSpcLogger()
 
         string regtext = string.Empty;
 
-        if (getregs)
+        if (getRegisters)
         {
             var regs = Spc.GetRegisters();
             var flags = Spc.GetFlags();
-            foreach(var r in regs)
+            foreach (var r in regs)
             {
                 regtext += $"{r.Name}:{r.Value} ";
             }
@@ -129,21 +117,21 @@ public class SnesSpcLogger()
             {
                 if (f.Value == "E")
                     break;
-               s +=  f.Value.ToLower();
+                s += f.Value.ToLower();
             }
             regtext += new string([.. s.Reverse()]) + " ";
         }
 
-        return (data, op, size);
+        return (data, access, op, size);
     }
 
-    internal void Log(int pc)
+    internal void Log()
     {
         if (!Logging) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var (disasm, op, size) = Disassemble(pc, true, false);
-            Outfile.WriteLine($"{pc:X4}  {disasm,-31}");
+            var (disasm, _, _, size) = Disassemble(_state.PC, true);
+            Outfile.WriteLine($"{_state.PC:X4}  {disasm,-31}");
         }
     }
 

@@ -1,7 +1,4 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Interfaces;
-using ImGuiNET;
-using static Gmulator.Interfaces.IMmu;
+﻿using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Nes
 {
@@ -122,10 +119,10 @@ namespace Gmulator.Core.Nes
             MemoryHandlers = [];
             for (int i = 0; i < 0x4000; i++)
             {
-                MemoryHandlers.Add(new(0, 0, 0, 0, 0, (int a) => 0, (int a, int v) => { }, RamType.None));
+                MemoryHandlers.Add(new(0, a => 0, (a, v) => { }, RamType.None));
             }
 
-            nes.SetMemory(0x00, 0x01, 0x0000, 0x3fff, 0x3fff, Read, Write, RamType.Vram, 1);
+            nes.CpuMap.Set(0x00, 0x01, 0x0000, 0x3fff, Read, Write, RamType.Vram, 1);
         }
 
         public void Reset()
@@ -253,8 +250,8 @@ namespace Gmulator.Core.Nes
             {
                 case 0x2002:
                 {
-                    int v = (((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
-                        | _dummy2007 & 0x1f);
+                    int v = ((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
+                        | _dummy2007 & 0x1f;
 
                     if (Scanline == 241)
                     {
@@ -270,7 +267,7 @@ namespace Gmulator.Core.Nes
                         {
                             NoNmi = false;
                             _vBlank = false;
-                            return (v & 0x7f);
+                            return v & 0x7f;
                         }
                     }
                     _vBlank = false;
@@ -286,7 +283,7 @@ namespace Gmulator.Core.Nes
                         _dummy2007 = Read(_vramAddr);
                     }
                     else
-                        v = (_dummy2007 = Read(_vramAddr));
+                        v = _dummy2007 = Read(_vramAddr);
 
                     _vramAddr += _vaddrIncrease != 0 ? 32 : 1;
                     return v & 0xff;
@@ -581,15 +578,12 @@ namespace Gmulator.Core.Nes
             _atShiftHi = (_atShiftHi << 1) | _atHi;
         }
 
-        public int Read(int a)
+        public int Read(int a) => a switch
         {
-            return a switch
-            {
-                < 0x2000 => ReadPattern(a),
-                < 0x3f00 => ReadNametable(a),
-                _ => ReadPalette(a)
-            };
-        }
+            < 0x2000 => ReadPattern(a),
+            < 0x3f00 => ReadNametable(a),
+            _ => ReadPalette(a)
+        };
 
         public void Write(int a, int v)
         {
@@ -641,10 +635,7 @@ namespace Gmulator.Core.Nes
                 return Vram[a];
         }
 
-        public int ReadPalette(int a)
-        {
-            return Vram[a & 0x3fff];
-        }
+        public int ReadPalette(int a) => Vram[a & 0x3fff];
 
         public void WriteNametable(int addr, int v)
         {
@@ -656,7 +647,7 @@ namespace Gmulator.Core.Nes
             }
             else if (Header.Mirror == SingleNt1)
             {
-                var b = MirrorNt1[((a >> 10) & 3)];
+                var b = MirrorNt1[(a >> 10) & 3];
                 Vram[0x2000 + a + b * 0x400] = (byte)v;
             }
             else if (Header.Mirror == Horizontal)
@@ -681,10 +672,7 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        private void WritePattern(int a, int v)
-        {
-            Vram[a & 0x3fff] = (byte)v;
-        }
+        private void WritePattern(int a, int v) => Vram[a & 0x3fff] = (byte)v;
 
         public void WritePalette(int a, int v)
         {
@@ -715,7 +703,7 @@ namespace Gmulator.Core.Nes
                     else if (Header.Mirror == Horizontal && y >= 240)
                         a = 0x800;
 
-                    int ppuaddr = 0x2000 + a + ((x % 256) / 8) + ((y % 240) / 8) * 32;
+                    int ppuaddr = 0x2000 + a + (x % 256 / 8) + y % 240 / 8 * 32;
                     int attaddr = 0x23c0 | (ppuaddr & 0xc00) | ((ppuaddr >> 4) & 0x38) | ((ppuaddr >> 2) & 0x07);
 
                     int fy = y & 7;

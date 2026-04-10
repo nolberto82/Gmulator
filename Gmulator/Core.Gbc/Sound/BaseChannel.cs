@@ -107,7 +107,7 @@ public abstract class BaseChannel
                 }
                 else
                 {
-                    Timer = (Divisor > 0 ? (Divisor) << 4 : 8) << Shift;
+                    Timer = (Divisor > 0 ? Divisor << 4 : 8) << Shift;
                     var res = (LFSR & 1) ^ ((LFSR & 2) >> 1);
                     LFSR = (LFSR >> 1) | (res << 14);
 

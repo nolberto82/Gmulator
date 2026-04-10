@@ -4,7 +4,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Unicode;
 
-namespace Gmulator;
+namespace Gmulator.Ui;
 
 public static class GuiUtils
 {

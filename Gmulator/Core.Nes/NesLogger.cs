@@ -1,14 +1,14 @@
-﻿using System.IO;
+﻿
 using static Gmulator.Core.Nes.NesCpu;
 
 namespace Gmulator.Core.Nes;
+
 public class NesLogger(Nes nes)
 {
     private StreamWriter _outFile;
     public bool Logging;
     private readonly NesCpu Cpu = nes.Cpu;
     private readonly NesPpu Ppu = nes.Ppu;
-
     public Func<int, int> ReadByte;
 
     public void Toggle(bool log = true)
@@ -33,10 +33,13 @@ public class NesLogger(Nes nes)
             _outFile?.Close();
     }
 
-    public (string, int, int) Disassemble(int pc, bool get_registers, bool getbytes, bool isSa1 = false)
+    public (string, string, int, int) Disassemble(int pc, bool getRegisters)
     {
         if (pc + 2 >= 0x10000)
-            return ("", 0, 1);
+            return ("", "", 0, 1);
+
+        int x = Cpu.X;
+        int y = Cpu.Y;
 
         int op = ReadByte(pc);
         int b0 = ReadByte(pc);
@@ -45,7 +48,7 @@ public class NesLogger(Nes nes)
 
         string data = string.Empty;
         string regtext = string.Empty;
-
+        string access = string.Empty;
         Opcode dops = Cpu.Disasm[op];
 
         string name = dops.Name;
@@ -72,12 +75,12 @@ public class NesLogger(Nes nes)
             }
             case ZERX:
             {
-                data = $"{name} ${b1:X2},X [${(byte)(b1 + Cpu.X):X4}]";// = ${Mem.ReadDebug((byte)(b1 + Cpu.X)):X2}";
+                data = $"{name} ${b1:X2},X [${(byte)(b1 + x):X4}]";// = ${Mem.ReadDebug((byte)(b1 + Cpu.X)):X2}";
                 break;
             }
             case ZERY:
             {
-                data = $"{name} ${b1:X2},Y [{(byte)(b1 + Cpu.Y):X2}]";// = {Mem.ReadDebug((byte)(b1 + Cpu.Y)):X2}";
+                data = $"{name} ${b1:X2},Y [{(byte)(b1 + y):X2}]";// = {Mem.ReadDebug((byte)(b1 + Cpu.Y)):X2}";
                 break;
             }
             case ABSO:
@@ -101,7 +104,7 @@ public class NesLogger(Nes nes)
                     data = $"{name} {IORegNames[a]}";
                 else
                     data = $"{name} ${a:X4},X " +
-                    $"[${(ushort)(a + Cpu.X):X4}]";// = ${Mem.ReadDebug(a + Cpu.X):X2}";
+                    $"[${(ushort)(a + x):X4}]";// = ${Mem.ReadDebug(a + Cpu.X):X2}";
                 break;
             }
             case ABSY:
@@ -111,15 +114,15 @@ public class NesLogger(Nes nes)
                     data = $"{name} {IORegNames[a]}";
                 else
                     data = $"{name} ${a:X4},Y " +
-                    $"[${(ushort)(a + Cpu.Y):X4}]";// = {Mem.ReadDebug(a + Cpu.Y):X2}";
+                    $"[${(ushort)(a + y):X4}]";// = {Mem.ReadDebug(a + Cpu.Y):X2}";
                 break;
             }
             case INDX:
             {
-                int lo = ReadByte(b1 + Cpu.X & 0xff);
-                int hi = ReadByte(b1 + 1 + Cpu.X & 0xff);
+                int lo = ReadByte(b1 + x & 0xff);
+                int hi = ReadByte(b1 + 1 + x & 0xff);
                 ushort a = (ushort)(lo | hi << 8);
-                data = $"{name} (${b1:X2},X) @ {b1 + Cpu.X & 0xff:X2} =" +
+                data = $"{name} (${b1:X2},X) @ {b1 + x & 0xff:X2} =" +
                     $" {a:X4}";// = {Mem.ReadDebug(a):X2}";
                 break;
             }
@@ -128,8 +131,8 @@ public class NesLogger(Nes nes)
                 int lo = ReadByte(b1 & 0xff);
                 int hi = ReadByte(b1 + 1 & 0xff);
                 ushort a = (ushort)(lo | hi << 8);
-                data = $"{name} (${b1:X2}),Y [${(ushort)(a + Cpu.Y):X4}]";// [{a:X4}]";// [{(ushort)(a + Cpu.Y):X4}]";// =" +
-                                                                                             //$" {Mem.ReadDebug((ushort)(a + Cpu.Y)):X2}";
+                data = $"{name} (${b1:X2}),Y [${(ushort)(a + y):X4}]";// [{a:X4}]";// [{(ushort)(a + Cpu.Y):X4}]";// =" +
+                                                                             //$" {Mem.ReadDebug((ushort)(a + Cpu.Y)):X2}";
                 break;
             }
             case INDI:
@@ -152,30 +155,26 @@ public class NesLogger(Nes nes)
                 break;
         }
 
-        if (get_registers)
+        if (getRegisters)
         {
-            string btext = "";
             if (data.Length > 9)
-            {
-                btext = $" {data[..9]}";
                 data = data[9..];
-            }
 
             regtext = $"A:{Cpu.A:X2} X:{Cpu.X:X2} Y:{Cpu.Y:X2}" +
                 $" S:{Cpu.SP:X2} P:{Cpu.PS:X2} Cyc:{Ppu.Totalcycles} Scan:{Ppu.Scanline,-3}";
 
-            return ($"{data,-38} {regtext}", op, size);
+            return ($"{data,-38} {regtext}", access, op, size);
         }
         else
-            return (data, op, size);
+            return (data, access, op, size);
     }
 
-    internal void Log(int pc)
+    internal void Log()
     {
         if (_outFile != null && _outFile.BaseStream.CanWrite)
         {
-            var (disasm, op, size) = Disassemble(pc, true, false);
-            _outFile.WriteLine($"{pc:X4}  {disasm,-26}");
+            var (disasm, _, _, _) = Disassemble(Cpu.PC, true);
+            _outFile.WriteLine($"{Cpu.PC:X4}  {disasm,-26}");
         }
     }
 

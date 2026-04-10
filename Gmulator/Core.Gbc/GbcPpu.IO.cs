@@ -7,37 +7,34 @@ namespace Gmulator.Core.Gbc
 {
     public partial class GbcPpu
     {
-        public int Read(int a)
+        public int Read(int a) => a switch
         {
-            return a switch
-            {
-                0xff40 => _lcdc,
-                0xff41 => _stat,
-                0xff42 => _scy,
-                0xff43 => _scx,
-                0xff44 => _ly,
-                0xff45 => _lyc,
-                0xff46 => _oamDma,
-                0xff47 => _bgp,
-                0xff48 => _obp0,
-                0xff49 => _obp1,
-                0xff4A => _wy,
-                0xff4B => _wx,
-                0xff4d => _key1,
-                0xff4f => Mmu.VramBank,
-                0xff51 => _hdma1,
-                0xff52 => _hdma2,
-                0xff53 => _hdma3,
-                0xff54 => _hdma4,
-                0xff55 => Read55(),
-                0xff68 => _bgpi,
-                0xff69 => Read69(),
-                0xff6a => _obpi,
-                0xff6b => Read6b(),
-                0xff70 => Mmu.WramBank,
-                _ => 0xff,
-            };
-        }
+            0xff40 => _lcdc,
+            0xff41 => _stat,
+            0xff42 => _scy,
+            0xff43 => _scx,
+            0xff44 => _ly,
+            0xff45 => _lyc,
+            0xff46 => _oamDma,
+            0xff47 => _bgp,
+            0xff48 => _obp0,
+            0xff49 => _obp1,
+            0xff4A => _wy,
+            0xff4B => _wx,
+            0xff4d => _key1,
+            0xff4f => Mmu.VramBank,
+            0xff51 => _hdma1,
+            0xff52 => _hdma2,
+            0xff53 => _hdma3,
+            0xff54 => _hdma4,
+            0xff55 => Read55(),
+            0xff68 => _bgpi,
+            0xff69 => Read69(),
+            0xff6a => _obpi,
+            0xff6b => Read6b(),
+            0xff70 => Mmu.WramBank,
+            _ => 0xff,
+        };
 
         public void Write(int a, int v)
         {

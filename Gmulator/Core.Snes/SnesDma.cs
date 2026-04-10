@@ -2,7 +2,7 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesDma : ISaveState
+public class SnesDma(Snes snes) : ISaveState
 {
     private const int MaxChannels = 8;
     private readonly bool[] Enabled = new bool[MaxChannels];
@@ -24,17 +24,9 @@ public class SnesDma : ISaveState
     private readonly bool[] Repeat = new bool[MaxChannels];
     private readonly bool[] TransferEnabled = new bool[MaxChannels];
 
-    private readonly Action Idle8;
+    private readonly Action Idle8 = snes.Cpu.Idle8;
 
-    private Snes Snes;
-
-    public SnesDma(Snes snes)
-    {
-        Idle8 = snes.Cpu.Idle8;
-        ReadCpu = snes.ReadMemory;
-        WriteCpu = snes.WriteMemory;
-        Snes = snes;
-    }
+    private readonly Snes Snes = snes;
 
     public void Reset()
     {
@@ -58,8 +50,8 @@ public class SnesDma : ISaveState
         Array.Fill(TransferEnabled, false);
     }
 
-    public Func<int, int> ReadCpu;
-    public Action<int, int> WriteCpu;
+    public Func<int, int> ReadCpu = snes.ReadMemory;
+    public Action<int, int> WriteCpu = snes.WriteMemory;
     private bool DmaEnabled;
     private int DmaState;
     public readonly byte[] Max = [1, 2, 2, 4, 4, 4, 2, 4];
@@ -283,7 +275,7 @@ public class SnesDma : ISaveState
         new($"43{i * 16:X2}.7","Direction",$"{Direction[i]}"),
         new($"43{i * 16 + 1:X2}","BAddress",$"{BAddress[i]:X2}"),
         new($"43{i * 16 + 2:X2}/3","AAddress",$"{AAddress[i]:X4}"),
-        new($"43{i * 16 + 4:X2}","ABank",$"{ABank[i]}"),
+        new($"43{i * 16 + 4:X2}","ABank",$"{ABank[i]:X2}"),
         new($"43{i * 16 + 5:X2}/6","Size",$"{Size[i]:X4}"),
         new($"43{i * 16 + 7:X2}","Bank",$"{HBank[i]:X2}"),
         new($"43{i * 16 + 8:X2}/9","HAddress",$"{HAddress[i]:X4}"),

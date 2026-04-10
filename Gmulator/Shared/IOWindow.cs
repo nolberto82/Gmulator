@@ -1,6 +1,6 @@
 ﻿using ImGuiNET;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 public static class IOWindow
 {
     public static void Render()

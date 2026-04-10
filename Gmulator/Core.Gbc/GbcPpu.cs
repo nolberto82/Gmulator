@@ -1,6 +1,5 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Interfaces;
-using Gmulator.Shared;
 using Raylib_cs;
 using System;
 using System.Security.Cryptography;
@@ -85,7 +84,7 @@ public partial class GbcPpu : IPpu, ISaveState
         CGBBkgPal = new byte[64];
         CGBObjPal = new byte[64];
 
-        gbc.SetMemory(0x00, 0x01, 0xff40, 0xff70, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff40, 0xff70, Read, Write, RamType.Register, 1);
     }
 
     public void Step(int cyc)
@@ -211,7 +210,7 @@ public partial class GbcPpu : IPpu, ISaveState
                 }
                 else
                 {
-                    var attaddr = ((MapAddr + sy / 8 * 32) + sx / 8);
+                    var attaddr = MapAddr + sy / 8 * 32 + sx / 8;
                     attribute = Mmu.ReadAttribute(attaddr);
                     var bank = ((attribute >> 3) & 1) * 0x2000;
                     int bgaddr = GetBgAddr(TileAddr, MapAddr, sx, sy, (attribute & 0x40) != 0) + bank;
@@ -453,7 +452,7 @@ public partial class GbcPpu : IPpu, ISaveState
         new("6", "Window Map", (_lcdc & 0x40) != 0 ? "9C00:9FFF" : "9800:9BFF"),
         new("7", "LCD", (_lcdc & 0x80) != 0 ? "Enabled" : "Disabled"),
         new("FF41", "STAT", ""),
-        new("0-1", "PPU mode", $"{(_stat & 3)}"),
+        new("0-1", "PPU mode", $"{_stat & 3}"),
         new("2", "LYC == LY", (_stat & 0x04) != 0 ? "Enabled" : "Disabled"),
         new("3", "Mode 0 select", (_stat & 0x08) != 0 ? "Enabled" : "Disabled"),
         new("4", "Mode 1 select", (_stat & 0x10) != 0 ? "Enabled" : "Disabled"),

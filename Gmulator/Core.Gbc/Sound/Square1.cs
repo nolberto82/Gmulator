@@ -21,21 +21,18 @@ public class Square1 : BaseChannel, ISaveState
 
     public Square1(Gbc gbc)
     {
-        gbc.SetMemory(0x00, 0x01, 0xff10, 0xff14, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff10, 0xff14, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff10 => _nr10 | 0x80,
-            0xff11 => _nr11 | 0x3f,
-            0xff12 => _nr12,
-            0xff13 => _nr13 | 0xff,
-            0xff14 => _nr14 | 0xbf,
-            _ => 0xff,
-        };
-    }
+        0xff10 => _nr10 | 0x80,
+        0xff11 => _nr11 | 0x3f,
+        0xff12 => _nr12,
+        0xff13 => _nr13 | 0xff,
+        0xff14 => _nr14 | 0xbf,
+        _ => 0xff,
+    };
 
     public void Write(int a, int v)
     {

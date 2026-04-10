@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 /// <summary>
 /// https://stackoverflow.com/posts/50302816/revisions
 /// </summary>

@@ -1,7 +1,5 @@
 ﻿
-
 namespace Gmulator.Core.Nes.Sound;
-
 public class Triangle : BaseChannel
 {
 
@@ -12,7 +10,7 @@ public class Triangle : BaseChannel
 
     public Triangle(Nes nes)
     {
-        nes.SetMemory(0x00, 0x00, 0x4008, 0x400b, 0xffff, (int a) => 0xff, Write, RamType.Register, 1);
+        nes.CpuMap.Set(0x00, 0x00, 0x4008, 0x400b, a => 0xff, Write, RamType.Register, 1);
     }
 
     public void Write(int a, int v)

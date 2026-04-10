@@ -1,8 +1,5 @@
-﻿using Gmulator;
-using Gmulator.Core.Nes.Sound;
+﻿using Gmulator.Core.Nes.Sound;
 using Gmulator.Interfaces;
-using Gmulator.Shared;
-using Raylib_cs;
 
 namespace Gmulator.Core.Nes;
 
@@ -18,7 +15,7 @@ public class NesApu : ISaveState
 
     public float[] AudioBuffer { get; private set; } = new float[MaxSamples * 2];
 
-    public List<float> AudioRecord { get; private set; } = new(5000000);
+    public List<float> AudioRecord { get; private set; } = [5000000];
     public bool Recording { get; set; }
 
     private int BufPos;
@@ -166,7 +163,7 @@ public class NesApu : ISaveState
                 else
                 {
                     var pulse = SquareTable[outsquare1 + outsquare2];
-                    var tnd = TndTable[(3 * (int)outtriangle) + (2 * outnoise + outdmc)];
+                    var tnd = TndTable[(3 * (int)outtriangle) + 2 * outnoise + outdmc];
                     var output = (float)HighPass(pulse + tnd);
 
                     AudioBuffer[BufPos++] = output;

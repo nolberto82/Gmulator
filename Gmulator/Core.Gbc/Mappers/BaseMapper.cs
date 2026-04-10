@@ -24,10 +24,7 @@ public abstract class BaseMapper : ISaveState
         //Mmu.SetMemory(0x4000, 0x8000, ReadRom, WriteRom1, RamType.Rom);
     }
 
-    public virtual void Reset()
-    {
-        Rombank = 1;
-    }
+    public virtual void Reset() => Rombank = 1;
 
     public virtual void Init(byte[] rom, string name)
     {
@@ -48,11 +45,9 @@ public abstract class BaseMapper : ISaveState
     public abstract void WriteRom0(int a, int v);
     public abstract void WriteRom1(int a, int v);
 
-    public virtual void Write()
-    {
+    public virtual void Write() =>
         //Sram[a % Sram.Length] = v;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
-    }
 
     public void LoadSram()
     {
@@ -79,9 +74,7 @@ public abstract class BaseMapper : ISaveState
         }
     }
 
-    public Dictionary<string, string> GetInfo()
-    {
-        return new Dictionary<string, string>
+    public Dictionary<string, string> GetInfo() => new Dictionary<string, string>
         {
             { "Game",Path.GetFileName(Name) },
             { "Mapper", MapperType },
@@ -92,7 +85,6 @@ public abstract class BaseMapper : ISaveState
             { "CGB Mode", $"{(CGB ? "Yes" : "No")}" },
             { "Cart RAM", $"{(CartRamOn ? "On" : "Off")}" }
         };
-    }
 
     private readonly Dictionary<int, string> MapperTypes = new()
     {

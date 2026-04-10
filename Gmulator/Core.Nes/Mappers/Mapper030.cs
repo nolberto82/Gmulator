@@ -6,20 +6,11 @@ public class Mapper030 : BaseMapper
         Reset();
     }
 
-    public override int ReadChr(int a)
-    {
-        return base.ReadChr(a);
-    }
+    public override int ReadChr(int a) => base.ReadChr(a);
 
-    public override int ReadPrg(int a)
-    {
-        return base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
-    }
+    public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
 
-    public override byte ReadVram(int a)
-    {
-        return base.ReadVram(a);
-    }
+    public override byte ReadVram(int a) => base.ReadVram(a);
 
     public override void Reset()
     {
@@ -36,8 +27,5 @@ public class Mapper030 : BaseMapper
         }
     }
 
-    public override void WritePrg(int a, int v)
-    {
-        base.WritePrg(a, v);
-    }
+    public override void WritePrg(int a, int v) => base.WritePrg(a, v);
 }

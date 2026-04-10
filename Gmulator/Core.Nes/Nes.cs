@@ -1,17 +1,9 @@
-﻿using Gmulator.Core.Nes;
-using Gmulator.Core.Nes.Mappers;
-using Gmulator.Ui;
-using ImGuiNET;
-using Raylib_cs;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Gmulator.Core.Nes.Mappers;
+using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Nes;
 
-public class Nes : Emulator
+public class Nes : Emulator, IConsole
 {
     public NesCpu Cpu;
     public NesPpu Ppu;
@@ -21,10 +13,21 @@ public class Nes : Emulator
     public NesLogger Logger;
     public NesJoypad Joypad1;
     public NesJoypad Joypad2;
+    public MemoryMap CpuMap;
 
-    public Nes() : base(0x10000)
+    ICpu IConsole.Cpu { get => Cpu; }
+    IPpu IConsole.Ppu { get => Ppu; }
+    IMmu IConsole.Mmu => Mmu;
+
+    public Debugger Debugger { get; set; }
+    public DebugState EmuState { get; set; }
+
+    public Nes()
     {
+        Console = this;
+        CpuMap = new(0x10000);
         CheatConverter = new(Cheats);
+        Debugger = new(this);
         Mmu = new(Cheats);
         Cpu = new(this);
         Apu = new(this);
@@ -40,23 +43,19 @@ public class Nes : Emulator
 
         Mmu.Init(this);
 
-        SetMemory(0x00, 0x00, 0x0000, 0x1fff, 0x07ff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 1);
-        SetMemory(0x00, 0x00, 0x2000, 0x2fff, 0x2007, Ppu.ReadRegister, Ppu.WriteRegister, RamType.Register, 1);
-        SetMemory(0x00, 0x00, 0x4015, 0x4015, 0xffff, Apu.Read, Apu.Write, RamType.Register, 1);
-        SetMemory(0x00, 0x00, 0x4014, 0x4014, 0xffff, (int a) => 0, Ppu.Write4014, RamType.Register, 1);
-        SetMemory(0x00, 0x00, 0x4016, 0x4016, 0xffff, Joypad1.Read, Joypad1.Write, RamType.Register, 1);
-        SetMemory(0x00, 0x00, 0x4017, 0x4017, 0xffff, Joypad2.Read, Apu.Write, RamType.Register, 1);
-
+        CpuMap.Set(0x00, 0x00, 0x0000, 0x1fff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 1);
+        CpuMap.Set(0x00, 0x00, 0x2000, 0x2fff, Ppu.ReadRegister, Ppu.WriteRegister, RamType.Register, 1);
+        CpuMap.Set(0x00, 0x00, 0x4015, 0x4015, Apu.Read, Apu.Write, RamType.Register, 1);
+        CpuMap.Set(0x00, 0x00, 0x4014, 0x4014, a => 0, Ppu.Write4014, RamType.Register, 1);
+        CpuMap.Set(0x00, 0x00, 0x4016, 0x4016, Joypad1.Read, Joypad1.Write, RamType.Register, 1);
+        CpuMap.Set(0x00, 0x00, 0x4017, 0x4017, Joypad2.Read, Apu.Write, RamType.Register, 1);
     }
 
-    public override void LuaMemoryCallbacks()
-    {
-        LuaApi.InitMemCallbacks(Cpu, Mmu);
-    }
+    public override void LuaMemoryCallbacks() => LuaApi.InitMemCallbacks(Cpu, Mmu);
 
     public override void RunFrame(bool opened)
     {
-        if (Mapper != null && (State == DebugState.Running || State == DebugState.StepMain) && !opened)
+        if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)
         {
             var cyclesframe = Header.Region == 0 ? NesNtscCycles : NesPalCycles;
             while (Ppu.Cycles < cyclesframe)
@@ -65,36 +64,30 @@ public class Nes : Emulator
 
                 if (Debug)
                 {
-                    if (State == DebugState.StepMain)
+                    if (EmuState == DebugState.StepMain)
                     {
                         Cpu.Step();
-                        State = DebugState.Break;
+                        EmuState = DebugState.Break;
                         return;
                     }
 
                     if (Cpu.StepOverAddr == Cpu.PC)
                     {
-                        State = DebugState.Break;
+                        EmuState = DebugState.Break;
                         Cpu.StepOverAddr = -1;
                         return;
                     }
 
                     if (!Run && Breakpoints.Count > 0)
-                    {
-                        if (DebugWindow.ExecuteCheck(pc))
-                        {
-                            State = DebugState.Break;
-                            return;
-                        }
-                    }
+                        Debugger.Execute(pc);
 
                     if (Logger.Logging)
-                        Logger.Log(pc);
+                        Logger.Log();
 
                     Run = false;
                 }
 
-                if (State == DebugState.Break)
+                if (EmuState == DebugState.Break)
                     return;
 
                 Cpu.Step();
@@ -124,12 +117,12 @@ public class Nes : Emulator
 
         if (Mapper != null)
         {
-            SetMemory(0x00, 0x00, 0x6000, 0x7fff, 0x1fff, Mapper.ReadSram, Mapper.WriteSram, RamType.Sram, 1);
-            SetMemory(0x00, 0x00, 0x8000, 0xffff, 0xffff, Mapper.ReadPrg, Mapper.Write, RamType.Rom, 1);
+            CpuMap.Set(0x00, 0x00, 0x6000, 0x7fff, Mapper.ReadSram, Mapper.WriteSram, RamType.Sram, 1);
+            CpuMap.Set(0x00, 0x00, 0x8000, 0xffff, Mapper.ReadPrg, Mapper.Write, RamType.Rom, 1);
 
             GameName = Mapper.Name;
             LastName = GameName;
-            Cpu.Reset();
+            Cpu.Reset(CpuMap.Handlers);
             Ppu.Reset();
             Apu.Reset(Header.Region, Header.Region == 0 ? NesNtscCpuClock : NesPalCpuClock);
             Mmu.Reset();
@@ -139,9 +132,7 @@ public class Nes : Emulator
             base.Reset(name, true, Ppu.ScreenBuffer);
 
 #if DEBUG || RELEASE
-            DebugWindow ??= new NesDebugWindow(this, Cpu, Ppu, Mmu, Logger);
-            Cpu.AccessCheck = DebugWindow.AccessCheck;
-            Cpu.SetState = SetState;
+            DebugWindow ??= new NesDebugWindow(this);
 #endif
         }
     }
@@ -155,7 +146,7 @@ public class Nes : Emulator
         {
             using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-            bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
+            bw.Write(Encoding.ASCII.GetBytes(Shared.EmuState.Version));
             Mmu.Save(bw);
             Cpu.Save(bw);
             Ppu.Save(bw);
@@ -178,7 +169,7 @@ public class Nes : Emulator
             {
                 using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
 
-                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == EmuState.Version)
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == Shared.EmuState.Version)
                 {
                     Mmu.Load(br);
                     Cpu.Load(br);
@@ -200,9 +191,4 @@ public class Nes : Emulator
     public override void LoadBreakpoints(string name) => base.LoadBreakpoints(name);
 
     public override void Close() => SaveBreakpoints(Mapper?.Name);
-
-    public override void SetState(DebugState v)
-    {
-        base.SetState(v);
-    }
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Gmulator.Core.Snes;
+﻿namespace Gmulator.Core.Snes;
 
 public partial class SnesPpu
 {
@@ -75,7 +71,11 @@ public partial class SnesPpu
         v &= 0xff;
         switch (a & 0xffff)
         {
-            case 0x4200: NMITIMEN = v; break;
+            case 0x4200:
+                NMITIMEN = v;
+                if ((RDNMI & 0x80) != 0)
+                    SetNmi();
+                break;
             case 0x4201: WRIO = v; break;
             case 0x4202: MultiplyA = v; break;
             case 0x4203: MulDivRemainder = MultiplyA * v; break;
@@ -87,7 +87,7 @@ public partial class SnesPpu
             case 0x4209: VTIMEL = v; break;
             case 0x420a: VTIMEH = v; break;
             case 0x420b or 0x420c: Dma.WriteDma(a, v); break;
-            case 0x420d: Cpu.FastMem = (v & 1) > 0; break;
+            case 0x420d: Cpu.FastMem = (v & 1) != 0; break;
             case >= 0x4300 and <= 0x437f: Dma.Write(a, v); break;
         }
     }

@@ -58,7 +58,7 @@ internal class GuiDesktop : Gui
                     if (!Opened)
                     {
                         Open(Emulator.Config);
-                        Emulator.State = DebugState.Paused;
+                        Emulator.Console.EmuState = DebugState.Paused;
                         ImGui.OpenPopup("Menu");
                     }
                 }
@@ -183,7 +183,7 @@ internal class GuiDesktop : Gui
                                     DeleteFile(file);
                                 else
                                 {
-                                    if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
+                                    if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                     {
                                         if (File.Exists(file.Name))
                                         {
@@ -326,7 +326,7 @@ internal class GuiDesktop : Gui
                             var file = LuaFiles[i];
                             if (ImGui.Selectable(Path.GetFileName($"{file.Name}"), i == SelOption[ScrLua], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
-                                if ((ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown)))
+                                if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                 {
                                     if (File.Exists(file.Name))
                                     {
@@ -388,10 +388,7 @@ internal class GuiDesktop : Gui
         base.Render();
     }
 
-    public override void Update(bool isdeck)
-    {
-        base.Update(isdeck);
-    }
+    public override void Update(bool isdeck) => base.Update(isdeck);
 
     public override void Init(bool isdeck)
     {
@@ -407,8 +404,5 @@ internal class GuiDesktop : Gui
             SelOption[t] = i;
     }
 
-    public override void ResetGame(string name)
-    {
-        base.ResetGame(name);
-    }
+    public override void ResetGame(string name) => base.ResetGame(name);
 }

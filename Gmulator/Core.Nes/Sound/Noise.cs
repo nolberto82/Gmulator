@@ -9,7 +9,7 @@ public class Noise : BaseChannel
 
     public Noise(Nes nes)
     {
-        nes.SetMemory(0x00, 0x00, 0x400c, 0x400f, 0xffff, (int a) => 0xff, Write, RamType.Register, 1);
+        nes.CpuMap.Set(0x00, 0x00, 0x400c, 0x400f, a => 0xff, Write, RamType.Register, 1);
     }
 
     public void Write(int a, int v)

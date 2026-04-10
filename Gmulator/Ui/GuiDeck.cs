@@ -1,4 +1,5 @@
 ﻿using Raylib_cs;
+using rlImGui_cs;
 using System.Numerics;
 
 namespace Gmulator.Ui;
@@ -18,12 +19,12 @@ internal class GuiDeck : Gui
             Emulator?.Render(MenuHeight);
             Emulator?.Update();
             Emulator?.Input();
-            LuaApi?.Update(Opened);
 
             Input.UpdateGuiInput(Emulator, this);
 
             Update(true);
             Render();
+            LuaApi?.Update(Opened);
 
             Raylib.EndDrawing();
         }

@@ -1,6 +1,8 @@
-﻿using Timer = System.Threading.Timer;
+﻿using System.Net.Sockets;
+using Timer = System.Threading.Timer;
 
 namespace Gmulator.Core.Snes.Mappers;
+
 public class BaseMapper
 {
     public string Name { get; set; }
@@ -18,6 +20,11 @@ public class BaseMapper
     public byte[] Sram { get; set; }
     public byte[] Prg { get; set; }
     public SnesMmu Mmu { get; set; }
+    public MemoryMap MemMap { get; set; }
+
+    public int Offset { get; set; }
+
+    public List<MemoryHandler> MemoryHandler;
 
     public const int Gsu = 1;
     public const int Sa1 = 3;
@@ -26,12 +33,13 @@ public class BaseMapper
     {
     }
 
-    public BaseMapper(Header header)
+    public BaseMapper(Header header, MemoryMap map)
     {
-        Init(header);
+        MemMap = map;
+        Init(header, map.Handlers);
     }
 
-    public virtual void Init(Header header)
+    public virtual void Init(Header header, List<MemoryHandler> mh)
     {
         Name = header.Name;
         Map = header.Map;
@@ -42,20 +50,37 @@ public class BaseMapper
         Sram = new byte[header.Ramsize];
         Rom = header.Rom;
         Banks = header.Rom.Length / 0x8000;
+        Ramsize = header.Ramsize;
+        Mmu = header.Mmu;
+        MemoryHandler = mh;
     }
 
-    public virtual int Read(int a)
-    {
-        return Rom[a % Rom.Length];
-    }
+    public byte[] GetCart() => Rom;
+    public byte[] GetSram() => Sram;
 
-    public virtual int ReadSram(int a) => Sram[a & Sram.Length - 1];
+    public virtual int Read(int a) => Rom[a % Rom.Length];
 
     public virtual void Write(int a, int v)
     {
-        Sram[a % Sram.Length] = (byte)v;
+    }
+
+    public virtual int ReadSa1(int a) => 0;
+
+    public virtual int ReadSram(int a) => Sram[a & Sram.Length - 1];
+
+    public virtual int ReadSramDebug(int a) => Sram[a & Sram.Length - 1];
+
+    public virtual void WriteSram(int a, int v)
+    {
+        Sram[a & Sram.Length - 1] = (byte)v;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
+
+    public virtual void WriteSramDebug(int a, int v) => Sram[a & Sram.Length - 1] = (byte)v;
+
+    public virtual int ReadBwRam(int a) => Sram[a & Sram.Length - 1];
+
+    public virtual void WriteBwRam(int a, int v) => Sram[a & Sram.Length - 1] = (byte)v;
 
     private void SaveSram(object state)
     {
@@ -71,35 +96,25 @@ public class BaseMapper
         }
     }
 
-    public int ReadBwRam(int a)
-    {
-        a &= Sram.Length - 1;
-        return Sram[a & (Sram.Length - 1)];
-    }
-
-    public void WriteBwRam(int a, int v)
-    {
-        a &= Sram.Length - 1;
-        Sram[a] = (byte)v;
-    }
-
     public void LoadSram()
     {
         var name = Path.GetFileNameWithoutExtension($"{Name}");
         if (File.Exists($"{SaveDirectory}/{name}.srm"))
         {
             var data = File.ReadAllBytes($"{SaveDirectory}/{name}.srm");
-            if (data.Length > 0)
+            if (data?.Length > 0)
                 Sram = data;
         }
     }
 
+    public virtual void Reset(Snes snes)
+    {
+
+    }
+
     private readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
 
-    public BaseMapper LoadRom(string name, Snes snes)
-    {
-        return Set(File.ReadAllBytes(name), name, snes);
-    }
+    public BaseMapper LoadRom(string name, Snes snes) => Set(File.ReadAllBytes(name), name, snes);
 
     public BaseMapper Set(byte[] rom, string name, Snes snes)
     {
@@ -131,7 +146,7 @@ public class BaseMapper
             if (reset < 0x8000)
                 continue;
 
-            var complement = (rom[o + 0x7fdc] | rom[o + 0x7fdd] << 8);
+            var complement = rom[o + 0x7fdc] | rom[o + 0x7fdd] << 8;
             var checksum = rom[o + 0x7fde] | rom[o + 0x7fdf] << 8;
             if (complement + checksum == 0xffff && complement != 0 && checksum != 0)
                 score += 4;
@@ -159,12 +174,12 @@ public class BaseMapper
                 if (o <= 0x0200)
                 {
                     if (map == 0x23)
-                        Mapper = new Sa1Rom(header);
+                        Mapper = new Sa1Rom(header, snes.CpuMap);
                     else
-                        Mapper = new LoRom(header);
+                        Mapper = new LoRom(header, snes.CpuMap);
                 }
                 else if (o <= 0x8200)
-                    Mapper = new HiRom(header);
+                    Mapper = new HiRom(header, snes.CpuMap);
                 highscore = score;
             }
         }
@@ -202,29 +217,29 @@ public class BaseMapper
         [0x15] = "ExHiRom"
     };
 
-    private readonly Dictionary<int, string> Chips = new()
-    {
-        [0x00] = "ROM only",
-        [0x01] = "ROM + RAM",
-        [0x02] = "ROM + RAM + battery",
-        [0x03] = "ROM + coprocessor",
-        [0x04] = "ROM + coprocessor + RAM",
-        [0x05] = "ROM + coprocessor + RAM + battery",
-        [0x06] = "ROM + coprocessor + battery",
-        [0x00] = "Coprocessor is DSP (DSP-1, 2, 3 or 4)",
-        [0x10] = "Coprocessor is GSU (SuperFX)",
-        [0x20] = "Coprocessor is OBC1",
-        [0x30] = "Coprocessor is SA-1",
-        [0x40] = "Coprocessor is S-DD1",
-        [0x50] = "Coprocessor is S-RTC",
-        [0xE0] = "Coprocessor is Other (Super Game Boy/Satellaview)",
-        [0xF0] = "Coprocessor is Custom (specified with [0xFFBF)"
-    };
+    //private readonly Dictionary<int, string> Chips = new()
+    //{
+    //    [0x00] = "ROM only",
+    //    [0x01] = "ROM + RAM",
+    //    [0x02] = "ROM + RAM + battery",
+    //    [0x03] = "ROM + coprocessor",
+    //    [0x04] = "ROM + coprocessor + RAM",
+    //    [0x05] = "ROM + coprocessor + RAM + battery",
+    //    [0x06] = "ROM + coprocessor + battery",
+    //    [0x00] = "Coprocessor is DSP (DSP-1, 2, 3 or 4)",
+    //    [0x10] = "Coprocessor is GSU (SuperFX)",
+    //    [0x20] = "Coprocessor is OBC1",
+    //    [0x30] = "Coprocessor is SA-1",
+    //    [0x40] = "Coprocessor is S-DD1",
+    //    [0x50] = "Coprocessor is S-RTC",
+    //    [0xE0] = "Coprocessor is Other (Super Game Boy/Satellaview)",
+    //    [0xF0] = "Coprocessor is Custom (specified with [0xFFBF)"
+    //};
 
     public Dictionary<string, string> GetCartInfo() => new()
     {
         ["Game"] = Path.GetFileNameWithoutExtension(Name),
-        ["Type"] = $"{RomTypes.TryGetValue(Map, out string v)}",
+        ["Type"] = $"{RomTypes.TryGetValue(Map, out _)}",
         ["Id"] = $"{Map:X2}"
     };
 }

@@ -135,12 +135,12 @@ namespace Gmulator.Core.Gbc
             return (ushort)(r1 - 1);
         }
 
-        private void OpDI() => _ime = false;
+        private void OpDI() => Ime = false;
 
         private void OpEI()
         {
-            _imeDelay = 1;
-            _ime = true;
+            ImeDelay = 1;
+            Ime = true;
         }
 
         private byte OpInc8(int r1)
@@ -236,7 +236,7 @@ namespace Gmulator.Core.Gbc
 
         private void OpReti()
         {
-            _ime = true;
+            Ime = true;
             PC = OpPop();
             //OpRet(true);
             Tick();
@@ -249,7 +249,7 @@ namespace Gmulator.Core.Gbc
 
             SetF((byte)v == 0, FZ); SetF(false, FN);
             SetF(false, FH); SetF((r1 >> 7) != 0, FC);
-            return (byte)(v);
+            return (byte)v;
         }
 
         private void OpRla()
@@ -405,7 +405,7 @@ namespace Gmulator.Core.Gbc
             int n1;
             int n2;
             (n1, n2) = (v & 0x0f, v >> 4);
-            v = (n1 << 4 | n2);
+            v = n1 << 4 | n2;
 
             SetF((byte)v == 0, FZ); SetF(false, FN);
             SetF(false, FH); SetF(false, FC);
@@ -425,10 +425,10 @@ namespace Gmulator.Core.Gbc
             return (byte)v;
         }
 
-        private static int OpRes(int r1, int r2) => (r2 & ~(1 << r1)) & 0xff;
-        private void OpResHL(int r1) => OpLdWr(HL, (OpLdReg(HL) & ~(1 << r1)));
+        private static int OpRes(int r1, int r2) => r2 & ~(1 << r1) & 0xff;
+        private void OpResHL(int r1) => OpLdWr(HL, OpLdReg(HL) & ~(1 << r1));
         private static int OpSet(int r1, int r2) => (r2 | (1 << r1)) & 0xff;
-        private void OpSetHL(int r1) => OpLdWr(HL, (OpLdReg(HL) | (1 << r1)));
+        private void OpSetHL(int r1) => OpLdWr(HL, OpLdReg(HL) | (1 << r1));
         #endregion
     }
 }

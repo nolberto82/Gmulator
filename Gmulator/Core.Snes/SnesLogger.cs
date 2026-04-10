@@ -4,38 +4,39 @@ namespace Gmulator.Core.Snes;
 
 public class SnesLogger(Snes snes)
 {
-    public bool Logging { get; private set; }
+    public bool LogMain { get; private set; }
+    public bool LogSa1 { get; private set; }
 
     private StreamWriter Outfile;
     private readonly Snes Snes = snes;
     private readonly SnesCpu Cpu = snes.Cpu;
-
+    private readonly List<Opcode> opcodes = snes.Cpu.Disasm;
+    private readonly Func<int, int> Read = snes.ReadOp;
+    private readonly Func<int, int> ReadWord = snes.ReadWord;
+    private readonly Func<int, int> ReadLong = snes.ReadLong;
     private bool MMode;
     private bool XMode;
 
-    public (string, int, int) Disassemble(int pc, bool getregs, bool getbytes, bool isSa1=false)
+    public (string, string, int, int) Disassemble(int pc, bool getRegisters)
     {
-        var snes = Snes;
-        var Cpu = isSa1 ? Snes.Sa1 : Snes.Cpu;
-        int op = snes.ReadOp(pc);
-        int a, c, x = 0;
-        string w = string.Empty;
+        int x = Cpu.X; int y = Cpu.Y;
+        int op = Read(pc);
+        int a;
 
-        Opcode dops = Cpu.Disasm[op];
+        Opcode opcode = opcodes[op];
 
-        string name = dops.Name;
-        int size = dops.Size;
-        int mode = dops.Mode;
-        string oper = dops.Oper;
+        int size = opcode.Size;
+        int mode = opcode.Mode;
         string bytedata = "";
 
-        string data = $"{dops.Name} ";
+        string data = $"{opcode.Name} ";
         string regtext = string.Empty;
+        string access = string.Empty;
 
         int[] b = new int[size];
 
         for (int i = 0; i < b.Length; i++)
-            b[i] = Snes.ReadOp(pc + i);
+            b[i] = Read(pc + i);
 
         foreach (var n in b)
             bytedata += $"{n:x2} ";
@@ -58,167 +59,166 @@ public class SnesLogger(Snes snes)
         switch (mode)
         {
             case Absolute:
-                a = snes.ReadWord(pc + 1);
+                a = ReadWord(pc + 1);
                 if (op == 0x20 || op == 0x4c || op == 0x6c)
                     data += $"${a:x4}";
                 else
+                {
                     data += $"${a:x4}";
+                    access += $"${Cpu.DB:x2}{a:x4} = #${Read(a):x2}";
+                }
                 break;
             case AbsoluteIndexedIndirect:
-                c = snes.ReadWord(pc + 1);
-                a = snes.ReadWord((ushort)(c + Cpu.X));
-                data += $"(${c:x4},x)";// [${Cpu.PB:X2}{a:X4}] ";
+                a = ReadWord(pc + 1);
+                data += $"(${a:x4},x)";
                 break;
             case AbsoluteIndexedX:
-                c = snes.ReadWord(pc + 1);
-                a = c + (Cpu.XMem ? (byte)Cpu.X : Cpu.X);
-                data += $"${c:x4},x";// [${Cpu.DB << 16 | a:X6}] ";
+                a = ReadWord(pc + 1);
+                data += $"${a:x4},x";
+                access += $"${a + Cpu.X:x4} = #${Read(a + Cpu.X):x2}";
                 break;
             case AbsoluteIndexedY:
-                c = snes.ReadWord(pc + 1);
-                a = Cpu.DB << 16 | c + (Cpu.XMem ? (byte)Cpu.Y : Cpu.Y);
-                data += $"${c:x4},y";// [${Cpu.DB << 16 | a:X6}] ";
+                a = ReadWord(pc + 1);
+                data += $"${a:x4},y";
+                access += $"${a + Cpu.Y:x4} = #${Read(a + Cpu.Y):x2}";
                 break;
             case AbsoluteIndirect:
-                a = snes.ReadWord(pc + 1);
-                data += $"$({a:x4})";// [${Cpu.PB << 16 | snes.ReadWord(a):X6}]";
+                a = ReadWord(pc + 1);
+                data += $"$({a:x4})";
                 break;
             case AbsoluteIndirectLong:
-                a = snes.ReadWord(pc + 1);
-                data += $"[${a:x4}]";// [${snes.ReadLong(a):X6}]";
+                a = ReadWord(pc + 1);
+                data += $"[${a:x4}]";
                 break;
             case AbsoluteLong:
-                a = snes.ReadLong(pc + 1);
+                a = ReadLong(pc + 1);
                 data += $"${a:x6}";
+                access += $"${a:x6} = #${Read(a):x2}";
                 break;
             case AbsoluteLongIndexedX:
-                c = snes.ReadLong(pc + 1);
-                data += $"${c:x6},x";// [${c + Cpu.X:X6}]";
+                a = ReadLong(pc + 1);
+                data += $"${a:x6},x";
+                access += $"${a + Cpu.X:x6} = #${Read(a + Cpu.X):x2}";
                 break;
             case BlockMove:
-                data += $"${snes.ReadOp(pc + 2):x2},${snes.ReadOp(pc + 1):x2}";
+                data += $"${Read(pc + 2):x2},${Read(pc + 1):x2}";
                 break;
             case DPIndexedIndirectX:
-                c = snes.ReadOp(pc + 1);
-                x = (c + Cpu.D + Cpu.X) & 0xffff;
-                x = Cpu.E ? 0x100 : x;
-                a = Cpu.DB << 16 | snes.ReadOp(x);
-                a |= Cpu.DB << 16 | snes.ReadOp((x & 0xff) == 0xff ? x & 0xff00 : x + 1) << 8;
-                data += $"(${c:x2},x)";// [{a:X6}]";
+                a = Read(pc + 1);
+                data += $"(${a:x2},x)";
                 break;
             case DPIndexedX:
-                c = snes.ReadOp(pc + 1);
-                a = (c + Cpu.D + Cpu.X) & 0xffff;
-                a = Cpu.E && a > 0xff ? a & 0xff | 0x100 : a;
-                data += $"${c:x2},x";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"${a:x2},x";
                 break;
             case DPIndexedY:
-                c = snes.ReadOp(pc + 1);
-                a = (ushort)(c + Cpu.D + Cpu.Y);
-                data += $"${c:x2},y";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"${a:x2},y";
                 break;
             case DPIndirect:
-                a = snes.ReadOp(pc + 1);
+                a = Read(pc + 1);
                 data += $"(${a:x2})";
                 break;
             case DPIndirectIndexedY:
-                a = snes.ReadOp(pc + 1);
-                data += $"(${a:x2}),y";// [${Cpu.DB << 16 | snes.ReadWord(a) + Cpu.Y:X6}]";
+                a = Read(pc + 1);
+                data += $"(${a:x2}),y";
                 break;
             case DPIndirectLong:
-                c = snes.ReadOp(pc + 1);
-                a = snes.ReadLong((c + Cpu.D) & 0xffff);
-                data += $"[${c:x2}]";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"[${a:x2}]";
+                a = ReadLong(a);
+                access += $"${a:x6} = #${Read(a):x2}";
                 break;
             case DPIndirectLongIndexedY:
-                c = snes.ReadOp(pc + 1);
-                a = snes.ReadLong(Cpu.D + c) + Cpu.Y;
-                data += $"[${c:x2}],y";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"[${a:x2}],y";
+                a = ReadLong(a + Cpu.D);
+                access += $"${a + Cpu.Y:x6} = #${Read(a + Cpu.Y):x2}";
                 break;
             case DirectPage:
-                c = snes.ReadOp(pc + 1);
-                a = (snes.ReadOp(pc + 1) + Cpu.D) & 0xffff;
-                data += $"${c:x2}";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"${a:x2}";
+                access += $"${a:x4} = #${Read(a):x2}";
                 break;
             case Immediate:
-                a = snes.ReadOp(pc + 1);
+                //if (!MMode && op != 0xc2 && op != 0xe2)
+                //{
+                //    a = Read(pc + 1) | Read(pc + 2) << 8;
+                //    data += $"#${a:x4}";
+                //}
+                //else
+                //{
+                a = Read(pc + 1);
                 data += $"#${a:x2}";
-
-                //if (op == 0xe2 && b[1].GetBit(4))
-                //    XMode = false;
-                // if (op == 0xc2 && b[1].GetBit(5))
-                //     MMode = true;
+                //}
                 break;
             case ImmediateIndex:
                 if (!Cpu.XMem)
                 {
-                    c = snes.ReadOp(pc + 2);
-                    a = snes.ReadWord(pc + 1);
+                    a = Read(pc + 1) | Read(pc + 2) << 8;
                     data += $"#${a:x4}";
                     size++;
                 }
                 else
                 {
-                    a = snes.ReadOp(pc + 1);
+                    a = Read(pc + 1);
                     data += $"#${a:x2}";
                 }
                 break;
             case ImmediateMemory:
                 if (!Cpu.MMem)
                 {
-                    c = snes.ReadOp(pc + 2);
-                    a = snes.ReadWord(pc + 1);
+                    a = Read(pc + 1) | Read(pc + 2) << 8;
                     data += $"#${a:x4}";
                     size++;
                 }
                 else
                 {
-                    a = snes.ReadOp(pc + 1);
+                    a = Read(pc + 1);
                     data += $"#${a:x2}";
                 }
                 break;
             case ProgramCounterRelative:
-                a = pc + (sbyte)snes.ReadOp(pc + 1) + 2;
+                a = pc + (sbyte)Read(pc + 1) + 2;
                 data += $"${a:x4}";
                 break;
             case ProgramCounterRelativeLong:
-                a = pc + (short)(snes.ReadWord(pc + 1) + 3);
+                a = pc + (short)(ReadWord(pc + 1) + 3);
                 data += $"${a:x6}";// [${a:X6}]";
                 break;
             case SRIndirectIndexedY:
-                c = snes.ReadOp(pc + 1);
-                a = snes.ReadWord(c + Cpu.SP + Cpu.Y);
-                data += $"(${c:x2},s),y";// [${a:X6}]";
+                a = Read(pc + 1);
+                data += $"(${a:x2},s),y";
                 break;
             case StackAbsolute:
-                c = snes.ReadWord(pc + 1);
-                data += $"#${c:x4}";
+                a = ReadWord(pc + 1);
+                data += $"#${a:x4}";
                 break;
             case StackDPIndirect:
-                c = snes.ReadOp(pc + 1); pc++;
-                data += $"${c:x2}";// [${(ushort)(Cpu.SP + Cpu.D):X6}]";
+                a = Read(pc + 1);
+                data += $"${a:x2}";
                 break;
             case StackInterrupt:
                 data += $"$00";
                 break;
             case StackPCRelativeLong:
-                data += $"{pc + snes.ReadWord(pc + 1) + 3:X6}";
+                data += $"{pc + ReadWord(pc + 1) + 3:X6}";
                 break;
             case StackRelative:
-                c = snes.ReadOp(pc + 1);
-                data += $"${c:x2},s";// [${c + Cpu.SP:X6}]";
+                a = Read(pc + 1);
+                data += $"${a:x2},s";
                 break;
             default:
                 break;
         }
 
-        if (getregs)
+        if (getRegisters)
         {
             foreach (var r in Cpu.GetRegisters())
             {
                 if (r.Value == "P" || r.Value == "PB") continue;
                 var v = r.Value == "DB" ? $"{r.Value:x2}" : $"{r.Value:x4}";
-                regtext += $"{r.Value}:{v.ToLower()} ";
+                regtext += $"{r.Name.Replace(" ", "")}:{v.ToLower()} ";
             }
 
             string s = "";
@@ -231,34 +231,47 @@ public class SnesLogger(Snes snes)
                 s += $"{k}";
             }
             //regtext += new string([.. s.Reverse()]) + " ";
+            return ($"{data,-20} {regtext}", access, op, size);
         }
-        return (data, op, size);
+        return (data, access, op, size);
     }
 
     public void Log(int hpos)
     {
-        if (!Logging) return;
+        if (!LogMain) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var bank = Cpu.PB << 16;
-            var pc = bank | Cpu.PC;
-            var (disasm, _, _) = Disassemble(pc, true, true);
-            Outfile.WriteLine($"{bank | pc:x6} {disasm,-13} {hpos}");
+            var (disasm, _, _, _) = Disassemble(Cpu.PBPC, true);
+            Outfile.WriteLine($"{Cpu.PBPC:x6} {disasm,-13} {hpos}");
         }
     }
 
-    public void Toggle()
+    public void LogSaOne(int hpos)
     {
-        Logging = !Logging;
-        if (Logging)
-            Outfile = new StreamWriter(Environment.CurrentDirectory + "\\trace.log");
+        if (!LogSa1) return;
+        if (Outfile != null && Outfile.BaseStream.CanWrite)
+        {
+            var (disasm, _, _, _) = Disassemble(Snes.Sa1.Cpu.PBPC, true);
+            Outfile.WriteLine($"{Snes.Sa1.Cpu.PBPC:x6} {disasm,-13} {hpos}");
+        }
+    }
+
+    public void Toggle(bool sa1)
+    {
+        if (sa1)
+            LogSa1 = !LogSa1;
+        else
+            LogMain = !LogMain;
+
+        if (LogMain || LogSa1)
+            Outfile = new StreamWriter($"{Environment.CurrentDirectory}/trace{(LogSa1 ? ".sa1" : "")}.log");
         else
             Outfile?.Close();
     }
 
     private void Close()
     {
-        Logging = false;
+        LogMain = LogSa1 = false;
         Outfile?.Close();
     }
 

@@ -18,20 +18,17 @@ public class GbcTimer : ISaveState
 
     public GbcTimer(Gbc gbc)
     {
-        gbc.SetMemory(0x00, 0x00, 0xff04, 0xff07, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x00, 0xff04, 0xff07, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff04 => _div | 0xad,
-            0xff05 => _tima,
-            0xff06 => _tma,
-            0xff07 => _tac | 0xf8,
-            _ => 0,
-        };
-    }
+        0xff04 => _div | 0xad,
+        0xff05 => _tima,
+        0xff06 => _tma,
+        0xff07 => _tac | 0xf8,
+        _ => 0,
+    };
 
     public void Write(int a, int v)
     {

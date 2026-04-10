@@ -1,5 +1,4 @@
 ﻿using Gmulator.Interfaces;
-using Raylib_cs;
 
 namespace Gmulator.Core.Snes;
 
@@ -96,10 +95,7 @@ public class SnesDsp : ISaveState
         DirPage = 0;
     }
 
-    public void SetSnes(Snes snes)
-    {
-        Apu = snes.Apu;
-    }
+    public void SetSnes(Snes snes) => Apu = snes.Apu;
 
     public void Cycle()
     {

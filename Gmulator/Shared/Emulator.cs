@@ -1,4 +1,5 @@
-﻿using Gmulator.Ui;
+﻿using Gmulator.Interfaces;
+using Gmulator.Ui;
 using ImGuiNET;
 using Raylib_cs;
 using System.Numerics;
@@ -12,11 +13,10 @@ namespace Gmulator.Shared
     {
         public string GameName { get; set; }
         public string LastName { get; set; }
-        public List<MemoryHandler> MemoryHandlers { get; set; }
         public ReadDel[] Read { get; set; }
         public WriteDel[] Write { get; set; }
         public RamType[] RamTypes { get; set; }
-
+        public int Offset { get; set; }
         public Config Config { get; set; }
         public RenderTexture2D Screen { get; set; }
         public Dictionary<int, Cheat> Cheats { get; set; } = [];
@@ -24,7 +24,6 @@ namespace Gmulator.Shared
         public LuaApi LuaApi { get; set; }
         public DebugWindow DebugWindow { get; set; }
         public CheatConverter CheatConverter { get; set; }
-        public DebugState State { get; set; }
         public bool Run { get; set; }
         public bool FastForward { get; set; }
         public bool Debug { get; set; }
@@ -33,7 +32,8 @@ namespace Gmulator.Shared
         public bool[] Buttons { get; set; }
         public Vector2 Dimensions { get; set; } = new(GbWidth, GbHeight);
         public object StateLock { get; set; } = new object();
-        public SortedDictionary<int, Breakpoint> Breakpoints { get; set; } = [];
+        public List<Breakpoint> Breakpoints { get; set; } = [];
+        public IConsole Console { get; set; }
 
         public enum StateResult
         {
@@ -42,25 +42,7 @@ namespace Gmulator.Shared
 
         public Emulator() { }
 
-        public Emulator(int size)
-        {
-            Read = new ReadDel[size];
-            Write = new WriteDel[size];
-            RamTypes = new RamType[size];
-
-            for (int i = 0; i < Read.Length; i++)
-            {
-                Read[i] = (int a) => 0;
-                Write[i] = (int a, int v) => { };
-                RamTypes[i] = RamType.None;
-            }
-
-            MemoryHandlers = new();
-            for (int i = 0; i < size; i++)
-                MemoryHandlers.Add(new(0, 0, 0, 0, 0, (int a) => 0, (int a, int v) => { }, RamType.None));
-        }
-
-        public void Init(int width, int height, int system, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
+        public void Init(int width, int height, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
         {
             Screen = Raylib.LoadRenderTexture(width, height);
             Dimensions = new(width, height);
@@ -75,9 +57,9 @@ namespace Gmulator.Shared
             Debug = true;
 #endif
             if (!Debug)
-                State = DebugState.Running;
+                Console.EmuState = DebugState.Running;
             else
-                State = DebugState.Break;
+                Console.EmuState = DebugState.Break;
             LuaApi?.SetDebug(Debug);
             if (name != "")
                 GameName = name;
@@ -85,12 +67,12 @@ namespace Gmulator.Shared
             UpdateTexture(Screen.Texture, pixels);
         }
 
-        public virtual void SetState(DebugState v)
-        {
-            State = v;
-            if (v == DebugState.Running || (v == DebugState.StepOverMain && v == DebugState.StepOverSpc))
-                Run = true;
-        }
+        //public virtual void SetState(DebugState v)
+        //{
+        //    State = v;
+        //    if (v == DebugState.Running || (v == DebugState.StepOverMain && v == DebugState.StepOverSpc))
+        //        Run = true;
+        //}
 
         public virtual void RunFrame(bool opened) { }
 
@@ -135,40 +117,18 @@ namespace Gmulator.Shared
                 Raylib.UpdateTexture(texture, pixels);
         }
 
-        public void UpdateScreen(uint[] buffer)
-        {
-            UpdateTexture(Screen.Texture, buffer);
-        }
+        public void UpdateScreen(uint[] buffer) => UpdateTexture(Screen.Texture, buffer);
 
-        public virtual void SetMemory(int bank_s, int bank_e, int addr_s, int addr_e, int mask, ReadDel read, WriteDel write, RamType type, int add)
-        {
-            for (int i = bank_s; i <= bank_e; i++)
-            {
-                for (int j = addr_s; j <= addr_e; j += add)
-                {
-                    int a = add == 0x1000 ? i << 4 | (j >> 12) : j;
-                    MemoryHandlers[a].AddrStart = addr_s;
-                    MemoryHandlers[a].AddrEnd = addr_e;
-                    MemoryHandlers[a].BankStart = bank_s;
-                    MemoryHandlers[a].BankEnd = bank_e;
-                    MemoryHandlers[a].Read = read;
-                    MemoryHandlers[a].Write = write;
-                    MemoryHandlers[a].Mask = mask;
-                    MemoryHandlers[a].Type = type;
-                }
-            }
-        }
 
-        public virtual void CheckAccess(int a, int v, RamType type, int mask, bool write)
-        {
-            if (Debug && DebugWindow.AccessCheck(a, v, type, mask, write))
-                State = DebugState.Break;
-        }
 
-        public T GetConsole<T>()
-        {
-            return (T)Convert.ChangeType(this, typeof(T));
-        }
+        //public virtual void CheckAccess(int a, int v, MemoryHandler handler, bool write)
+        //{
+        //    if (DebugWindow == null) return;
+        //    if (Breakpoint.AccessCheck(a, v, handler, write))
+        //        State = DebugState.Break;
+        //}
+
+        public T GetConsole<T>() => (T)Convert.ChangeType(this, typeof(T));
 
         public virtual void Update() { }
 
@@ -362,7 +322,7 @@ namespace Gmulator.Shared
                 var res = JsonSerializer.Deserialize<List<Breakpoint>>(File.ReadAllText(file), GEmuJsonContext.Default.Options);
                 foreach (var bp in res)
                 {
-                    Breakpoints.Add(bp.Addr, bp);
+                    Breakpoints.Add(bp);
                 }
             }
         }
@@ -371,7 +331,7 @@ namespace Gmulator.Shared
         {
             if (!Directory.Exists(DebugDirectory)) return;
             if (name == null || name == "") return;
-            var bps = Breakpoints.Values.DistinctBy(c => c.Addr).ToList();
+            var bps = Breakpoints.DistinctBy(c => c.Addr).ToList();
             var file = @$"{DebugDirectory}/{Path.GetFileNameWithoutExtension(name)}.json";
             var json = JsonSerializer.Serialize(bps, GEmuJsonContext.Default.Options);
             File.WriteAllText(file, json);
@@ -380,25 +340,19 @@ namespace Gmulator.Shared
 
     public class MemoryHandler
     {
-        public int AddrStart { get; set; }
-        public int AddrEnd { get; set; }
-        public int BankStart { get; set; }
-        public int BankEnd { get; set; }
+        public int Offset { get; set; }
+        public int Mask { get; set; }
+        public byte[] Ram { get; set; }
         public ReadDel Read { get; set; }
         public WriteDel Write { get; set; }
-        public int Mask { get; set; }
         public RamType Type { get; set; }
+        public Func<int,int> ReadByte { get; set; }
 
         public MemoryHandler() { }
-        public MemoryHandler(int bankStart, int bankEnd, int addrStart, int addrEnd, int mask, ReadDel read, WriteDel write, RamType type)
+        public MemoryHandler(int mask, ReadDel read, WriteDel write, RamType type)
         {
-            AddrStart = addrStart;
-            AddrEnd = addrEnd;
-            BankStart = bankStart;
-            BankEnd = bankEnd;
             Read = read;
             Write = write;
-            Mask = mask;
             Type = type;
         }
     }

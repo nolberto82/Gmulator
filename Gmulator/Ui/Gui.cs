@@ -1,7 +1,6 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
-using Gmulator.Shared;
 using ImGuiNET;
 using Raylib_cs;
 using rlImGui_cs;
@@ -139,6 +138,10 @@ public abstract class Gui
                 ToggleAllCheats = false;
                 break;
             case ScrLua:
+                if (Raylib.IsGamepadButtonPressed(0, BtnB))
+                {
+                    LoadLua(LuaFiles[SelOption[ScrLua]].Name);
+                }
                 break;
             case ScrOptions:
                 if (Options.Count == 0) break;
@@ -186,7 +189,7 @@ public abstract class Gui
         Audio = new();
 
 #if DEBUG || RELEASE
-        Raylib.SetWindowSize(1000, 980);
+        Raylib.SetWindowSize(1280, 980);
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
@@ -232,7 +235,7 @@ public abstract class Gui
         }
 
         Emulator?.Config = new();
-        Emulator.Config.CreateDirectories(isdeck);
+        Config.CreateDirectories(isdeck);
         Emulator.Config.Load();
         FileExtensions = [".gb", ".gbc", ".nes", ".sfc", ".smc", ".sms", ".gg"];
         CurrentName = PreviousName = "";
@@ -260,7 +263,7 @@ public abstract class Gui
 
         Options =
         [
-            new("Frameskip", [config.FrameSkip, 1, 1, 10], null, false, ChangeOption, null),
+            new("Frameskip", [config.FrameSkip, 1, 1, 15], null, false, ChangeOption, null),
             new("Volume", [config.Volume, 1, 0, 100], null, false, ChangeOption, null),
             new("Rotate AB Buttons", [config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
             //new("Copy Hacks", [0, 0, 0, 0], [""], true, null, CopyHacks),
@@ -295,21 +298,21 @@ public abstract class Gui
                 case ".gb" or ".gbc":
                 {
                     Emulator = new Gbc();
-                    Emulator.Init(GbWidth, GbHeight, GbcConsole, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(GbWidth, GbHeight, MenuHeight, DebugFont, GuiFont);
                     Audio.Init(GbcAudioFreq, 4096, 4096, 32);
                     break;
                 }
                 case ".nes":
                 {
                     Emulator = new Nes();
-                    Emulator.Init(NesWidth, NesHeight, NesConsole, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(NesWidth, NesHeight, MenuHeight, DebugFont, GuiFont);
                     Audio.Init(NesAudioFreq, 4096, 4096, 32);
                     break;
                 }
                 case ".sfc" or ".smc":
                 {
                     Emulator = new Snes();
-                    Emulator.Init(SnesWidth, SnesHeight, SnesConsole, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(SnesWidth, SnesHeight, MenuHeight, DebugFont, GuiFont);
                     Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
                     break;
                 }
@@ -354,7 +357,7 @@ public abstract class Gui
         }
     }
 
-    public void DeleteFile(FileDetails file)
+    public static void DeleteFile(FileDetails file)
     {
         if (file.IsFile)
         {
@@ -492,6 +495,12 @@ public abstract class Gui
         foreach (var c in emulator.Cheats.Values)
             c.Enabled = true;
         emulator.SaveCheats(CurrentName);
+    }
+
+    public void LoadLua(string filename)
+    {
+        LuaApi?.Load(filename);
+        Opened = false;
     }
 
     public readonly string[] MainEntries = ["Games", "Cheats", "Lua", "Options", "Copy Hacks"];

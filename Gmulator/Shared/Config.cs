@@ -44,7 +44,7 @@ public class Config
         File.WriteAllText(file, json);
     }
 
-    public void CreateDirectories(bool isdeck)
+    public static void CreateDirectories(bool isdeck)
     {
         if (!Directory.Exists(RomDirectory))
             Directory.CreateDirectory(RomDirectory);

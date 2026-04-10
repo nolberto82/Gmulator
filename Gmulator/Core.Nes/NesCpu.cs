@@ -18,43 +18,48 @@ public partial class NesCpu : EmuState, ICpu
     private const int INT_NMI = 0xfffa;
     private const int INT_RESET = 0xfffc;
     private const int INT_BRK = 0xfffe;
-    private int pc, sp, a, x, y, ps;
-    private bool[] flags;
+
     private readonly NesMmu Mmu;
 
+    #region State
     public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
     public int SP { get => (byte)sp; set => sp = value & 0xff; }
     public int A { get => a & 0xff; set => a = value & 0xff; }
     public int X { get => (byte)x; set => x = value & 0xff; }
     public int Y { get => y & 0xff; set => y = (byte)value; }
     public int Instructions { get; private set; }
-    public int Cycles { get; set; }
+    public ulong Cycles { get; set; }
     public int CycleTotal { get; set; }
     public int PS { get => ps & 0xff; set => ps = (ushort)value; }
     public int NmiTriggered { get; set; }
-    public bool[] Flags { get => flags; set => flags = value; }
-    private int StallCycles;
+    public bool[] Flags { get => _flags; set => _flags = value; }
+    public int StalledCycles { get => _stalledCycles; set => _stalledCycles = value; }
+
+    private int pc, sp, a, x, y, ps;
+    private bool[] _flags;
+    private int _stalledCycles;
+    #endregion
 
     public int StepOverAddr { get; set; } = -1;
-
     public Action<int> PpuStep;
     public Action<DebugState> SetState { get; internal set; }
-    public Func<int, int, RamType, int, bool, bool> AccessCheck { get; internal set; }
+    public Func<int, int, MemoryHandler, bool, bool> AccessCheck { get; internal set; }
     public Action Tick { get; set; }
 
-    private Nes Nes;
+    private readonly Nes Nes;
+    private List<MemoryHandler> MemoryHandlers;
 
     public NesCpu(Nes nes)
     {
         Nes = nes;
         Mmu = nes.Mmu;
-        flags = new bool[8];
+        _flags = new bool[8];
         CreateOpcodes();
     }
 
     public int ReadDmc(int a)
     {
-        StallCycles += 4;
+        _stalledCycles += 4;
         return Mmu.ReadByte(a);
     }
 
@@ -63,7 +68,7 @@ public partial class NesCpu : EmuState, ICpu
         Cycles++;
         PpuStep(3);
         var v = Mmu.ReadByte(a) & 0xff;
-        Nes.CheckAccess(a, v, Mmu.RamType, Mmu.RamMask, false);
+        Nes.Debugger.Access(a, v, MemoryHandlers[a >> 12], false);
         return v;
     }
 
@@ -72,14 +77,14 @@ public partial class NesCpu : EmuState, ICpu
         Cycles++;
         PpuStep(3);
         Mmu.WriteByte(a, v);
-        Nes.CheckAccess(a, v & 0xff, Mmu.RamType, Mmu.RamMask, true);
+        Nes.Debugger.Access(a, v & 0xff, MemoryHandlers[a >> 12], true);
     }
 
     public void Step()
     {
-        if (StallCycles > 0)
+        if (StalledCycles > 0)
         {
-            StallCycles--;
+            StalledCycles--;
             return;
         }
 
@@ -422,8 +427,7 @@ public partial class NesCpu : EmuState, ICpu
     private void Plp(int mode)
     {
         TickRead(PC); TickRead(PC);
-        PS = Pop() & ~0x30;// & ~0x10 | 0x20;
-        //SetFlags();
+        PS = Pop() & ~0x30;
     }
 
     private void Rol(int mode)
@@ -509,7 +513,6 @@ public partial class NesCpu : EmuState, ICpu
         SetFlag((b & 0xff) == 0, FZ);
         SetFlag(b & 0x80, FN);
         SetFlag((A ^ v) & (A ^ b) & 0x80, FV);
-
         A = b;
     }
 
@@ -682,7 +685,7 @@ public partial class NesCpu : EmuState, ICpu
                 int b1 = TickRead(PC++);
                 int lo = TickRead(b1 & 0xff);
                 int hi = TickRead(b1 + 1 & 0xff);
-                ushort oldaddr = ((ushort)(hi << 8 | lo));
+                ushort oldaddr = (ushort)(hi << 8 | lo);
                 ushort addr = (ushort)(oldaddr + Y);
                 if ((addr & 0xff00) != (oldaddr & 0xff00)) TickRead(PC);
                 return addr;
@@ -761,10 +764,10 @@ public partial class NesCpu : EmuState, ICpu
         return 0;
     }
 
-    public void Reset()
+    public void Reset(List<MemoryHandler> handlers)
     {
-        flags[2] = true;
-        flags[5] = true;
+        Flags[2] = true;
+        Flags[5] = true;
 
         PC = Mmu.ReadWord(INT_RESET);
         SP = 0xfd;
@@ -772,9 +775,9 @@ public partial class NesCpu : EmuState, ICpu
         X = 0x00;
         A = 0x00;
         Y = 0x00;
-        Instructions = 0;
         Cycles = 7;
         StepOverAddr = -1;
+        MemoryHandlers = handlers;
     }
 
     private void Nmi()
@@ -858,14 +861,14 @@ public partial class NesCpu : EmuState, ICpu
 
     public List<RegisterInfo> GetFlags() =>
     [
-        new("","C",$"{Flags[0]}"),
-        new("","Z",$"{Flags[1]}"),
-        new("","I",$"{Flags[2]}"),
-        new("","D",$"{Flags[3]}"),
-        new("","B",$"{Flags[4]}"),
-        new("","U",$"{Flags[5]}"),
-        new("","V",$"{Flags[6]}"),
-        new("","N",$"{Flags[7]}"),
+        new("","C",$"{ Flags[0]}"),
+        new("","Z",$"{ Flags[1]}"),
+        new("","I",$"{ Flags[2]}"),
+        new("","D",$"{ Flags[3]}"),
+        new("","B",$"{ Flags[4]}"),
+        new("","U",$"{ Flags[5]}"),
+        new("","V",$"{ Flags[6]}"),
+        new("","N",$"{ Flags[7]}"),
     ];
 
     public List<RegisterInfo> GetRegisters() =>
@@ -877,18 +880,15 @@ public partial class NesCpu : EmuState, ICpu
         new("", "SP", $"{SP:X2}"),
     ];
 
-    public int GetReg(string reg)
+    public int GetReg(string reg) => reg.ToLowerInvariant() switch
     {
-        return reg.ToLowerInvariant() switch
-        {
-            "a" => A,
-            "x" => X,
-            "y" => Y,
-            "p" => PS,
-            "pc" => PC,
-            _ => 0,
-        };
-    }
+        "a" => A,
+        "x" => X,
+        "y" => Y,
+        "p" => PS,
+        "pc" => PC,
+        _ => 0,
+    };
 
     public void SetReg(string reg, int v)
     {
@@ -904,17 +904,11 @@ public partial class NesCpu : EmuState, ICpu
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(PC); bw.Write(SP); bw.Write(A); bw.Write(X);
-        bw.Write(Y); bw.Write(Instructions); bw.Write(Cycles); bw.Write(CycleTotal);
-        bw.Write(PS); bw.Write(NmiTriggered); WriteArray(bw, Flags); bw.Write(StallCycles);
-        bw.Write(StepOverAddr);
+
     }
 
     public void Load(BinaryReader br)
     {
-        PC = br.ReadInt32(); SP = br.ReadInt32(); A = br.ReadInt32(); X = br.ReadInt32();
-        Y = br.ReadInt32(); Instructions = br.ReadInt32(); Cycles = br.ReadInt32(); CycleTotal = br.ReadInt32();
-        PS = br.ReadInt32(); NmiTriggered = br.ReadInt32(); Flags = ReadArray<bool>(br, Flags.Length); StallCycles = br.ReadInt32();
-        StepOverAddr = br.ReadInt32();
+
     }
 }

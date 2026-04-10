@@ -1,12 +1,9 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
-using Gmulator.Core.Snes.Mappers;
+﻿using Gmulator.Core.Snes;
+using Gmulator.Core.Snes.Sa1;
 using Gmulator.Interfaces;
 using ImGuiNET;
 using Raylib_cs;
-using System;
-using System.Net.Sockets;
+using System.Reflection.Emit;
 using static Gmulator.Shared.MemoryEditor;
 
 namespace Gmulator.Ui
@@ -28,14 +25,13 @@ namespace Gmulator.Ui
         public List<ButtonName> ButtonNames { get; set; }
         public Dictionary<string, Action<bool>> ButtonNamesSa1 { get; set; }
         public List<MemRegion> MemRegions { get; set; } = [];
-        public List<RamName> RamNames { get; set; }
         public int AsmOffset { get; private set; }
         public int[] JumpAddr { get; set; }
         public int[] ScrollY { get; set; }
         public int SelectedCpu { get; set; }
-        public SortedDictionary<int, Breakpoint> Breakpoints { get; set; }
+        public List<Breakpoint> Breakpoints { get; set; }
         public MemoryEditor MemoryEditor { get; set; }
-        public Func<int, bool, bool, bool, (string, int, int)>[] OnDisassemble { get; set; }
+        public Func<int, bool, (string, string, int, int)>[] OnDisassemble { get; set; }
         public Action CpuStep { get; set; }
         public Action<DebugState> SetState { get; set; }
         public Action<string> SaveBreakpoints { get; set; }
@@ -43,6 +39,7 @@ namespace Gmulator.Ui
         public Func<List<RegisterInfo>> GetCpuFlags { get; set; }
         public Func<List<RegisterInfo>> GetSa1State { get; set; }
         public Func<List<RegisterInfo>> GetSa1Flags { get; set; }
+        public Func<List<RegisterInfo>> GetSa1IORegs { get; set; }
         public Func<List<RegisterInfo>> GetPpuState { get; set; }
         public Func<List<RegisterInfo>> GetApuState { get; set; }
         public Func<List<RegisterInfo>> GetSpcState { get; set; }
@@ -51,6 +48,8 @@ namespace Gmulator.Ui
         public Func<int> GetSpcPC { get; set; }
         public Func<int[]> GetPrg { get; set; }
         public Func<int[]> GetChr { get; set; }
+        public IConsole Console { get; set; }
+        public ICpu Cpu { get; set; }
         public IPpu Ppu { get; set; }
 
         public const int MainCpu = 0;
@@ -58,16 +57,18 @@ namespace Gmulator.Ui
         public const int SpcCpu = 2;
         public const int GsuCpu = 3;
 
-        public DebugWindow(ICpu cpu, IPpu ppu)
+        public DebugWindow(IConsole console)
         {
-            CpuStep = cpu.Step;
-            Ppu = ppu;
+            CpuStep = console.Cpu.Step;
+            Console = console;
+            Cpu = console.Cpu;
+            Ppu = console.Ppu;
             ButtonNames =
             [
                 new("Run", Continue),
-                new("Reset",Reset),
                 new("Step", StepInto),
                 new("Over", StepOver),
+                new("Reset",Reset),
                 new("Line", StepScanline),
                 new("Trace", ToggleTrace),
             ];
@@ -75,7 +76,8 @@ namespace Gmulator.Ui
             MemoryEditor = new(AddBreakpoint);
         }
 
-        public virtual void SetCpu(Snes snes) { }
+        public virtual void Reset(Snes snes)
+        { }
 
         public virtual void Draw(Texture2D texture)
         {
@@ -91,46 +93,112 @@ namespace Gmulator.Ui
             }
         }
 
-        public virtual void DrawDebugger(int PC, bool logging, int n)
+        public virtual void DrawDebugger(int pc, bool logging, int n)
         {
             ImGui.SetNextWindowPos(new(5, 272));
-            ImGui.SetNextWindowSize(new(550, 405));
-            ImGui.Begin("Debugger");
+            ImGui.SetNextWindowSize(new(460, 405));
+            ImGui.Begin("Main Processor");
+            {
+                ImGui.Columns(2);
+                DrawButtons(logging, 0);
+                ImGui.SetColumnWidth(0, 215);
+                DrawDisassembly(pc, MainCpu);
+                ImGui.NextColumn();
+                DrawCpuInfo(Cpu.GetRegisters, Cpu.GetFlags);
+                DrawBreakpoints();
+                ImGui.Columns(1);
+                ImGui.End();
+            }
+        }
+
+        private void DrawDisassembly(int PC, int n)
+        {
+            ImGui.PushID(n);
+            ImGui.BeginChild($"Disassembly{n}");
+            {
+                var pc = Scroll(PC, n);
+                //pc = pc & 0xfff000;
+                if (ImGui.BeginPopupContextWindow($"gotomenu{n}"))
+                    JumpTo(n);
+
+                if (ImGui.IsKeyPressed(ImGuiKey.F5))
+                    SetState(DebugState.Running);
+
+                for (int i = 0; i < DisasmMaxLines - 1; i++)
+                {
+                    var (disasm, access, op, size) = OnDisassemble[n](pc, false);
+
+                    ImGui.PushID(pc);
+
+                    if (ImGui.Selectable($"{pc:X6} ", false, ImGuiSelectableFlags.AllowDoubleClick))
+                    {
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
+                        {
+                            var bp = Breakpoints.Find(b => b.Addr == pc);
+                            if (bp == null)
+                                AddBreakpoint(pc, BPType.Exec, -1, false, 6);
+                            else
+                                RemoveBreakpoint(bp);
+                        }
+
+                    }
+
+                    DrawHighlight(PC, pc);
+
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetNextWindowSize(new(150, 0));
+                        ImGui.BeginTooltip();
+                        int offset = Console.Mmu.GetOffset(pc);
+                        ImGui.Text($"PC:  ${pc:x6}");
+                        ImGui.Text($"Prg: ${offset:x6}");
+                        ImGui.Text($"Mem: {access}");
+                        ImGui.EndTooltip();
+                    }
+
+                    ImGui.PopID();
+                    ImGui.SameLine();
+                    ImGui.Text($"{disasm}");
+                    pc += size;
+                }
+                ImGui.EndChild();
+            }
+            ImGui.PopID();
+        }
+
+        public virtual void DrawCoProcessors(bool logging)
+        {
+            ImGui.SetNextWindowPos(new(470, 272));
+            ImGui.SetNextWindowSize(new(395, 405));
+            ImGui.Begin("Co Processors", NoScrollFlags);
             {
                 Func<List<RegisterInfo>> cpu = null;
                 Func<List<RegisterInfo>> cpuflags = null;
-                DrawButtons(logging, n);
+                ImGui.Columns(2);
+                DrawButtons(logging, SelectedCpu);
                 ImGui.BeginTabBar("##cputab");
                 {
-                    ImGui.Columns(2);
-                    ImGui.SetColumnWidth(0, 200);
-                    if (ImGui.BeginTabItem("Cpu"))
-                    {
-                        SelectedCpu = MainCpu;
-                        cpu = GetCpuState;
-                        cpuflags = GetCpuFlags;
-                        DrawDisassembly(PC, logging, false, MainCpu);
-                        ImGui.EndTabItem();
-                    }
-
                     if (GetSa1State != null)
                     {
                         if (ImGui.BeginTabItem("Sa1"))
                         {
+                            SnesSa1 sa1 = (Console as Snes).Sa1;
+                            ImGui.SetColumnWidth(0, 210);
                             SelectedCpu = Sa1Cpu;
-                            cpu = GetSa1State;
-                            cpuflags = GetSa1Flags;
-                            DrawDisassembly(PC, logging, true, Sa1Cpu);
+                            cpu = sa1.Cpu.GetRegisters;
+                            cpuflags = sa1.Cpu.GetFlags;
+                            DrawDisassembly((Console as Snes).Sa1.Cpu.PBPC, Sa1Cpu);
                             ImGui.EndTabItem();
                         }
                     }
 
                     if (GetSpcPC != null && ImGui.BeginTabItem("Spc"))
                     {
+                        SnesSpc spc = (Console as Snes).Spc;
                         SelectedCpu = SpcCpu;
-                        cpu = () => GetSpcState();
-                        cpuflags = () => GetSpcFlags();
-                        DrawDisassembly(GetSpcPC(), logging, false, SpcCpu);
+                        cpu = spc.GetRegisters;
+                        cpuflags = spc.GetFlags;
+                        DrawDisassembly(GetSpcPC(), SpcCpu);
                         ImGui.EndTabItem();
                     }
                     //if (CoProcessor == BaseMapper.CoprocessorGsu)
@@ -144,7 +212,6 @@ namespace Gmulator.Ui
 
                     ImGui.NextColumn();
                     DrawCpuInfo(cpu, cpuflags);
-                    DrawBreakpoints();
                     ImGui.Columns(1);
 
                     ImGui.EndTabBar();
@@ -153,59 +220,29 @@ namespace Gmulator.Ui
             }
         }
 
-        private void DrawDisassembly(int PC, bool logging, bool isSa1, int n)
-        {
-            ImGui.BeginChild("Disassembly");
-            {
-                var pc = Scroll(PC, 0);
-
-                if (ImGui.BeginPopupContextWindow("gotomenu"))
-                    JumpTo(0);
-
-                if (ImGui.IsKeyPressed(ImGuiKey.F5))
-                    SetState(DebugState.Running);
-
-                for (int i = 0; i < DisasmMaxLines; i++)
-                {
-                    var (disasm, op, size) = OnDisassemble[n](pc, false, false, isSa1);
-
-                    ImGui.PushID(pc);
-                    if (ImGui.Selectable($"{pc:X6} ", false, ImGuiSelectableFlags.AllowDoubleClick))
-                    {
-                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
-                            AddBreakpoint(pc, BPType.Exec, -1, false, RamType.Rom);
-                    }
-
-                    DrawHighlight(PC, pc);
-
-                    ImGui.PopID();
-                    ImGui.SameLine();
-                    ImGui.Text($"{disasm}");
-                    pc += size;
-                }
-                ImGui.EndChild();
-            }
-        }
-
         public virtual void DrawButtons(bool logging, int processor)
         {
-            ImGui.BeginChild("##Buttons", new(0, 25));
+            ImGui.BeginChild($"##Buttons{processor}", new(0, 45));
             {
                 foreach (var v in ButtonNames.Select((e, i) => new { e, i }))
                 {
                     ImGui.PushStyleColor(ImGuiCol.Text, v.i == ButtonNames.Count - 1 && logging ? GREEN : WHITE);
                     if (ImGui.Button(v.e.Name, ButtonSize))
+                    {
+                        SelectedCpu = processor;
                         v.e.Action(0);
-                    ImGui.SameLine();
+                    }
+                    if (v.i != 2)
+                        ImGui.SameLine();
                     ImGui.PopStyleColor();
                 }
                 ImGui.EndChild();
             }
         }
 
-        public virtual void DrawCoProcessors() { }
         public virtual void DrawCpuInfo(Func<List<RegisterInfo>> cpu, Func<List<RegisterInfo>> cpuflags)
         {
+            if (cpu == null || cpuflags == null) return;
             ImGui.BeginChild("Cpu Registers", new(70, 140));
             {
                 var registers = cpu();
@@ -251,7 +288,7 @@ namespace Gmulator.Ui
         public virtual void DrawCartInfo(Dictionary<string, string> info)
         {
             ImGui.SetNextWindowPos(new(266, 30));
-            ImGui.SetNextWindowSize(new(289, 240));
+            ImGui.SetNextWindowSize(new(409, 240));
             ImGui.Begin("Cartridge");
             {
                 var v = info;
@@ -263,6 +300,7 @@ namespace Gmulator.Ui
                     {
                         TableRow(v.ElementAt(i).Key, v.ElementAt(i).Value);
                     }
+                    //TableRow("Cpu Test Addr",$"{Cpu.TestAddr}");
                     ImGui.EndTable();
                 }
             }
@@ -304,17 +342,23 @@ namespace Gmulator.Ui
 
         public virtual void DrawDmaInfo() { }
 
-        public virtual void Continue(DebugState type) => FollowPc = true;
+        public virtual void Continue(DebugState type)
+        {
+            FollowPc = true;
+            Console.EmuState = DebugState.Running;
+        }
+
         public virtual void StepInto(DebugState type)
         {
-            SetState(DebugState.StepMain);
+            //SetState(type);
             FollowPc = true;
+            Console.EmuState = type;
         }
 
         public virtual void StepOver(DebugState type)
         {
-            SetState(DebugState.Running);
             FollowPc = true;
+            Console.EmuState = DebugState.Running;
         }
 
         public virtual void StepScanline(DebugState type)
@@ -328,9 +372,7 @@ namespace Gmulator.Ui
 
         public virtual void Reset(DebugState type) => FollowPc = true;
         public virtual void ToggleTrace(DebugState type)
-        {
-
-        }
+        { }
 
         public virtual void SetJumpAddress(object addr, int i)
         {
@@ -347,13 +389,15 @@ namespace Gmulator.Ui
             FollowPc = false;
         }
 
+
         public virtual void DrawMemory()
         {
             ImGui.SetNextWindowPos(new(5, 680));
             ImGui.SetNextWindowSize(new(550, 295));
             ImGui.Begin("Memory", NoScrollFlags);
-            foreach (var n in MemRegions)
+            for (int i = 0; i < MemRegions.Count; i++)
             {
+                MemRegion n = MemRegions[i];
                 if (ImGui.BeginTabBar("memregions"))
                 {
                     if (ImGui.BeginTabItem(n.Name))
@@ -361,12 +405,39 @@ namespace Gmulator.Ui
                         MemoryEditor.ReadFn = n.Read;
                         MemoryEditor.WriteFn = n.Write;
                         MemoryEditor.OptAddrDigitsCount = n.AddrLength;
+                        MemoryEditor.SelectedMemTab = i;
                         MemoryEditor.DrawContents(null, n.Size, n.StartAddr);
                         ImGui.EndTabItem();
                     }
                     ImGui.EndTabBar();
                 }
             }
+            //if (ImGui.BeginCombo("##memoryregions", MemRegions[MemoryEditor.SelectedMemTab].Name))
+            //{
+            //    for (int i = 0; i < MemRegions.Count; i++)
+            //    {
+            //        MemRegion m = MemRegions[i];
+            //        if (m.StartAddr == -1) continue;
+            //        if (ImGui.Selectable(m.Name, MemoryEditor.SelectedMemTab == i))
+            //        {
+            //            MemoryEditor.ReadFn = m.Read;
+            //            MemoryEditor.WriteFn = m.Write;
+            //            MemoryEditor.OptAddrDigitsCount = m.AddrLength;
+            //            MemoryEditor.SelectedMemTab = i;
+            //        }
+            //    }
+            //    ImGui.EndCombo();
+            //}
+
+            //if (MemoryEditor.ReadFn == null || MemoryEditor.WriteFn == null)
+            //{
+            //    MemoryEditor.ReadFn = MemRegions[0].Read;
+            //    MemoryEditor.WriteFn = MemRegions[0].Write;
+            //    MemoryEditor.OptAddrDigitsCount = MemRegions[0].AddrLength;
+            //}
+
+            //int index = MemoryEditor.SelectedMemTab;
+            //MemoryEditor.DrawContents(null, MemRegions[index].Size, MemRegions[index].StartAddr);
             ImGui.End();
         }
 
@@ -388,18 +459,18 @@ namespace Gmulator.Ui
                     }
 
                     ImGui.TableNextColumn();
-                    List<Breakpoint> list = [.. Breakpoints.Values];
-                    for (int i = 0; i < list.Count; i++)
+                    for (int i = 0; i < Breakpoints.Count; i++)
                     {
-                        Breakpoint bp = list[i];
+                        Breakpoint bp = Breakpoints[i];
                         cbp = bp;
                         var types = (bp.Type & BPType.Exec) > 0 ? "X" : ".";
                         types += (bp.Type & BPType.Write) > 0 ? "W" : ".";
                         types += (bp.Type & BPType.Read) > 0 ? "R" : ".";
+                        ImGui.PushID(i);
                         if (ImGui.Button($"{bp.Addr:X6}"))
                             SetJumpAddress(bp.Addr, 0);
                         ImGui.TableNextColumn();
-                        ImGui.PushID(bp.Addr);
+
                         bool enabled = bp.Enabled;
                         if (ImGui.Checkbox("", ref enabled))
                         {
@@ -408,7 +479,10 @@ namespace Gmulator.Ui
                         }
 
                         var condition = bp.Condition > -1 ? $"{bp.Condition:X4}" : "    ";
-                        var name = RamNames.FirstOrDefault(x => (int)x.Type == (int)bp.RamType).Name;
+                        string name = "";
+                        var memRegion = MemRegions.FirstOrDefault(x => (int)x.Id == (int)bp.RamType);
+                        if (memRegion != null)
+                            name = memRegion.Name;
                         var text = $"{types} {name} {condition}";
                         ImGui.TableNextColumn();
                         if (ImGui.Selectable(text, false, ImGuiSelectableFlags.AllowDoubleClick))
@@ -416,7 +490,7 @@ namespace Gmulator.Ui
                             if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                             {
                                 BpAddr = $"{bp.Addr:X6}";
-                                BPCondition = bp.Condition > -1 ? $"{bp.Condition}" : "";
+                                BPCondition = bp.Condition > -1 ? $"{bp.Condition:X2}" : "";
                                 BreakTypes[0] = (bp.Type & BPType.Exec) > 0;
                                 BreakTypes[1] = (bp.Type & BPType.Write) > 0;
                                 BreakTypes[2] = (bp.Type & BPType.Read) > 0;
@@ -432,7 +506,7 @@ namespace Gmulator.Ui
 
                         if (ImGui.Button("x"))
                         {
-                            AddBreakpoint(bp.Addr, bp.Type, bp.Condition, bp.Write);
+                            RemoveBreakpoint(bp);
                             ImGui.PopID();
                             break;
                         }
@@ -455,7 +529,8 @@ namespace Gmulator.Ui
 
         public virtual void DrawBpMenu(Breakpoint bp, bool edit = false)
         {
-            ImGui.Combo("Type", ref itemindex, [.. RamNames.Select(x => x.Name)], RamNames.Count);
+            var n = MemRegions.FindIndex(x => (int)x.Id == itemindex);
+            ImGui.Combo("Type", ref itemindex, [.. MemRegions.Select(x => x.Name)], MemRegions.Count);
             ImGui.PushItemWidth(-1);
             ImGui.Text("Address:"); ImGui.SameLine(86);
             ImGui.InputText($"##bpinput2", ref BpAddr, 6, HexInputFlags);
@@ -479,9 +554,9 @@ namespace Gmulator.Ui
                 types += BreakTypes[2] ? BPType.Read : 0;
                 IsSpc = itemindex == 6;
                 if (!edit)
-                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1], RamNames[itemindex].Type);
+                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1], MemRegions[itemindex].Id);
                 else
-                    EditBreakpoint(BpAddr.ToInt(), bp.Addr, types, condition, BreakTypes[1], (RamType)itemindex);
+                    EditBreakpoint(BpAddr.ToInt(), bp.Addr, types, condition, BreakTypes[1], itemindex);
                 ImGui.CloseCurrentPopup();
             }
             ImGui.SameLine();
@@ -492,8 +567,8 @@ namespace Gmulator.Ui
 
         public virtual void DrawRegisters()
         {
-            ImGui.SetNextWindowPos(new(558, 30));
-            ImGui.SetNextWindowSize(new(299, 648));
+            ImGui.SetNextWindowPos(new(870, 30));
+            ImGui.SetNextWindowSize(new(325, 648));
             ImGui.Begin("IO Registers", NoScrollFlags);
             {
                 ImGui.BeginTabBar("##ioregtab");
@@ -513,6 +588,12 @@ namespace Gmulator.Ui
                     DrawIORegisters(GetPortState());
                     ImGui.EndTabItem();
                 }
+                if (GetSa1IORegs != null && ImGui.BeginTabItem("Sa1"))
+                {
+                    DrawIORegisters(GetSa1IORegs());
+                    ImGui.EndTabItem();
+                }
+
                 ImGui.EndTabBar();
                 ImGui.End();
             }
@@ -523,7 +604,7 @@ namespace Gmulator.Ui
             ImGui.BeginChild("##regswindow");
             ImGui.BeginTable("##ioregs", 3, ImGuiTableFlags.RowBg);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 60);
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 140);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 170);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 60);
             foreach (var v in ioregisters)
             {
@@ -535,6 +616,8 @@ namespace Gmulator.Ui
 
         public virtual void DrawTestAddr(int[] a, string[] testcpu)
         {
+            ImGui.SetNextWindowPos(new(680, 30));
+            ImGui.SetNextWindowSize(new(0, 240));
             ImGui.Begin("Test Error");
             {
                 for (int i = 0; i < a.Length; i++)
@@ -545,7 +628,8 @@ namespace Gmulator.Ui
 
         public void DrawHighlight(int pc, int line)
         {
-            if (Breakpoints.TryGetValue(line, out var bp))
+            var bp = Breakpoints.Find(b => b.Addr == line);
+            if (bp != null)
             {
                 if (bp.Enabled && (bp.Type & BPType.Exec) != 0)
                     DrawRect(0x4000ff00, 0xff00ff00);
@@ -605,84 +689,39 @@ namespace Gmulator.Ui
             return pc;
         }
 
-
-        public virtual bool ExecuteCheck(int a)
-        {
-            Breakpoints.TryGetValue(a, out Breakpoint bp);
-            if (bp != null)
-            {
-                if (bp.Enabled)
-                {
-                    if (a == bp.Addr)
-                    {
-                        if (bp.Type == BPType.Exec || bp.Type == BPType.SpcExec || bp.Type == BPType.GsuExec)
-                        {
-                            FollowPc = true;
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        public bool AccessCheck(int a, int v, RamType memtype, int mask, bool write)
-        {
-            Breakpoints.TryGetValue(a, out Breakpoint bp);
-            if (bp == null)
-                Breakpoints.TryGetValue(a & mask, out bp);
-            if (bp != null && bp.Enabled && bp.RamType == memtype && bp.Type > 0)
-            {
-                if ((bp.Type == BPType.Write && (bp.Write && write)) ||
-                    (bp.Type == BPType.Read && (!bp.Write && !write)))
-                {
-                    if ((bp.Condition == -1) || (bp.Condition == v))
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        public bool AccessCheckSpc(int a, int v, RamType memtype, bool write)
-        {
-            Breakpoints.TryGetValue(a, out Breakpoint bp);
-            if (bp != null && bp.Enabled && bp.RamType == memtype && (bp.Type & (BPType.Read | BPType.Write)) > 0)
-            {
-                if ((bp.Type == BPType.Write && (bp.Write && write)) ||
-                    (bp.Type == BPType.Read && (!bp.Write && !write)))
-                {
-                    if ((a == bp.Addr && bp.Condition == -1) || (a == bp.Addr && bp.Condition == v))
-                        return true;
-                }
-            }
-            return false;
-        }
-
-        public virtual void AddBreakpoint(int a, int type, int condition, bool write, RamType index = 0)
+        public virtual void AddBreakpoint(int a, int type, int condition, bool write, int index = 0)
         {
             if (a == -1) return;
-            Breakpoints.TryGetValue(a, out Breakpoint bp);
+            //var n = MemRegions.FindIndex(b => b.Type == (RamType)index);
+            var i = MemRegions[index].Id;
+            var bp = Breakpoints.Find(b => b.Addr == a && index == i);
             if (bp == null)
-                Breakpoints.Add(a, new(a, -1, type, write, true, index));
-            else
-                Breakpoints.Remove(a);
+            {
+                Breakpoints.Add(new(a, -1, type, write, true, i));
+                SaveBreakpoints(GameName);
+            }
+        }
+
+        public virtual void RemoveBreakpoint(Breakpoint bp)
+        {
+            Breakpoints.Remove(bp);
             SaveBreakpoints(GameName);
         }
 
-        public virtual void EditBreakpoint(int a, int o, int type, int condition, bool write, RamType index = 0)
+        public virtual void EditBreakpoint(int a, int o, int type, int condition, bool write, int index = 0)
         {
             if (a == -1 || o == -1) return;
-            Breakpoints.TryGetValue(o, out Breakpoint bp);
+            var bp = Breakpoints.FirstOrDefault(b => b.Addr == o);
             if (bp != null)
             {
-                Breakpoints.Remove(o);
-                Breakpoints[a] = new(a, condition, type, write, bp.Enabled, index);
+                Breakpoints.Remove(bp);
+                Breakpoints.Add(new(a, condition, type, write, bp.Enabled, index));
                 SaveBreakpoints(GameName);
             }
         }
     }
 
-    public class MemRegion(string name, ReadDel read, WriteDel write, int addr, int size, int addrlength)
+    public class MemRegion(string name, ReadDel read, WriteDel write, int addr, int size, int addrlength, int id)
     {
         public string Name { get; } = name;
         public ReadDel Read { get; } = read;
@@ -690,22 +729,12 @@ namespace Gmulator.Ui
         public int StartAddr { get; } = addr;
         public int Size { get; } = size;
         public int AddrLength { get; } = addrlength;
+        public int Id { get; set; } = id;
     }
 
-    public class RamName(string name, RamType type)
+    public class ButtonName(string name, Action<DebugState> action)
     {
-        public string Name { get; } = name;
-        public RamType Type { get; } = type;
-    }
-
-    public class ButtonName
-    {
-        public string Name { get; set; }
-        public Action<DebugState> Action { get; set; }
-        public ButtonName(string name, Action<DebugState> action)
-        {
-            Name = name;
-            Action = action;
-        }
+        public string Name { get; set; } = name;
+        public Action<DebugState> Action { get; set; } = action;
     }
 }

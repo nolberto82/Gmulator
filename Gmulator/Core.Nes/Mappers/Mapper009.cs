@@ -50,7 +50,7 @@ internal class Mapper009 : BaseMapper
 
     public override void Reset()
     {
-        var bank = (Header.PrgBanks * 2);
+        var bank = Header.PrgBanks * 2;
         Prg = [0, bank - 3, bank - 2, bank - 1];
         Chr = [0, 1];
         LChr = [0, 1, 2, 3];

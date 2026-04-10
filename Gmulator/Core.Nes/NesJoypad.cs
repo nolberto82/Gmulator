@@ -1,5 +1,4 @@
-﻿using Raylib_cs;
-
+﻿
 namespace Gmulator.Core.Nes;
 
 public class NesJoypad()

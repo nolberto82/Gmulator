@@ -12,20 +12,17 @@ public class Square2 : BaseChannel, ISaveState
 
     public Square2(Gbc gbc)
     {
-        gbc.SetMemory(0x00, 0x01, 0xff16, 0xff19, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff16, 0xff19, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff16 => _nr21 | 0x3f,
-            0xff17 => _nr22,
-            0xff18 => _nr23 | 0xff,
-            0xff19 => _nr24 | 0xbf,
-            _ => 0xff,
-        };
-    }
+        0xff16 => _nr21 | 0x3f,
+        0xff17 => _nr22,
+        0xff18 => _nr23 | 0xff,
+        0xff19 => _nr24 | 0xbf,
+        _ => 0xff,
+    };
 
     public void Write(int a, int v)
     {

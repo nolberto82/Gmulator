@@ -1,7 +1,10 @@
-﻿namespace Gmulator.Interfaces;
+﻿
+namespace Gmulator.Interfaces;
+
 public interface ICpu
 {
     Action Tick { get; set; }
+    int StepOverAddr { get; set; }
     List<RegisterInfo> GetRegisters();
     List<RegisterInfo> GetFlags();
     int GetReg(string reg);
@@ -9,4 +12,9 @@ public interface ICpu
     void Step();
     void Save(BinaryWriter bw);
     void Load(BinaryReader br);
+}
+
+public interface ICpuState
+{
+    
 }

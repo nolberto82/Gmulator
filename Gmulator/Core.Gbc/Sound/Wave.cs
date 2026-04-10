@@ -11,7 +11,7 @@ public class Wave : BaseChannel, ISaveState
     private int _nr33;
     private int _nr34;
 
-    private Gbc Gbc;
+    private readonly Gbc Gbc;
 
     private readonly byte[] WaveRamReset =
     [
@@ -26,21 +26,18 @@ public class Wave : BaseChannel, ISaveState
     {
         CGBEnabled = gbc.GetCGBEnabled;
         Gbc = gbc;
-        gbc.SetMemory(0x00, 0x00, 0xff1a, 0xff1e, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x00, 0xff1a, 0xff1e, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff1a => _nr30 | 0x7f,
-            0xff1b => _nr31 | 0xff,
-            0xff1c => _nr32 | 0x9f,
-            0xff1d => _nr33 | 0xff,
-            0xff1e => _nr34 | 0xbf,
-            _ => 0xff,
-        };
-    }
+        0xff1a => _nr30 | 0x7f,
+        0xff1b => _nr31 | 0xff,
+        0xff1c => _nr32 | 0x9f,
+        0xff1d => _nr33 | 0xff,
+        0xff1e => _nr34 | 0xbf,
+        _ => 0xff,
+    };
 
     public void Write(int a, int v)
     {
@@ -76,11 +73,7 @@ public class Wave : BaseChannel, ISaveState
     }
 
     private int ReadWaveRam(int a) => WaveRam[a & 0x0f];
-    private void WriteWaveRam(int a, int v)
-    {
-        WaveRam[a & 0x0f] = (byte)v;
-        //Mmu.WriteByte(0xff00 + a, v);
-    }
+    private void WriteWaveRam(int a, int v) => WaveRam[a & 0x0f] = (byte)v;//Mmu.WriteByte(0xff00 + a, v);
 
     public override void Reset()
     {
@@ -111,7 +104,7 @@ public class Wave : BaseChannel, ISaveState
             r.NextBytes(WaveRam);
         }
 
-        Gbc.SetMemory(0x00, 0x00, 0xff30, 0xff3f, 0xffff, ReadWaveRam, WriteWaveRam, RamType.Register, 1);
+        Gbc.CpuMap.Set(0x00, 0x00, 0xff30, 0xff3f, ReadWaveRam, WriteWaveRam, RamType.Register, 1);
     }
 
     public void Save(BinaryWriter bw)

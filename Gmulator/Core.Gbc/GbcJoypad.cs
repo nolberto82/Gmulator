@@ -1,5 +1,4 @@
-﻿using Gmulator.Shared;
-using Raylib_cs;
+﻿using Raylib_cs;
 using System.Data;
 
 namespace Gmulator.Core.Gbc;
@@ -23,15 +22,11 @@ public class GbcJoypad
     public GbcJoypad(Gbc gbc)
     {
         _buttons = new bool[8];
-        gbc.SetMemory(0x00, 0x00, 0xff00, 0xff00, 0xffff, Read00, Write00, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x00, 0xff00, 0xff00, Read00, Write00, RamType.Register, 1);
     }
 
     private int Read00(int a) => Status;
-    private void Write00(int a, int v)
-    {
-        Status = (byte)v;
-        //IF |= IntJoypad;
-    }
+    private void Write00(int a, int v) => Status = (byte)v;//IF |= IntJoypad;
 
     private byte _status;
     public byte Status

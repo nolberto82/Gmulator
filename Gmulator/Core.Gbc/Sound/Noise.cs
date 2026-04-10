@@ -15,20 +15,17 @@ public class Noise : BaseChannel, ISaveState
 
     public Noise(Gbc gbc)
     {
-        gbc.SetMemory(0x00, 0x01, 0xff20, 0xff23, 0xffff, Read, Write, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff20, 0xff23, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a)
+    public int Read(int a) => a switch
     {
-        return a switch
-        {
-            0xff20 => _nr41 | 0xff,
-            0xff21 => _nr42,
-            0xff22 => _nr43,
-            0xff23 => _nr44 | 0xbf,
-            _ => 0xff,
-        };
-    }
+        0xff20 => _nr41 | 0xff,
+        0xff21 => _nr42,
+        0xff22 => _nr43,
+        0xff23 => _nr44 | 0xbf,
+        _ => 0xff,
+    };
 
     public void Write(int a, int v)
     {

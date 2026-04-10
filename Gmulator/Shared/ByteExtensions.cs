@@ -4,18 +4,12 @@ using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 
-namespace Gmulator;
+namespace Gmulator.Shared;
 public static class ByteExtensions
 {
-    public static void Set(this byte[] dst, byte[] src, int offset)
-    {
-        src.CopyTo(dst, offset);
-    }
+    public static void Set(this byte[] dst, byte[] src, int offset) => src.CopyTo(dst, offset);
 
-    public static byte[] Slice(this byte[] src, int offset, int count)
-    {
-        return [.. src.Skip(offset).Take(count - offset)];
-    }
+    public static byte[] Slice(this byte[] src, int offset, int count) => [.. src.Skip(offset).Take(count - offset)];
 
     public static void WriteBytes(this byte[] arr, int b, int addr, int v)
     {

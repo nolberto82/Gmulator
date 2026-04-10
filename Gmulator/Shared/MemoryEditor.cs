@@ -2,7 +2,6 @@
 using System.Diagnostics;
 using System.Globalization;
 using System.Numerics;
-using System.Runtime.Loader;
 
 namespace Gmulator.Shared;
 
@@ -36,6 +35,7 @@ public unsafe class MemoryEditor
     public WriteDel WriteFn;
     public delegate bool HighlightDel(byte[] data, int off);//= 0      // optional handler to return Highlight property (to support non-contiguous highlighting).
     public HighlightDel HighlightFn;
+    public int SelectedMemTab;
 
     // [public State]
     private bool ContentsWidthChanged;
@@ -47,9 +47,7 @@ public unsafe class MemoryEditor
     private int GotoAddr;
     private int HighlightMin, HighlightMax;
     private readonly ImGuiDataType PreviewDataType;
-
-    public int SelectedRam { get; set; }
-    private readonly int bpaddr;
+    private int _bpAddr;
 
     private record Sizes
     {
@@ -65,7 +63,7 @@ public unsafe class MemoryEditor
         public float WindowWidth;
     };
 
-    public MemoryEditor(Action<int, int, int, bool, RamType> addbp)
+    public MemoryEditor(Action<int, int, int, bool, int> addbp)
     {
         // Settings
         Open = true;
@@ -265,8 +263,8 @@ public unsafe class MemoryEditor
                         {
                             if (WriteFn != null)
                                 WriteFn(addr | base_display_addr, (byte)data_input_value);
-                            else if (mem_data != null)
-                                mem_data[addr] = (byte)data_input_value;
+                            else
+                                mem_data?[addr] = (byte)data_input_value;
                         }
                         ImGui.PopID();
                     }
@@ -298,22 +296,22 @@ public unsafe class MemoryEditor
                             data_editing_addr_next = addr;
                         }
 
-                        //if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-                        //{
-                        //    DataEditingAddr = -1;
-                        //    DataEditingTakeFocus = false;
-                        //    if (ImGui.IsItemHovered())
-                        //    {
-                        //        bpaddr = addr;
-                        //        ImGui.OpenPopup("bpcontext");
-                        //    }
-                        //}
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+                        {
+                            DataEditingAddr = -1;
+                            DataEditingTakeFocus = false;
+                            if (ImGui.IsItemHovered())
+                            {
+                                _bpAddr = addr;
+                                ImGui.OpenPopup("bpcontext");
+                            }
+                        }
 
                         ImGui.SetNextWindowSize(new(0, 68));
                         if (ImGui.BeginPopupModal("bpcontext"))
                         {
-                            var a = bpaddr;
-                            if (bpaddr == addr)
+                            var a = _bpAddr;
+                            if (_bpAddr == addr)
                             {
                                 ImGui.SetNextItemWidth(s.GlyphWidth * 7 + style.FramePadding.X * 2.0f);
                                 if (ImGui.Button($"Breakpoint on Write - {a:X4}"))
@@ -441,34 +439,16 @@ public unsafe class MemoryEditor
             }
             GotoAddr = -1;
         }
+    }
 
-        ImGui.SameLine();
-
-        if (ImGui.Button("Write Bp"))
-        {
-            if (TryHexParse(AddrInputBuf, out var addr))
-                AddBreakpoint(addr & 0xffff, BPType.Write, -1, true, 0);
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button("Read Bp"))
-        {
-            if (TryHexParse(AddrInputBuf, out var addr))
-                AddBreakpoint(addr & 0xffff, BPType.Read, -1, false, 0);
-        }
-
-        ImGui.SameLine();
-
-        if (ImGui.Button("Freeze Value"))
-        {
-            if (TryHexParse(AddrInputBuf, out var addr))
-                AddCheat(addr, 0);
-        }
+    private void AddAccessBreakpoint(int access)
+    {
+        if (TryHexParse(AddrInputBuf, out var addr))
+            AddBreakpoint(addr & 0xff0000 | addr & 0xffff, access, -1, false, SelectedMemTab);
     }
 
     // FIXME: We should have a way to retrieve the text edit cursor position more easily in the API, this is rather tedious. This is such a ugly mess we may be better off not using InputText() at all here.
-    public unsafe static int Callback(ImGuiInputTextCallbackData* userdata)
+    public static int Callback(ImGuiInputTextCallbackData* userdata)
     {
         var data = new ImGuiInputTextCallbackDataPtr(userdata);
         UserData* user_data = (UserData*)data.UserData;
@@ -517,7 +497,7 @@ public unsafe class MemoryEditor
     }
 
     private static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
-    private readonly Action<int, int, int, bool, RamType> AddBreakpoint;
+    private readonly Action<int, int, int, bool, int> AddBreakpoint;
     private readonly Action<int, byte> AddCheat;
 
     private static int DataTypeGetSize(ImGuiDataType data_type)

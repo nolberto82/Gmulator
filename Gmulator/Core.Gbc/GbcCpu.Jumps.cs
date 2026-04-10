@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Core.Gbc;
+
 public partial class GbcCpu
 {
     private void Step00(int op)
@@ -21,7 +22,7 @@ public partial class GbcCpu
             case 0x0d: C = OpDec8(C); break;
             case 0x0e: C = OpLdImm8(); break;
             case 0x0f: OpRrca(); break;
-            case 0x10: _ime = false; _halt = true; _stop = 8200; break;
+            case 0x10: Ime = false; Halt = true; Stop = 8200; break;
             case 0x11: DE = OpLdImm16(); break;
             case 0x12: OpLdWr(DE, A); break;
             case 0x13: DE = OpInc16(DE); break;
@@ -37,7 +38,7 @@ public partial class GbcCpu
             case 0x1d: E = OpDec8(E); break;
             case 0x1e: E = OpLdImm8(); break;
             case 0x1f: OpRra(); break;
-            case 0x20: OpJr((F & FZ) == 0); break;
+            case 0x20: OpJr(!FlagZ); break;
             case 0x21: HL = OpLdImm16(); break;
             case 0x22: OpLdWr(HL++, A); break;
             case 0x23: HL = OpInc16(HL); break;
@@ -45,7 +46,7 @@ public partial class GbcCpu
             case 0x25: H = OpDec8(H); break;
             case 0x26: H = OpLdImm8(); break;
             case 0x27: OpDaa(); break;
-            case 0x28: OpJr((F & FZ) > 0); break;
+            case 0x28: OpJr(FlagZ); break;
             case 0x29: HL = OpAdd(HL, HL); break;
             case 0x2a: A = OpLdReg(HL++); break;
             case 0x2b: HL = OpDec16(HL); break;
@@ -53,7 +54,7 @@ public partial class GbcCpu
             case 0x2d: L = OpDec8(L); break;
             case 0x2e: L = OpLdImm8(); break;
             case 0x2f: OpCpl(); break;
-            case 0x30: OpJr((F & FC) == 0); break;
+            case 0x30: OpJr(!FlagC); break;
             case 0x31: SP = OpLdImm16(); break;
             case 0x32: OpLdWr(HL--, A); break;
             case 0x33: SP = OpInc16(SP); break;
@@ -61,7 +62,7 @@ public partial class GbcCpu
             case 0x35: OpLdWr(HL, OpDec8(OpLdReg(HL))); break;
             case 0x36: OpLdWr(HL, OpLdImm8()); break;
             case 0x37: OpScf(); break;
-            case 0x38: OpJr((F & FC) > 0); break;
+            case 0x38: OpJr(FlagC); break;
             case 0x39: HL = OpAdd(HL, SP); break;
             case 0x3a: A = OpLdReg(HL); HL--; break;
             case 0x3b: SP = OpDec16(SP); break;
@@ -122,8 +123,7 @@ public partial class GbcCpu
             case 0x72: OpLdWr(HL, D); break;
             case 0x73: OpLdWr(HL, E); break;
             case 0x74: OpLdWr(HL, H); break;
-            case 0x75: OpLdWr(HL, L); break;
-            case 0x76: _halt = true; PC--; break;
+            case 0x75: Halt = true; PC--; break;
             case 0x77: OpLdWr(HL, A); break;
             case 0x78: A = B; break;
             case 0x79: A = C; break;
@@ -197,57 +197,57 @@ public partial class GbcCpu
             case 0xbd: OpCp(L); break;
             case 0xbe: OpCp(OpLdReg(HL)); break;
             case 0xbf: OpCp(A); break;
-            case 0xc0: OpRet((F & FZ) == 0); break;
+            case 0xc0: OpRet(!FlagZ); break;
             case 0xc1: BC = OpPop(); break;
-            case 0xc2: OpJp((F & FZ) == 0); break;
+            case 0xc2: OpJp(!FlagZ); break;
             case 0xc3: OpJp(true); break;
-            case 0xc4: OpCall((F & FZ) == 0); break;
+            case 0xc4: OpCall(!FlagZ); break;
             case 0xc5: Tick(); OpPush(BC); break;
             case 0xc6: OpAdd8(OpLdImm8()); break;
             case 0xc7: OpRst(0x00); break;
-            case 0xc8: OpRet((F & FZ) > 0); break;
+            case 0xc8: OpRet(FlagZ); break;
             case 0xc9: OpRet(true, true); break;
-            case 0xca: OpJp((F & FZ) > 0); break;
+            case 0xca: OpJp(FlagZ); break;
             case 0xcb: break;
-            case 0xcc: OpCall((F & FZ) > 0); break;
+            case 0xcc: OpCall(FlagZ); break;
             case 0xcd: OpCall(true); break;
             case 0xce: OpAdc8(OpLdImm8()); break;
             case 0xcf: OpRst(0x08); break;
-            case 0xd0: OpRet((F & FC) == 0); break;
+            case 0xd0: OpRet(!FlagC); break;
             case 0xd1: DE = OpPop(); break;
-            case 0xd2: OpJp((F & FC) == 0); break;
-            case 0xd3: SetState(DebugState.Break); break;
-            case 0xd4: OpCall((F & FC) == 0); break;
+            case 0xd2: OpJp(!FlagC); break;
+            case 0xd3: break;
+            case 0xd4: OpCall(!FlagC); break;
             case 0xd5: Tick(); OpPush(DE); break;
             case 0xd6: OpSub8(OpLdImm8()); break;
             case 0xd7: OpRst(0x10); break;
-            case 0xd8: OpRet((F & FC) > 0); break;
+            case 0xd8: OpRet(FlagC); break;
             case 0xd9: OpReti(); break;
-            case 0xda: OpJp((F & FC) > 0); break;
-            case 0xdb: SetState(DebugState.Break); break;
-            case 0xdc: OpCall((F & FC) > 0); break;
-            case 0xdd: SetState(DebugState.Break); break;
+            case 0xda: OpJp(FlagC); break;
+            case 0xdb: break;
+            case 0xdc: OpCall(FlagC); break;
+            case 0xdd: break;
             case 0xde: OpSbc8(OpLdImm8()); break;
             case 0xdf: OpRst(0x18); break;
             case 0xe0: OpLdWr((ushort)(0xff00 + OpLdImm8()), A); break;
             case 0xe1: HL = OpPop(); break;
             case 0xe2: OpLdWr((ushort)(0xff00 + C), A); break;
-            case 0xe3: SetState(DebugState.Break); break;
-            case 0xe4: SetState(DebugState.Break); break;
+            case 0xe3: break;
+            case 0xe4: break;
             case 0xe5: Tick(); OpPush(HL); break;
             case 0xe6: OpAnd(OpLdImm8()); break;
             case 0xe7: OpRst(0x20); break;
             case 0xe8: SP = OpAddSP(SP, (sbyte)OpLdImm8()); break;
             case 0xe9: PC = HL; break;
             case 0xea: OpLdWr(OpLdImm16(), A); break;
-            case 0xeb or 0xec or 0xed: SetState(DebugState.Break); break;
+            case 0xeb or 0xec or 0xed: break;
             case 0xee: OpXor(OpLdImm8()); break;
             case 0xef: OpRst(0x28); break;
             case 0xf0: A = OpLdReg((ushort)(0xff00 + OpLdImm8())); break;
             case 0xf1: AF = OpPop(true); break;
             case 0xf2: A = OpLdReg((ushort)(0xff00 + C)); break;
             case 0xf3: OpDI(); break;
-            case 0xf4: SetState(DebugState.Break); break;
+            case 0xf4: break;
             case 0xf5: Tick(); OpPush(AF); break;
             case 0xf6: OpOr(OpLdImm8()); break;
             case 0xf7: OpRst(0x30); break;
@@ -255,7 +255,7 @@ public partial class GbcCpu
             case 0xf9: { Tick(); SP = HL; }; break;
             case 0xfa: A = OpLdReg(OpLdImm16()); break;
             case 0xfb: OpEI(); break;
-            case 0xfc or 0xfd: SetState(DebugState.Break); break;
+            case 0xfc or 0xfd: break;
             case 0xfe: OpCp(OpLdImm8()); break;
             case 0xff: OpRst(0x38); break;
         }

@@ -1,5 +1,3 @@
-using System.Text.Json.Serialization;
-
 namespace Gmulator.Core.Snes;
 public partial class SnesCpu
 {
@@ -14,7 +12,6 @@ public partial class SnesCpu
         public int Cycles = cycles;
     };
 
-	[JsonIgnore]
 	public List<Opcode> Disasm = [];
 
 	public void CreateOpcodes() 

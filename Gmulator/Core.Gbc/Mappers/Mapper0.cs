@@ -6,10 +6,7 @@ public class Mapper0(byte[] rom, GbcMmu mmu) : BaseMapper(rom, mmu)
 {
     public override void Reset() => base.Reset();
 
-    public override void Init(byte[] rom, string filename)
-    {
-        base.Init(rom, filename);
-    }
+    public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
     public override int ReadRom(int a) => Rom[a % 0x4000];
 

@@ -1,14 +1,16 @@
-﻿using Gmulator.Interfaces;
+﻿using Gmulator.Core.Snes;
+using Gmulator.Interfaces;
 using System.Diagnostics;
 
 namespace Gmulator.Core.Gbc;
 
 public partial class GbcCpu : ICpu, ISaveState
 {
+    #region State
     public int AF
     {
-        get { return (A << 8 | F) & 0xffff; }
-        set { A = (value >> 8) & 0xff; F = value & 0xff; }
+        get { return (A << 8 | _f) & 0xffff; }
+        set { A = (value >> 8) & 0xff; _f = value & 0xff; }
     }
 
     public int BC
@@ -28,43 +30,52 @@ public partial class GbcCpu : ICpu, ISaveState
         get { return (H << 8 | L) & 0xffff; }
         set { H = (value >> 8) & 0xff; L = value & 0xff; }
     }
+    public int F { get => _f & 0xff; set => _f = value & 0xff; }
     public int SP { get => sp & 0xffff; set => sp = value & 0xffff; }
     public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
+    public ulong Cycles { get; set; }
+    public int IE { get => _ie; set => _ie = value; }
+    public int IF { get => _if; set => _if = value; }
+    public int Sb { get => _sb; set => _sb = value; }
+    public int Sc { get => _sc; set => _sc = value; }
+    public bool Halt { get => _halt; set => _halt = value; }
+    public bool Ime { get => _ime; set => _ime = value; }
+    public int Stop { get => _stop; set => _stop = value; }
+    public int ImeDelay { get => _imeDelay; set => _imeDelay = value; }
 
+    public int A, _f, B, C, D, E, H, L, pc, sp;
     private int _ie;
     private int _if;
     private int _sb;
     private int _sc;
-    public int Cycles { get; set; }
+
     private bool _halt;
     private bool _ime;
     private int _stop;
     private int _imeDelay;
+    #endregion
+
     public int StepOverAddr { get; set; }
 
-    private int A, F, B, C, D, E, H, L, pc, sp;
-
     public static int GetWord(int low, int high) => (ushort)(high << 8 | low);
-    public bool FlagZ { get => (F & FZ) == FZ; }
-    public bool FlagN { get => (F & FN) == FN; }
-    public bool FlagH { get => (F & FH) == FZ; }
-    public bool FlagC { get => (F & FC) == FC; }
+    public bool FlagZ { get => (AF & FZ) == FZ; }
+    public bool FlagN { get => (AF & FN) == FN; }
+    public bool FlagH { get => (AF & FH) == FZ; }
+    public bool FlagC { get => (AF & FC) == FC; }
 
-    private int Read0F(int a) => _if;
-    private int ReadFF(int a) => _ie;
-    private void Write0F(int a, int v) => _if = v & 0xff;
-    private void WriteFF(int a, int v) => _ie = v & 0xff;
+    private int Read0F(int a) => IF;
+    private int ReadFF(int a) => IE;
+    private void Write0F(int a, int v) => IF = v & 0xff;
+    private void WriteFF(int a, int v) => IE = v & 0xff;
 
-    private int Read01() => _sb;
-    private int Read02() => _sc;
 
-    private Gbc Gbc;
+    private readonly Gbc Gbc;
 
     public GbcMmu Mmu { get; private set; }
 
-    private Func<int, int, RamType, int, bool, bool> AccessCheck;
-    private Action<DebugState> SetState;
+    private List<MemoryHandler> MemoryHandlers;
     public Action Tick { get; set; }
+
 
     public GbcCpu(Gbc gbc)
     {
@@ -72,16 +83,11 @@ public partial class GbcCpu : ICpu, ISaveState
         Mmu = gbc.Mmu;
         GenerateOpInfo();
 
-        gbc.SetMemory(0x00, 0x01, 0xff0f, 0x0ff0f, 0xffff, Read0F, Write0F, RamType.Register, 1);
-        gbc.SetMemory(0x00, 0x01, 0xffff, 0x0ffff, 0xffff, ReadFF, WriteFF, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xff0f, 0x0ff0f, Read0F, Write0F, RamType.Register, 1);
+        gbc.CpuMap.Set(0x00, 0x01, 0xffff, 0x0ffff, ReadFF, WriteFF, RamType.Register, 1);
     }
 
-    public void SetAccess(Gbc gbc)
-    {
-        if (gbc.DebugWindow != null)
-            AccessCheck = gbc.DebugWindow.AccessCheck;
-        SetState = gbc.SetState;
-    }
+    public void SetAccess(List<MemoryHandler> handlers) => MemoryHandlers = handlers;
 
     public void Reset(bool cgb, bool isbios)
     {
@@ -101,11 +107,11 @@ public partial class GbcCpu : ICpu, ISaveState
         if (isbios)
             PC = 0x0000;
 
-        _halt = false;
-        _ime = false;
-        _ie = _if = 0;
-        StepOverAddr = -1;
+        Halt = false;
+        Ime = false;
+        IE = IF = 0;
         Cycles = 0;
+        StepOverAddr = -1;
     }
 
     private void SetF(bool flag, int v)
@@ -120,7 +126,7 @@ public partial class GbcCpu : ICpu, ISaveState
     {
         Tick();
         int v = Mmu.ReadByte(a) & 0xff;
-        Gbc.CheckAccess(a, v, Mmu.RamType, Mmu.RamMask, false);
+        Gbc.Debugger.Access(a, v, MemoryHandlers[a >> 12], false);
         return v;
     }
 
@@ -128,28 +134,28 @@ public partial class GbcCpu : ICpu, ISaveState
     {
         Tick();
         Mmu.WriteByte(a, v);
-        Gbc.CheckAccess(a, v, Mmu.RamType, Mmu.RamMask, true);
+        Gbc.Debugger.Access(a, v, MemoryHandlers[a >> 12], true);
     }
 
     public void CheckInterrupts()
     {
-        if ((_ie & _if) == 0)
+        if ((IE & IF) == 0)
             return;
 
-        if (_halt)
+        if (Halt)
             PC++;
-        _halt = false;
+        Halt = false;
 
-        if (!_ime)
+        if (!Ime)
             return;
 
-        _ime = false;
+        Ime = false;
         for (byte i = 0; i < 5; i++)
         {
             byte mask = (byte)(1 << i);
-            if ((_ie & mask) != 0 && (_if & mask) != 0)
+            if ((IE & mask) != 0 && (IF & mask) != 0)
             {
-                _if &= (byte)~mask;
+                IF &= (byte)~mask;
                 Tick();
                 OpPush(PC);
                 PC = 0x40 + (i * 8);
@@ -160,15 +166,12 @@ public partial class GbcCpu : ICpu, ISaveState
         }
     }
 
-    public void RequestIE(int v)
-    {
-        _ie |= v;
-    }
+    public void RequestIE(int v) => IE |= v;
 
     public void RequestIF(int v)
     {
-        _if |= v;
-        _halt = false;
+        IF |= v;
+        Halt = false;
     }
 
     //public void Serial(int cycles)
@@ -198,19 +201,19 @@ public partial class GbcCpu : ICpu, ISaveState
 
     public void Step()
     {
-        if (_halt)
+        if (Halt)
         {
             ReadCycle(PC);
-            if (!_halt)
+            if (!Halt)
                 PC++;
 
-            if (_stop != 0)
+            if (Stop != 0)
             {
-                _stop -= 4;
-                if (_stop == 0)
+                Stop -= 4;
+                if (Stop == 0)
                 {
                     PC++;
-                    _halt = false;
+                    Halt = false;
                     Mmu.WriteByte(0xff4d, 0x80);
                 }
             }
@@ -230,26 +233,20 @@ public partial class GbcCpu : ICpu, ISaveState
             }
         }
 
-        if (_imeDelay != 0)
-            _imeDelay--;
+        if (ImeDelay != 0)
+            ImeDelay--;
         else
             CheckInterrupts();
     }
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(AF); bw.Write(BC); bw.Write(DE); bw.Write(HL);
-        bw.Write(SP); bw.Write(PC); bw.Write(_ie); bw.Write(_if);
-        bw.Write(_sb); bw.Write(_sc); bw.Write(Cycles); bw.Write(_halt);
-        bw.Write(_ime); bw.Write(_stop); bw.Write(_imeDelay); bw.Write(StepOverAddr);
+
     }
 
     public void Load(BinaryReader br)
     {
-        AF = br.ReadInt32(); BC = br.ReadInt32(); DE = br.ReadInt32(); HL = br.ReadInt32();
-        SP = br.ReadInt32(); PC = br.ReadInt32(); _ie = br.ReadInt32(); _if = br.ReadInt32();
-        _sb = br.ReadInt32(); _sc = br.ReadInt32(); Cycles = br.ReadInt32(); _halt = br.ReadBoolean();
-        _ime = br.ReadBoolean(); _stop = br.ReadInt32(); _imeDelay = br.ReadInt32(); StepOverAddr = br.ReadInt32();
+
     }
 
     public List<RegisterInfo> GetFlags() =>
@@ -272,32 +269,29 @@ public partial class GbcCpu : ICpu, ISaveState
     public List<RegisterInfo> GetInterruptState() =>
     [
         new("FF0F","IF",""),
-        new("0","Vblank", (_if & 0x01) != 0 ? "Enabled" : "Disabled"),
-        new("1","LCD", (_if & 0x02) != 0 ? "Enabled" : "Disabled"),
-        new("2","Timer", (_if & 0x04) != 0 ? "Enabled" : "Disabled"),
-        new("3","Serial", (_if & 0x08) != 0 ? "Enabled" : "Disabled"),
-        new("4","Joypad", (_if & 0x10) != 0 ? "Enabled" : "Disabled"),
+        new("0","Vblank", (IF & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("1","LCD", (IF & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("2","Timer", (IF & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("3","Serial", (IF & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("4","Joypad", (IF & 0x10) != 0 ? "Enabled" : "Disabled"),
         new("FFFF","IE",""),
-        new("0","Vblank", (_ie & 0x01) != 0 ? "Enabled" : "Disabled"),
-        new("1","LCD", (_ie & 0x02) != 0 ? "Enabled" : "Disabled"),
-        new("2","Timer", (_ie & 0x04) != 0 ? "Enabled" : "Disabled"),
-        new("3","Serial", (_ie & 0x08) != 0 ? "Enabled" : "Disabled"),
-        new("4","Joypad", (_ie & 0x10) != 0 ? "Enabled" : "Disabled"),
+        new("0","Vblank", (IE & 0x01) != 0 ? "Enabled" : "Disabled"),
+        new("1","LCD", (IE & 0x02) != 0 ? "Enabled" : "Disabled"),
+        new("2","Timer", (IE & 0x04) != 0 ? "Enabled" : "Disabled"),
+        new("3","Serial", (IE & 0x08) != 0 ? "Enabled" : "Disabled"),
+        new("4","Joypad", (IE & 0x10) != 0 ? "Enabled" : "Disabled"),
      ];
 
-    public int GetReg(string reg)
+    public int GetReg(string reg) => reg.ToLowerInvariant() switch
     {
-        return reg.ToLowerInvariant() switch
-        {
-            "af" => AF,
-            "bc" => BC,
-            "de" => DE,
-            "hl" => HL,
-            "sp" => SP,
-            "pc" => PC,
-            _ => 0,
-        };
-    }
+        "af" => AF,
+        "bc" => BC,
+        "de" => DE,
+        "hl" => HL,
+        "sp" => SP,
+        "pc" => PC,
+        _ => 0,
+    };
 
     public void SetReg(string reg, int v)
     {

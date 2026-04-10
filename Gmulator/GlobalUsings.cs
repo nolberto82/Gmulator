@@ -1,7 +1,11 @@
 ﻿global using static Gmulator.Shared.EmuState;
 global using static Gmulator.Shared.Constants;
-global using static Gmulator.GuiUtils;
-global using static Gmulator.ByteExtensions;
+global using static Gmulator.Ui.GuiUtils;
+global using static Gmulator.Shared.ByteExtensions;
 global using static Gmulator.JsonUtil;
 global using Gmulator;
+global using Gmulator.Ui;
 global using Gmulator.Shared;
+global using Raylib_cs;
+global using System.Text;
+global using System.IO;

@@ -1,8 +1,5 @@
 ﻿using Gmulator.Core.Nes.Mappers;
-using Gmulator.Core.Snes;
 using Gmulator.Interfaces;
-using System.Text;
-using static Gmulator.Interfaces.IMmu;
 
 namespace Gmulator.Core.Nes;
 
@@ -12,7 +9,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
     private NesJoypad Joypad2;
     private NesApu Apu;
 
-    public byte[] Wram { get; private set; } = new byte[0x800];
+    public byte[] Wram { get; set; } = new byte[0x800];
     public byte[] Vram { get; private set; }
     public byte[] Oram { get; private set; }
 
@@ -24,10 +21,12 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
     public string RomName { get; internal set; }
     public Dictionary<int, Cheat> Cheats { get; private set; } = cheats;
     public RamType RamType { get; private set; }
-    public int RamMask { get; private set; }
-    public ReadDel[] Read { get; set; }
-    public WriteDel[] Write { get; set; }
-    public RamType[] RamTypes { get; set; }
+
+    public int GetOffset(int a)
+    {
+        var handler = MemoryHandlers[a >> 12];
+        return handler.Offset;
+    }
 
     public void Init(Nes nes)
     {
@@ -36,7 +35,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
         Joypad2 = nes.Joypad2;
         Vram = nes.Ppu.Vram;
         Oram = nes.Ppu.Oram;
-        MemoryHandlers = nes.MemoryHandlers;
+        MemoryHandlers = nes.CpuMap.Handlers;
     }
 
     public void Reset()
@@ -90,10 +89,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
 
     public byte ReadDebug(int addr) => Wram[addr];
 
-    public int ReadWord(int addr)
-    {
-        return ReadByte(addr) | ReadByte(addr + 1) << 8;
-    }
+    public int ReadWord(int addr) => ReadByte(addr) | ReadByte(addr + 1) << 8;
 
     public BaseMapper LoadRom(string filename)
     {
@@ -177,6 +173,21 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
     public void Load(BinaryReader br)
     {
         Wram = ReadArray<byte>(br, Wram.Length); Vram = ReadArray<byte>(br, Vram.Length); Oram = ReadArray<byte>(br, Oram.Length);
+    }
+
+    public void WriteWord(int a, int v)
+    {
+        throw new NotImplementedException();
+    }
+
+    public int ReadLong(int a)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void WriteLong(int a, int v)
+    {
+        throw new NotImplementedException();
     }
 }
 

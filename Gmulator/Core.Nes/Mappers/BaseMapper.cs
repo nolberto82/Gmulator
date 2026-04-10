@@ -103,16 +103,13 @@ public class BaseMapper : ISaveState
 
     public static void SetFire(bool v) => Fire = v;
 
-    public Dictionary<string, string> GetInfo()
-    {
-        return new Dictionary<string, string>
+    public Dictionary<string, string> GetInfo() => new Dictionary<string, string>
         {
             { "Game",Path.GetFileName(Name) },
             { "Mapper", $"{Header.MapperId:X3}" },
             { "Prg Size", $"{PrgSize}" },
             { "Chr Size", $"{ChrSize}" },
         };
-    }
 
     public void Save(BinaryWriter bw)
     {

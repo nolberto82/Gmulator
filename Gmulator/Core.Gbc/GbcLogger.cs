@@ -3,7 +3,7 @@ using static Gmulator.Core.Gbc.GbcCpu;
 
 namespace Gmulator.Core.Gbc;
 
-public class GbcLogger(ICpu cpu)
+public class GbcLogger(Gbc gbc)
 {
     public StreamWriter Outfile { get; private set; }
     public bool Logging { get; private set; }
@@ -11,18 +11,19 @@ public class GbcLogger(ICpu cpu)
     public delegate int ReadDel(int a);
     public event ReadDel ReadByte;
 
-    private readonly ICpu Cpu = cpu;
+    private readonly Gbc Gbc = gbc;
+    private readonly GbcCpu Cpu = gbc.Cpu;
 
-    public void Log(int pc)
+    public void Log()
     {
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
             //bool gamedoctor = false;
-            var (disasm, _, _) = Disassemble(pc, true);
+            var (disasm, _, _, _) = Disassemble(Cpu.PC, true);
             //if (gamedoctor)
             //    Outfile.WriteLine($"{regtext}");
             //else
-            Outfile.WriteLine($"{pc:X4}  {disasm,-26}");
+            Outfile.WriteLine($"{Cpu.PC:X4}  {disasm,-26}");
         }
     }
 
@@ -41,11 +42,12 @@ public class GbcLogger(ICpu cpu)
         Outfile?.Close();
     }
 
-    public (string, int, int) Disassemble(int pc, bool get_registers, bool gamedoctor = false, bool isSa1 = false)
+    public (string, string, int, int) Disassemble(int pc, bool getRegisters)
     {
         string data = string.Empty;
         string bytes = string.Empty;
         string regtext = string.Empty;
+        string access = string.Empty;
         int b1 = ReadByte(pc + 1);
         int b2 = ReadByte(pc + 2);
         int b3 = ReadByte(pc + 3);
@@ -83,9 +85,9 @@ public class GbcLogger(ICpu cpu)
             else if (d.Name == "ldh")
             {
                 if (op == 0xe0)
-                    data = $"{d.Name} (${(0xff00 + b1):x4}), a";
+                    data = $"{d.Name} (${0xff00 + b1:x4}), a";
                 else
-                    data = $"{d.Name} a, (${(0xff00 + b1):x4})";
+                    data = $"{d.Name} a, (${0xff00 + b1:x4})";
             }
             else if (op == 0xe2)
                 data = $"{d.Name} ($ff00+c), a";
@@ -142,33 +144,33 @@ public class GbcLogger(ICpu cpu)
             bytes = $"{op:X2}";
         }
 
-        if (get_registers)
+        if (getRegisters)
         {
-            if (gamedoctor)
+            //if (gamedoctor)
+            //{
+            //bytes = $"{op:X2},{b1:X2},{b2:X2},{b3:X2}";
+            //regtext = $"A:{Cpu.A:X2} F:{Cpu.F:X2} B:{Cpu.B:X2} C:{Cpu.C:X2} " +
+            //          $"D:{Cpu.D:X2} E:{Cpu.E:X2} H:{Cpu.H:X2} L:{Cpu.L:X2} " +
+            //          $"SP:{Cpu.SP:X4} PC:{pc:X4} " +
+            //          $"PCMEM:{bytes}";
+            //}
+            //else
             {
                 //bytes = $"{op:X2},{b1:X2},{b2:X2},{b3:X2}";
-                //regtext = $"A:{Cpu.A:X2} F:{Cpu.F:X2} B:{Cpu.B:X2} C:{Cpu.C:X2} " +
-                //          $"D:{Cpu.D:X2} E:{Cpu.E:X2} H:{Cpu.H:X2} L:{Cpu.L:X2} " +
-                //          $"SP:{Cpu.SP:X4} PC:{pc:X4} " +
-                //          $"PCMEM:{bytes}";
-            }
-            else
-            {
-                //bytes = $"{op:X2},{b1:X2},{b2:X2},{b3:X2}";
-                var Regs = Cpu.GetRegisters();
-                var F = Cpu.GetFlags();
-                char[] flags =
-                [
-                    F[0].Value != "" ? 'Z' : 'z',
-                    F[1].Value != "" ? 'N' : 'n',
-                    F[2].Value != "" ? 'H' : 'h',
-                    F[3].Value != "" ? 'C' : 'c'
-                ];
+                //var Regs = Cpu.GetRegisters();
+                //var F = Cpu.GetFlags();
+                //char[] flags =
+                //[
+                //    F[0].Value != "" ? 'Z' : 'z',
+                //    F[1].Value != "" ? 'N' : 'n',
+                //    F[2].Value != "" ? 'H' : 'h',
+                //    F[3].Value != "" ? 'C' : 'c'
+                //];
 
-                foreach (var v in Regs)
-                {
-                    regtext += v;
-                }
+                //foreach (var v in Regs)
+                //{
+                //    regtext += v;
+                //}
 
                 //regtext = $"{R["A"]:X2} B:{Cpu.B:X2} C:{Cpu.C:X2} D:{Cpu.D:X2} " +
                 //           $"E:{Cpu.E:X2} F:{new(flags)} H:{Cpu.H:X2} L:{Cpu.L:X2} " +
@@ -177,6 +179,6 @@ public class GbcLogger(ICpu cpu)
             }
         }
         data = $"{bytes,0} {data}";
-        return (data, op, d.Size);
+        return (data, access, op, d.Size);
     }
 }

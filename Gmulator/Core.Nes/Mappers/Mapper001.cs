@@ -12,10 +12,7 @@
             Reset();
         }
 
-        public override int ReadPrg(int a)
-        {
-            return base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
-        }
+        public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
 
         public override int ReadChr(int a)
         {
@@ -94,7 +91,7 @@
             v &= 0xf;
             if (PrgMode == 0 || PrgMode == 1)
             {
-                Prg[0] = ((byte)(v & 0xfe));
+                Prg[0] = (byte)(v & 0xfe);
             }
             else if (PrgMode == 2)
             {

@@ -35,7 +35,7 @@ public static class Constants
     public const int SingleNt0 = 0;
     public const int SingleNt1 = 1;
 
-    public const int ScreenWidth = 1024;
+    public const int ScreenWidth = 1280;
     public const int ScreenHeight = 900;
     public const int DeckWidth = 1280;
     public const int DeckHeight = 800;

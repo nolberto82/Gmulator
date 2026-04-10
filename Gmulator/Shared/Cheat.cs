@@ -1,6 +1,7 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
+using Gmulator.Interfaces;
 using System;
 using System.Text.Json;
 
@@ -123,7 +124,7 @@ public class Cheat
                     for (int i = 0; i < c.Length; i++)
                     {
                         d <<= 4;
-                        d |= ((byte)"DF4709156BC8A23E".IndexOf(c[i]));
+                        d |= (byte)"DF4709156BC8A23E".IndexOf(c[i]);
                     }
 
                     byte val = (byte)(d >> 24);

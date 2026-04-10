@@ -1,10 +1,5 @@
-﻿
-using System.Collections.Generic;
-using System.Net;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿namespace Gmulator.Shared;
 
-namespace Gmulator;
 public class Breakpoint
 {
     public int Addr { get; set; }
@@ -12,12 +7,12 @@ public class Breakpoint
     public int Type { get; set; }
     public bool IsDebug { get; set; }
     public int CpuType { get; set; }
-    public RamType RamType { get; set; }
+    public int RamType { get; set; }
     public bool Write { get; set; }
     public bool Enabled { get; set; }
 
     public Breakpoint() { }
-    public Breakpoint(int addr, int condition, int type, bool write, bool enabled, RamType index = 0)
+    public Breakpoint(int addr, int condition, int type, bool write, bool enabled, int index = 0)
     {
         Addr = addr;
         Condition = condition;
@@ -30,8 +25,8 @@ public class Breakpoint
 
 public static class AccessTypes
 {
-    public const int Reads = BPType.Read | BPType.VideoRead | BPType.RegRead | BPType.SpcRead;
-    public const int Writes = BPType.Write | BPType.VideoWrite | BPType.RegWrite | BPType.SpcWrite;
+    public const int Reads = BPType.Read | BPType.VideoRead | BPType.RegRead | BPType.SpcRead | BPType.Sa1Read;
+    public const int Writes = BPType.Write | BPType.VideoWrite | BPType.RegWrite | BPType.SpcWrite | BPType.Sa1Write;
     public const int RamReads = 0xff;
     public const int RamWrites = RamReads & ~(int)RamType.Rom;
 }
@@ -54,11 +49,13 @@ public static class BPType
     public const int SpcWrite = 128;
     public const int SpcRead = 256;
     public const int SpcExec = 512;
-    public const int GsuExec = 1024;
+    public const int Sa1Write = 1024;
+    public const int Sa1Read = 2048;
+    public const int GsuExec = 4096;
 };
 
 public enum RamType : int
 {
-    Wram, Sram, Vram, Oram, Rom, Cram,
-    SpcRam, SpcRom, GsuRom, Register, None
+    Wram, Sram, Vram, Oram, Cram, SpcRam, Iram, Rom,
+    GsuRom, Register, None
 }

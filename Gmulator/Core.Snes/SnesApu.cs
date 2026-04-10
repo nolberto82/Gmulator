@@ -16,7 +16,9 @@ public class SnesApu : ISaveState
     private int DspAddr;
     private byte[] ram;
 
-    private const double apuCyclesPerMaster = (32040 * 32) / (1364 * 262 * 60.0);
+    public byte[] GetRam() => ram;
+
+    private const double apuCyclesPerMaster = 32040 * 32 / (1364 * 262 * 60.0);
 
     private Snes Snes;
     private SnesSpc Spc;
@@ -24,12 +26,11 @@ public class SnesApu : ISaveState
     private SnesPpu Ppu;
     private SnesSpcLogger Logger;
 
-    private SortedDictionary<int, Breakpoint> Breakpoints;
-    private Action<DebugState> SetState;
+    private List<Breakpoint> Breakpoints;
     private Func<int, bool> ExecuteCheck;
-    private Func<int, int, RamType, bool, bool> AccessCheckSpc;
+    private Action<int, int, RamType, bool> AccessCheckSpc;
 
-    public SnesApu(Snes snes)
+    public SnesApu()
     {
         Ram = new byte[0x10000];
         TimerOut = new int[3];
@@ -45,13 +46,11 @@ public class SnesApu : ISaveState
         Dsp = snes.Dsp;
         Logger = snes.SpcLogger;
         Breakpoints = snes.Breakpoints;
-        SetState = snes.SetState;
         if (snes.DebugWindow != null)
         {
-            ExecuteCheck = snes.DebugWindow.ExecuteCheck;
-            AccessCheckSpc = snes.DebugWindow.AccessCheckSpc;
+            ExecuteCheck = snes.Debugger.Execute;
+            AccessCheckSpc = snes.Debugger.AccessSpc;
         }
-
     }
 
     public void Step()
@@ -62,24 +61,22 @@ public class SnesApu : ISaveState
 #if !DECKRELEASE
             if (Snes.Debug)
             {
-                DebugState state = Snes.State;
+                DebugState state = Snes.EmuState;
                 if (Logger.Logging)
-                    Logger.Log(Spc.PC);
+                    Logger.Log();
 
                 if (Breakpoints.Count > 0 && state == DebugState.Running)
                 {
-                    if (ExecuteCheck(Spc.PC))
+                    if (ExecuteCheck(Spc.State.PC))
                     {
-                        SetState(DebugState.Break);
+                        Snes.EmuState = DebugState.Break;
                         return;
                     }
+
                 }
 
                 if (state == DebugState.Break || state == DebugState.StepSpc)
-                {
-                    SetState(DebugState.Break);
                     return;
-                }
             }
 #endif
             Spc.Step();
@@ -120,8 +117,8 @@ public class SnesApu : ISaveState
         a &= 0xffff;
         Cycle();
 #if DEBUG || RELEASE
-        if (Snes.Debug && AccessCheckSpc(a, -1, RamType.SpcRam, false))
-            SetState(DebugState.Break);
+        if (Snes.Debug)
+            AccessCheckSpc(a, -1, RamType.SpcRam, false);
 #endif
 
         switch (a)
@@ -150,8 +147,8 @@ public class SnesApu : ISaveState
         byte v = (byte)value;
 
 #if DEBUG || RELEASE
-        if (Snes.Debug && AccessCheckSpc(a, v, RamType.SpcRam, true))
-            SetState(DebugState.Break);
+        if (Snes.Debug)
+            AccessCheckSpc(a, v, RamType.SpcRam, true);
 #endif
 
         switch (a)
@@ -204,6 +201,13 @@ public class SnesApu : ISaveState
         }
 
         ram[a] = v;
+    }
+
+    public int ReadDebug(int a)
+    {
+        if (a >= 0xffc0)
+            return IplBootrom[a & 0x3f];
+        return ram[a & 0xffff];
     }
 
     public int ReadFromSpu(int a)
