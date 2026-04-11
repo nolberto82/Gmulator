@@ -1,4 +1,5 @@
-﻿using Gmulator.Interfaces;
+﻿using Gmulator.Core.Snes.Spc;
+using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Snes;
 

@@ -29,7 +29,7 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
 
     public override void Step()
     {
-        var syncto = Snes.Ppu.Cycles / 8;
+        var syncto = Snes.Ppu.Cycles / 9;
         while (Cycles < syncto)
         {
             if (!Sa1._sa1Ready && !Sa1._sa1Reset)

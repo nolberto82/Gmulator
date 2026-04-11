@@ -8,7 +8,7 @@ using rlImGui_cs;
 
 namespace Gmulator.Ui;
 
-internal class GuiDesktop : Gui
+public class GuiDesktop : Gui
 {
     private bool ShowPpuDebug;
 
@@ -76,14 +76,6 @@ internal class GuiDesktop : Gui
                     Emulator.Debug = !Emulator.Debug;
                     LuaApi?.SetDebug(Emulator.Debug);
                 }
-
-                ImGui.BeginDisabled(Emulator is not Snes);
-                if (ImGui.MenuItem("Show Sa1", "", Emulator.DebugWindow?.ShowSa1 == true))
-                    Emulator.DebugWindow.ShowSa1 = !Emulator.DebugWindow.ShowSa1;
-
-                if (ImGui.MenuItem("Show Spc", "", Emulator.DebugWindow?.ShowSpc == true))
-                    Emulator.DebugWindow.ShowSpc = !Emulator.DebugWindow.ShowSpc;
-                ImGui.EndDisabled();
 
                 if (ImGui.MenuItem("Show Ppu Debug", "", ShowPpuDebug))
                     ShowPpuDebug = !ShowPpuDebug;
@@ -231,6 +223,7 @@ internal class GuiDesktop : Gui
                     }
                     else
                     {
+                        CheatWindow();
                         if (ImGui.BeginChild("##cheats", new(0, bottom), ImGuiChildFlags.FrameStyle))
                         {
                             ImGui.BeginTable("##cheattable", 3);
@@ -250,7 +243,6 @@ internal class GuiDesktop : Gui
                                     {
                                         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                         {
-
                                             ImGui.OpenPopup("Add/Edit Cheat");
                                         }
                                     }
@@ -402,6 +394,27 @@ internal class GuiDesktop : Gui
     {
         if (ImGui.IsItemHovered())
             SelOption[t] = i;
+    }
+
+    private void CheatWindow()
+    {
+        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
+            ImGui.OpenPopup("Add/Edit Cheat");
+
+        ImGui.SetNextWindowSize(new(400, 300));
+        if (ImGui.BeginPopupModal("Add/Edit Cheat"))
+        {
+
+            if (ImGui.Button("Ok"))
+            {
+
+                ImGui.CloseCurrentPopup();
+            }
+
+            if (ImGui.Button("Cancel"))
+                ImGui.CloseCurrentPopup();
+            ImGui.EndPopup();
+        }
     }
 
     public override void ResetGame(string name) => base.ResetGame(name);

@@ -60,7 +60,9 @@ public class SnesMmu : IMmu, ISaveState
     public void WriteDma(int v)
     {
         WriteWram(0x7e0000 | RamAddr, v);
+#if DEBUG || RELEASE
         Snes.Debugger.Access(RamAddr, v, CpuMap.Handlers[RamAddr >> 12], true);
+#endif
         RamAddr = (RamAddr + 1) & 0xffffff;
     }
 

@@ -177,22 +177,19 @@ public partial class SnesCpu : ISaveState, ICpu
     public virtual int Read(int a)
     {
         var c = GetClockSpeed(a);
-        Ppu?.Step(c);
-        Snes?.HandleDma();
-        Snes?.Sa1?.Step();
+        Ppu.Step(c);
+        Snes.HandleDma();
         cycles++;
-        int v = Snes?.ReadMemory(a) ?? 0;
-        return OpenBus = v & 0xff;
+        return OpenBus = Snes.ReadMemory(a) & 0xff;
     }
 
     public virtual void Write(int a, int v)
     {
         var c = GetClockSpeed(a);
-        Ppu?.Step(c);
-        Snes?.HandleDma();
-        Snes?.Sa1?.Step();
+        Ppu.Step(c);
+        Snes.HandleDma();
         cycles++;
-        Snes?.WriteMemory(a, v);
+        Snes.WriteMemory(a, v);
     }
 
     private int GetClockSpeed(int a)

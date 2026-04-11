@@ -1,6 +1,4 @@
-﻿using Gmulator.Ui;
-
-namespace Gmulator;
+﻿namespace Gmulator;
 public partial class Program
 {
     [STAThread]

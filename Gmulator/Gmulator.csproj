@@ -29,6 +29,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+	  <Compile Remove="Core.Snes\Sa1\SnesCpu.Mode.cs" />
 	  <Compile Remove="Core.Snes\SnesGui.cs" />
 	</ItemGroup>
 
@@ -38,6 +39,7 @@
 
 	<ItemGroup>
 	  <None Include="..\.editorconfig" Link=".editorconfig" />
+	  <None Include="Core.Snes\SnesCpu.Mode.cs" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -904,11 +904,15 @@ public partial class NesCpu : EmuState, ICpu
 
     public void Save(BinaryWriter bw)
     {
-
+        bw.Write(PC); bw.Write(SP); bw.Write(A); bw.Write(X);
+        bw.Write(Y); bw.Write(Instructions); bw.Write(Cycles); bw.Write(CycleTotal);
+        bw.Write(PS); bw.Write(NmiTriggered); WriteArray(bw, Flags); bw.Write(StalledCycles);
     }
 
     public void Load(BinaryReader br)
     {
-
+        PC = br.ReadInt32(); SP = br.ReadInt32(); A = br.ReadInt32(); X = br.ReadInt32();
+        Y = br.ReadInt32(); Instructions = br.ReadInt32(); Cycles = br.ReadUInt64(); CycleTotal = br.ReadInt32();
+        PS = br.ReadInt32(); NmiTriggered = br.ReadInt32(); Flags = ReadArray<bool>(br, Flags.Length); StalledCycles = br.ReadInt32();
     }
 }

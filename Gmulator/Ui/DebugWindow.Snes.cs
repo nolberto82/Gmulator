@@ -3,6 +3,7 @@ using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
 using Gmulator.Core.Snes.Mappers;
 using Gmulator.Core.Snes.Sa1;
+using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
 using ImGuiNET;
 using Raylib_cs;
@@ -58,18 +59,19 @@ internal class SnesDebugWindow : DebugWindow
 
         GetCpuState = Cpu.GetRegisters;
         GetCpuFlags = Cpu.GetFlags;
-        if (Sa1 != null)
-        {
-            GetSa1State = Sa1.Cpu.GetRegisters;
-            GetSa1Flags = Sa1.Cpu.GetFlags;
-            GetSa1IORegs = Sa1.GetIORegisters;
-        }
         GetPpuState = Ppu.GetState;
         GetApuState = Dsp.GetState;
         GetSpcState = Spc.GetRegisters;
         GetSpcFlags = Spc.GetFlags;
         GetPortState = snes.Apu.GetState;
         GetSpcPC = () => Spc.State.PC;
+
+        if (Sa1 != null)
+        {
+            GetSa1State = Sa1!.Cpu.GetRegisters;
+            GetSa1Flags = Sa1!.Cpu.GetFlags;
+            GetSa1IORegs = Sa1!.GetIORegisters;
+        }
 
         ScrollY = new int[CpuNumbers];
         JumpAddr = new int[CpuNumbers];

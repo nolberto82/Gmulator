@@ -137,8 +137,16 @@ public partial class SnesSa1 : Emulator, IConsole
     {
         a &= 0xffffff;
         int b = a >> 12;
+#if DEBUG || RELEASE
         Snes.Debugger.Access(a, -1, Sa1Map.Handlers[b], false);
-        return Sa1Map.Handlers[b].Read(a) & 0xff;
+#endif
+        int v = Sa1Map.Handlers[b].Read(a) & 0xff;
+        if (Snes.Cheats.Count > 0 && Sa1Map.Handlers[a >> 12].Type == RamType.Rom)
+        {
+            lock (Cheats)
+                return Snes.ApplyGameGenieCheats(a, v);
+        }
+        return v;
     }
 
     public void WriteByte(int a, int v)
@@ -146,7 +154,9 @@ public partial class SnesSa1 : Emulator, IConsole
         a &= 0xffffff;
         int b = a >> 12;
         Sa1Map.Handlers[b].Write(a, v);
+#if DEBUG || RELEASE
         Snes.Debugger.Access(a, v, Sa1Map.Handlers[b], true);
+#endif
     }
 
     public int ReadByteDebug(int a)

@@ -7,7 +7,7 @@ public class Config
 {
     public string WorkingDir { get; set; } = "C:";
     public int Volume { get; set; } = 2;
-    public int FrameSkip { get; set; } = 10;
+    public int FrameSkip { get; set; } = 9;
     public int RotateAB { get; set; }
 
     public Config() { }

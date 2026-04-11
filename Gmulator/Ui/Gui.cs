@@ -2,7 +2,6 @@
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
 using ImGuiNET;
-using Raylib_cs;
 using rlImGui_cs;
 using System.Data;
 using System.Diagnostics;
@@ -57,7 +56,6 @@ public abstract class Gui
 
     public string WorkingDirectory { get; set; }
     public string[] FileExtensions { get; set; }
-
 
     public virtual void Run()
     { }
@@ -263,7 +261,7 @@ public abstract class Gui
 
         Options =
         [
-            new("Frameskip", [config.FrameSkip, 1, 1, 15], null, false, ChangeOption, null),
+            new("Frameskip", [config.FrameSkip, 1, 1, 99], null, false, ChangeOption, null),
             new("Volume", [config.Volume, 1, 0, 100], null, false, ChangeOption, null),
             new("Rotate AB Buttons", [config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
             //new("Copy Hacks", [0, 0, 0, 0], [""], true, null, CopyHacks),

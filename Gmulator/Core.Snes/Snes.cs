@@ -1,5 +1,6 @@
 ﻿using Gmulator.Core.Snes.Mappers;
 using Gmulator.Core.Snes.Sa1;
+using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
 using Gmulator.Ui;
 
@@ -108,6 +109,8 @@ public class Snes : Emulator, IConsole
                 Cpu.Step();
                 Run = false;
             }
+
+            //ppu.Step(262 * 1364);
 
             ppu.FrameReady = false;
             if (Cheats.Count != 0)
@@ -333,7 +336,7 @@ public class Snes : Emulator, IConsole
         Joypad.SetJoy1H = Ppu.SetJoy1H;
     }
 
-    private int ApplyGameGenieCheats(int a, int v)
+    public int ApplyGameGenieCheats(int a, int v)
     {
         var cht = Cheats.ContainsKey(a) && Cheats[a].Enabled && Cheats[a].Type == GameGenie;
         if (cht)

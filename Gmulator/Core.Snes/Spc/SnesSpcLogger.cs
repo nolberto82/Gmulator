@@ -1,6 +1,6 @@
 ﻿using static Gmulator.Core.Snes.SnesSpc;
 
-namespace Gmulator.Core.Snes;
+namespace Gmulator.Core.Snes.Spc;
 
 public class SnesSpcLogger()
 {
