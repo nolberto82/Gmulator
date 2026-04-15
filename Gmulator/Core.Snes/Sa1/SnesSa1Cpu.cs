@@ -1,8 +1,7 @@
 ﻿using Gmulator.Interfaces;
-using ImGuiNET;
-using System.Text;
 
 namespace Gmulator.Core.Snes.Sa1;
+
 public class SnesSa1Cpu : SnesCpu, ISaveState
 {
     public bool HasStepped { get; private set; }
@@ -29,10 +28,15 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
 
     public override void Step()
     {
-        var syncto = Snes.Ppu.Cycles / 9;
+        ulong syncto = Snes.Ppu.Cycles / 2;
         while (Cycles < syncto)
         {
-            if (!Sa1._sa1Ready && !Sa1._sa1Reset)
+            if (Sa1._sa1Wait || Sa1._sa1Reset)
+            {
+                Cycles++;
+                HasStepped = false;
+            }
+            else
             {
 #if !DECKRELEASE
                 if (Snes.Breakpoints.Count > 0)
@@ -54,17 +58,12 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
                 ExecOp(op, mode, addr);
                 HasStepped = true;
             }
-            else
-            {
-                Cycles++;
-                HasStepped = false;
-            }
         }
     }
 
     public bool DebugStep()
     {
-        if (!Sa1._sa1Ready && !Sa1._sa1Reset)
+        if (!Sa1._sa1Wait && !Sa1._sa1Reset)
         {
             int op = ReadOpcode();
             int mode = Disasm[op].Mode;
@@ -129,7 +128,11 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
         Sa1.WriteByte(a, v);
     }
 
-    public override void Reset(bool isSa1) => PC = Sa1.GetResetVector();
+    public override void Reset(bool isSa1)
+    {
+        PC = Sa1.GetResetVector();
+        AddCycles((int)(Snes.Ppu.Cycles / 2));
+    }
 
     public void ResetCpu()
     {

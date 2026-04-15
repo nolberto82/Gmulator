@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Core.Gbc.Mappers;
+
 public class Mapper5 : BaseMapper
 {
     public Mapper5(byte[] rom, GbcMmu mmu) : base(rom, mmu)

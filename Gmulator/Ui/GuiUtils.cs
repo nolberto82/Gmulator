@@ -1,8 +1,5 @@
 ﻿using ImGuiNET;
-using Raylib_cs;
 using System.Numerics;
-using System.Text;
-using System.Text.Unicode;
 
 namespace Gmulator.Ui;
 
@@ -146,7 +143,7 @@ public static class GuiUtils
 
     public static void DrawRect(uint filled, uint unfilled)
     {
-        Vector2 min = Vector2.Add(ImGui.GetItemRectMin(), new(0,1.51f));
+        Vector2 min = Vector2.Add(ImGui.GetItemRectMin(), new(0, 1.51f));
         Vector2 max = ImGui.GetItemRectMax();
         ImGui.GetWindowDrawList().AddRectFilled(min, max, filled);
         ImGui.GetWindowDrawList().AddRect(min, max, unfilled);

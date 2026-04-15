@@ -1,7 +1,4 @@
-﻿using Gmulator.Core.Gbc;
-using static Gmulator.Shared.Cheat;
-
-namespace Gmulator.Shared;
+﻿namespace Gmulator.Shared;
 
 public class CheatConverter
 {

@@ -3,6 +3,7 @@ namespace Gmulator.Interfaces;
 
 public interface ICpu
 {
+    ulong Cycles { get; }
     Action Tick { get; set; }
     int StepOverAddr { get; set; }
     List<RegisterInfo> GetRegisters();
@@ -16,5 +17,5 @@ public interface ICpu
 
 public interface ICpuState
 {
-    
+
 }

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Gmulator.Interfaces
+﻿namespace Gmulator.Interfaces
 {
     internal interface ISaveState
     {

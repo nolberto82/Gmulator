@@ -2,7 +2,6 @@
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
-using Gmulator.Ui;
 
 namespace Gmulator.Core.Snes;
 
@@ -51,7 +50,6 @@ public class Snes : Emulator, IConsole
         Buttons = new bool[16];
         Joypad = new();
 
-
 #if DEBUG || DECKDEBUG
         //Debugger.Launch();
 #endif
@@ -61,76 +59,76 @@ public class Snes : Emulator, IConsole
 
     public override void RunFrame(bool opened)
     {
-        if (Mapper == null) return;
-        if (!opened && (EmuState == DebugState.Running || EmuState == DebugState.StepMain || EmuState == DebugState.StepSa1 || EmuState == DebugState.StepSpc))
+        if (Mapper != null)
         {
-            bool frameready = Ppu.FrameReady;
-            SnesPpu ppu = Ppu;
-            LuaApi lua = LuaApi;
-            SnesSpc spc = Spc;
-            BaseMapper mapper = Mapper;
-            //Sa1?.State = DebugState.Running;
-            while (!ppu.FrameReady)
+            if (!opened && (EmuState == DebugState.Running || EmuState == DebugState.StepMain || EmuState == DebugState.StepSa1 || EmuState == DebugState.StepSpc))
             {
-                int pc = Cpu.PBPC;
-#if DEBUG || DECKDEBUG || RELEASE
-                if (Debug)
+                bool frameready = Ppu.FrameReady;
+                SnesPpu ppu = Ppu;
+                LuaApi lua = LuaApi;
+                SnesSpc spc = Spc;
+                BaseMapper mapper = Mapper;
+                //Sa1?.State = DebugState.Running;
+                while (!ppu.FrameReady)
                 {
-                    if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
-                    {
-                        EmuState = DebugState.Break;
-                        break;
-                    }
-
-                    Logger.Log(ppu.HPos);
-
-                    if (mapper.CoProcessor == BaseMapper.Gsu && EmuState == DebugState.StepGsu)
-                    {
-                        //Gsu.Exec(state, Debug);
-                        EmuState = DebugState.Break;
-                        break;
-                    }
-
-                    if (!Run && Breakpoints.Count > 0 && EmuState == DebugState.Running)
-                    {
-                        if (Debugger.Execute(pc))
+                    int pc = Cpu.PBPC;
+#if DEBUG || DECKDEBUG || RELEASE
+                        if (Debug)
                         {
-                            EmuState = DebugState.Break;
-                            break;
+                            if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
+                            {
+                                EmuState = DebugState.Break;
+                                break;
+                            }
+
+                            Logger.Log(ppu.HPos);
+
+                            if (mapper.CoProcessor == BaseMapper.Gsu && EmuState == DebugState.StepGsu)
+                            {
+                                //Gsu.Exec(state, Debug);
+                                EmuState = DebugState.Break;
+                                break;
+                            }
+
+                            if (!Run && Breakpoints.Count > 0 && EmuState == DebugState.Running)
+                            {
+                                if (Debugger.Execute(pc))
+                                {
+                                    EmuState = DebugState.Break;
+                                    break;
+                                }
+                            }
                         }
-                    }
+
+                        if (EmuState == DebugState.Break)
+                            break;
+#endif
+                    lua?.OnExec(pc);
+                    Cpu.Step();
+                    Run = false;
                 }
 
-                if (EmuState == DebugState.Break)
-                    break;
-#endif
+                ppu.FrameReady = false;
 
-                lua?.OnExec(pc);
-                Cpu.Step();
-                Run = false;
-            }
+                Sa1?.Step();
 
-            //ppu.Step(262 * 1364);
+                if (Cheats.Count != 0)
+                    ApplyRawCheats();
 
-            ppu.FrameReady = false;
-            if (Cheats.Count != 0)
-                ApplyRawCheats();
+                UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
 
-            UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
-
-            float[] dspSamples = Dsp.GetSamples();
-            int totalSamples = AudioSamples.Count + dspSamples.Length;
-            if (totalSamples >= SnesMaxSamples)
-            {
-                float[] outputSamples = new float[totalSamples];
-                AudioSamples.CopyTo(outputSamples, 0);
-                Array.Copy(dspSamples, 0, outputSamples, AudioSamples.Count, dspSamples.Length);
-                Audio.Update(outputSamples);
-                AudioSamples.Clear();
-            }
-            else
-            {
-                AudioSamples.AddRange(dspSamples);
+                float[] dspSamples = Dsp.GetSamples();
+                int totalSamples = AudioSamples.Count + dspSamples.Length;
+                if (totalSamples >= SnesMaxSamples)
+                {
+                    float[] outputSamples = new float[totalSamples];
+                    AudioSamples.CopyTo(outputSamples, 0);
+                    Array.Copy(dspSamples, 0, outputSamples, AudioSamples.Count, dspSamples.Length);
+                    Audio.Update(outputSamples);
+                    AudioSamples.Clear();
+                }
+                else
+                    AudioSamples.AddRange(dspSamples);
             }
         }
     }
@@ -214,9 +212,9 @@ public class Snes : Emulator, IConsole
             Mmu.Reset();
             Dsp.Reset();
             Apu.Reset();
+            Sa1?.Reset2();
             Ppu.Reset();
             Cpu.Reset(false);
-            Sa1?.Reset2();
             Spc.Reset();
             Dma.Reset();
 
@@ -314,7 +312,10 @@ public class Snes : Emulator, IConsole
         base.Input();
     }
 
-    public override void Close() => SaveBreakpoints(Mapper?.Name);
+    public override void Close()
+    {
+        SaveBreakpoints(Mapper?.Name);
+    }
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 

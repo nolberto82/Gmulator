@@ -1,20 +1,11 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
-using Gmulator.Interfaces;
+﻿using Gmulator.Interfaces;
 using ImGuiNET;
-using KeraLua;
 using NLua;
 using NLua.Event;
 using NLua.Exceptions;
-using Raylib_cs;
-using System.Collections;
 using System.Numerics;
-using System.Xml.Linq;
-using static Gmulator.Interfaces.IMmu;
 using Color = Raylib_cs.Color;
 using Lua = NLua.Lua;
-using LuaFunction = NLua.LuaFunction;
 
 namespace Gmulator.Shared;
 

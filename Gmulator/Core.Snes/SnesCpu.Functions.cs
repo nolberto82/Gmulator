@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Core.Snes;
+
 public partial class SnesCpu
 {
     private void Adc(int a)

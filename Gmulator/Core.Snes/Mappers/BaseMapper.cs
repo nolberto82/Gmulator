@@ -1,5 +1,4 @@
-﻿using System.Net.Sockets;
-using Timer = System.Threading.Timer;
+﻿using Timer = System.Threading.Timer;
 
 namespace Gmulator.Core.Snes.Mappers;
 

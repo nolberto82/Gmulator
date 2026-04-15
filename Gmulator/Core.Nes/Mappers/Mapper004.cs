@@ -1,6 +1,4 @@
-﻿using System.Net.Sockets;
-
-namespace Gmulator.Core.Nes.Mappers;
+﻿namespace Gmulator.Core.Nes.Mappers;
 
 internal class Mapper004 : BaseMapper
 {

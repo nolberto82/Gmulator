@@ -1,8 +1,7 @@
 ﻿using ImGuiNET;
-using Raylib_cs;
-using System.Runtime.InteropServices;
 
 namespace Gmulator.Shared;
+
 internal static class Notifications
 {
     private static string[] Text;

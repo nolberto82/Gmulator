@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Gmulator.Core.Nes.Mappers;
+﻿namespace Gmulator.Core.Nes.Mappers;
 
 internal class Mapper002 : BaseMapper
 {

@@ -1,9 +1,6 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
-using Gmulator.Interfaces;
-using System;
-using System.Text.Json;
 
 namespace Gmulator.Shared;
 

@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace Gmulator.Core.Snes.Sa1
+﻿namespace Gmulator.Core.Snes.Sa1
 {
     public partial class SnesSa1
     {
@@ -83,7 +79,7 @@ namespace Gmulator.Core.Snes.Sa1
             {
                 case 0x2200:
                     _sa1IrqRequest = (v & 0x80) != 0;
-                    _sa1Ready = (v & 0x40) != 0;
+                    _sa1Wait = (v & 0x40) != 0;
                     if ((v & 0x20) == 0 && _sa1Reset)
                         Cpu.Reset(true);
                     _sa1Reset = (v & 0x20) != 0;

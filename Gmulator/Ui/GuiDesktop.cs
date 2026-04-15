@@ -1,9 +1,4 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
-using Gmulator.Shared;
-using ImGuiNET;
-using Raylib_cs;
+﻿using ImGuiNET;
 using rlImGui_cs;
 
 namespace Gmulator.Ui;
@@ -12,7 +7,10 @@ public class GuiDesktop : Gui
 {
     private bool ShowPpuDebug;
 
+    private string _cheatName;
     private string _cheatOut;
+    private string _cheatInput;
+    private bool _cheatDialogOpened;
 
     public override void Run()
     {
@@ -22,6 +20,9 @@ public class GuiDesktop : Gui
             Raylib.ClearBackground(Color.DarkGray);
 
             rlImGui.Begin();
+
+            if (Emulator.FastForward)
+                Emulator?.RunFrames(Opened);
 
             Emulator?.RunFrame(Opened);
             Emulator?.Render(MenuHeight);
@@ -58,7 +59,8 @@ public class GuiDesktop : Gui
                     if (!Opened)
                     {
                         Open(Emulator.Config);
-                        Emulator.Console.EmuState = DebugState.Paused;
+                        if (Emulator.Console?.EmuState != DebugState.Break)
+                            Emulator.Console?.EmuState = DebugState.Paused;
                         ImGui.OpenPopup("Menu");
                     }
                 }
@@ -223,7 +225,14 @@ public class GuiDesktop : Gui
                     }
                     else
                     {
-                        CheatWindow();
+                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right) && !_cheatDialogOpened)
+                        {
+                            _cheatDialogOpened = true;
+                            ImGui.OpenPopup("Add/Edit Cheat");
+                        }
+
+                        CheatWindow(null);
+
                         if (ImGui.BeginChild("##cheats", new(0, bottom), ImGuiChildFlags.FrameStyle))
                         {
                             ImGui.BeginTable("##cheattable", 3);
@@ -234,6 +243,7 @@ public class GuiDesktop : Gui
 
                             for (int i = 0; i < Cheats?.Count;)
                             {
+
                                 var res = Cheats.Values.ToList();
                                 var cht = res.Where(c => c.Description == res[i].Description).ToList();
                                 if (cht.Count > 0)
@@ -243,47 +253,20 @@ public class GuiDesktop : Gui
                                     {
                                         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                         {
+                                            _cheatDialogOpened = true;
                                             ImGui.OpenPopup("Add/Edit Cheat");
                                         }
                                     }
 
-                                    if (ImGui.BeginPopupModal("Add/Edit Cheat"))
-                                    {
-                                        ImGui.PushItemWidth(308);
-                                        ImGui.InputText($"##cheatinput1", ref cht[0].Description, 256);
-                                        ImGui.PopItemWidth();
-                                        ImGui.Separator();
-                                        string cheatstr = string.Join("\n", cht[0].Codes.Split("+"));
-                                        if (ImGui.InputTextMultiline($"##cheatinput2", ref cheatstr, 32768, new(150, 0)))
-                                        {
-                                            _cheatOut = cheatstr;
-                                            cht[0].Codes = cheatstr.Replace("\r\n", "+");
-                                        }
-                                        OpenCopyContext("Address", ref _cheatOut);
-                                        Emulator.ConvertCodes(cht[0], ref _cheatOut, false);
-                                        ImGui.SameLine();
-                                        ImGui.InputTextMultiline("##cheatoutput", ref _cheatOut, 32768, new(150, 0));
-                                        ImGui.Separator();
-                                        ImGui.SetCursorPosX(150);
-                                        if (ImGui.Button("OK", new(80, 0)))
-                                        {
-                                            Emulator.ConvertCodes(cht[0], ref _cheatOut, true);
-                                            ImGui.CloseCurrentPopup();
-                                        }
-                                        ImGui.SameLine(235);
-                                        if (ImGui.Button("Cancel", new(80, 0)))
-                                            ImGui.CloseCurrentPopup();
-                                        ImGui.EndPopup();
-                                    }
+                                    CheatWindow(cht[0]);
 
                                     SetActive(ScrCheats, i);
 
                                     ImGui.TableNextColumn();
                                     var enabled = cht[0].Enabled;
                                     if (ImGui.Checkbox("", ref enabled))
-                                    {
                                         ToggleCheat(cht);
-                                    }
+
                                     ImGui.TableNextColumn();
 
                                     ImGui.SameLine();
@@ -385,7 +368,9 @@ public class GuiDesktop : Gui
     public override void Init(bool isdeck)
     {
         base.Init(isdeck);
-        _cheatOut = "";
+        _cheatOut = string.Empty;
+        _cheatInput = string.Empty;
+        _cheatName = string.Empty;
         Open(Emulator.Config);
         TabIndex = ScrGames;
     }
@@ -396,23 +381,43 @@ public class GuiDesktop : Gui
             SelOption[t] = i;
     }
 
-    private void CheatWindow()
+    private void CheatWindow(Cheat cht)
     {
-        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right))
-            ImGui.OpenPopup("Add/Edit Cheat");
-
-        ImGui.SetNextWindowSize(new(400, 300));
+        ImGui.SetNextWindowSize(new(0, 0));
         if (ImGui.BeginPopupModal("Add/Edit Cheat"))
         {
-
-            if (ImGui.Button("Ok"))
+            var str = cht == null ? "" : cht.Description;
+            string cheatstr = cht == null ? "" : string.Join("\n", cht.Codes.Split("+"));
+            ImGui.PushItemWidth(308);
+            ImGui.InputText($"##cheatname", ref _cheatName, 256);
+            ImGui.PopItemWidth();
+            ImGui.Separator();
+            if (ImGui.InputTextMultiline($"##cheatinput2", ref _cheatInput, 32768, new(150, 0)))
             {
+                _cheatOut = cheatstr;
+                cht?.Codes = cheatstr.Replace("\r\n", "+");
+            }
+            OpenCopyContext("Address", ref _cheatInput);
+            if (_cheatInput != "")
+                _cheatOut = Emulator.ConvertCodes(_cheatName, _cheatInput, false);
+            ImGui.SameLine();
+            ImGui.InputTextMultiline("##cheatoutput", ref _cheatOut, 32768, new(150, 0));
+            ImGui.Separator();
+            ImGui.SetCursorPosX(150);
+            if (ImGui.Button("OK", new(80, 0)))
+            {
+                _cheatDialogOpened = false;
+                if (_cheatInput != "")
+                    Emulator.ConvertCodes(_cheatName, _cheatInput, true);
+                ImGui.CloseCurrentPopup();
 
+            }
+            ImGui.SameLine(235);
+            if (ImGui.Button("Cancel", new(80, 0)))
+            {
+                _cheatDialogOpened = false;
                 ImGui.CloseCurrentPopup();
             }
-
-            if (ImGui.Button("Cancel"))
-                ImGui.CloseCurrentPopup();
             ImGui.EndPopup();
         }
     }

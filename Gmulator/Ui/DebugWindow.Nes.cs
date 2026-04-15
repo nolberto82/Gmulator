@@ -1,6 +1,5 @@
 ﻿using Gmulator.Core.Nes;
-using ImGuiNET;
-using Raylib_cs;
+using Gmulator.Interfaces;
 
 namespace Gmulator.Ui
 {
@@ -59,8 +58,8 @@ namespace Gmulator.Ui
 
         public override void DrawBreakpoints() => base.DrawBreakpoints();
 
-        public override void DrawCpuInfo(Func<List<RegisterInfo>> cpu, Func<List<RegisterInfo>> cpuflags) =>
-            base.DrawCpuInfo(cpu, cpuflags);
+        public override void DrawCpuInfo(ICpu cpu) =>
+            base.DrawCpuInfo(cpu);
 
         public override void DrawCartInfo(Dictionary<string, string> info) => base.DrawCartInfo(info);
 

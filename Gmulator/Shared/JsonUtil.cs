@@ -2,6 +2,7 @@
 using System.Text.Json.Serialization;
 
 namespace Gmulator;
+
 public static partial class JsonUtil
 {
     [JsonSourceGenerationOptions(WriteIndented = true)]

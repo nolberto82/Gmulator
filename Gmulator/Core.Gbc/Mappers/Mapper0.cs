@@ -1,6 +1,4 @@
-﻿using static Gmulator.Interfaces.IMmu;
-
-namespace Gmulator.Core.Gbc.Mappers;
+﻿namespace Gmulator.Core.Gbc.Mappers;
 
 public class Mapper0(byte[] rom, GbcMmu mmu) : BaseMapper(rom, mmu)
 {

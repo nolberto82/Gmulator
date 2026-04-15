@@ -1,7 +1,5 @@
 ﻿using Gmulator.Core.Gbc.Mappers;
 using Gmulator.Interfaces;
-using System.Xml.Linq;
-using static Gmulator.Interfaces.IMmu;
 
 namespace Gmulator.Core.Gbc;
 

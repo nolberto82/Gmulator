@@ -1,5 +1,6 @@
 ﻿
 namespace Gmulator.Core.Nes.Sound;
+
 public class Triangle : BaseChannel
 {
 

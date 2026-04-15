@@ -1,7 +1,5 @@
-﻿using System.Data;
-using System.Text;
+﻿namespace Gmulator.Shared;
 
-namespace Gmulator.Shared;
 public class Patch
 {
     private string Header { get; set; }

@@ -1,10 +1,8 @@
-﻿using System.Drawing;
-using System.Net.Sockets;
-using System.Numerics;
+﻿using System.Numerics;
 using System.Runtime.InteropServices;
-using System.Security.Cryptography;
 
 namespace Gmulator.Shared;
+
 public static class ByteExtensions
 {
     public static void Set(this byte[] dst, byte[] src, int offset) => src.CopyTo(dst, offset);

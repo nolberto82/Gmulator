@@ -132,7 +132,7 @@ public class NesLogger(Nes nes)
                 int hi = ReadByte(b1 + 1 & 0xff);
                 ushort a = (ushort)(lo | hi << 8);
                 data = $"{name} (${b1:X2}),Y [${(ushort)(a + y):X4}]";// [{a:X4}]";// [{(ushort)(a + Cpu.Y):X4}]";// =" +
-                                                                             //$" {Mem.ReadDebug((ushort)(a + Cpu.Y)):X2}";
+                                                                      //$" {Mem.ReadDebug((ushort)(a + Cpu.Y)):X2}";
                 break;
             }
             case INDI:

@@ -1,10 +1,4 @@
-﻿using Gmulator.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Text;
-using static Gmulator.Interfaces.IMmu;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+﻿using static Gmulator.Interfaces.IMmu;
 
 namespace Gmulator.Shared
 {

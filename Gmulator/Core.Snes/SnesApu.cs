@@ -6,7 +6,7 @@ namespace Gmulator.Core.Snes;
 public class SnesApu : ISaveState
 {
     public Timer[] Timers = new Timer[3];
-    private ulong Cycles;
+    public ulong Cycles { get; private set; }
     private byte[] SpcIO;
     private byte[] CpuIO;
     private int[] TimerOut;
@@ -68,7 +68,7 @@ public class SnesApu : ISaveState
 
                 if (Breakpoints.Count > 0 && state == DebugState.Running)
                 {
-                    if (ExecuteCheck(Spc.State.PC))
+                    if (ExecuteCheck(Spc.PC))
                     {
                         Snes.EmuState = DebugState.Break;
                         return;
@@ -108,6 +108,7 @@ public class SnesApu : ISaveState
             }
             Timers[i].Cycles--;
         }
+
         Cycles++;
     }
 

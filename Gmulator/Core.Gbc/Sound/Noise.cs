@@ -1,8 +1,5 @@
 ﻿
 using Gmulator.Interfaces;
-using System;
-using System.ComponentModel;
-using static Gmulator.Interfaces.IMmu;
 
 namespace Gmulator.Core.Gbc.Sound;
 

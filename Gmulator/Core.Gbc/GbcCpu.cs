@@ -1,6 +1,4 @@
-﻿using Gmulator.Core.Snes;
-using Gmulator.Interfaces;
-using System.Diagnostics;
+﻿using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Gbc;
 

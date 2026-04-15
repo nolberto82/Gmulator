@@ -1,7 +1,4 @@
 ﻿using Gmulator.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Gmulator.Core.Snes.Sa1;
 

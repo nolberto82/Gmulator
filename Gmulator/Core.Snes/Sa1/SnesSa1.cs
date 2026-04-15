@@ -1,7 +1,5 @@
-﻿using Gmulator.Core.Nes;
-using Gmulator.Core.Snes.Mappers;
+﻿using Gmulator.Interfaces;
 using static Gmulator.Core.Snes.SnesCpu;
-using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Snes.Sa1;
 
@@ -28,7 +26,7 @@ public partial class SnesSa1 : Emulator, IConsole
     private bool _irqEnabled;
     private bool _irqRequest;
     public bool _sa1IrqRequest;
-    public bool _sa1Ready;
+    public bool _sa1Wait;
     public bool _sa1Reset;
     public bool _sa1NmiRequest;
     private bool _charDmaActive;
@@ -236,7 +234,7 @@ public partial class SnesSa1 : Emulator, IConsole
         bw.Write(_resetVector); bw.Write(_nmiVector); bw.Write(_irqVector); bw.Write(_snesMessage);
         bw.Write(_sa1Message); bw.Write(_snesCharConvIrqEnabled); bw.Write(_snesCharConvIrqFlag); WriteArray(bw, _mmcBanks);
         bw.Write(_sa1IrqEnabled); bw.Write(_sa1NmiEnabled); bw.Write(_nmiVectorSelect); bw.Write(_irqVectorSelect);
-        bw.Write(_irqEnabled); bw.Write(_irqRequest); bw.Write(_sa1IrqRequest); bw.Write(_sa1Ready);
+        bw.Write(_irqEnabled); bw.Write(_irqRequest); bw.Write(_sa1IrqRequest); bw.Write(_sa1Wait);
         bw.Write(_sa1Reset); bw.Write(_sa1NmiRequest); bw.Write(_charDmaActive); bw.Write(_bwCpuBank);
         bw.Write(_bwSa1Bank); bw.Write(_bwRamRegionProtect); bw.Write(_cpuIramProtect); bw.Write(_mathControl);
         bw.Write(_mathResult); bw.Write(_dmaControl); bw.Write(_dmaPriority); bw.Write(_dmaMode);
@@ -249,7 +247,7 @@ public partial class SnesSa1 : Emulator, IConsole
         _resetVector = br.ReadInt32(); _nmiVector = br.ReadInt32(); _irqVector = br.ReadInt32(); _snesMessage = br.ReadInt32();
         _sa1Message = br.ReadInt32(); _snesCharConvIrqEnabled = br.ReadBoolean(); _snesCharConvIrqFlag = br.ReadBoolean(); _mmcBanks = ReadArray<int>(br, _mmcBanks.Length);
         _sa1IrqEnabled = br.ReadBoolean(); _sa1NmiEnabled = br.ReadBoolean(); _nmiVectorSelect = br.ReadBoolean(); _irqVectorSelect = br.ReadBoolean();
-        _irqEnabled = br.ReadBoolean(); _irqRequest = br.ReadBoolean(); _sa1IrqRequest = br.ReadBoolean(); _sa1Ready = br.ReadBoolean();
+        _irqEnabled = br.ReadBoolean(); _irqRequest = br.ReadBoolean(); _sa1IrqRequest = br.ReadBoolean(); _sa1Wait = br.ReadBoolean();
         _sa1Reset = br.ReadBoolean(); _sa1NmiRequest = br.ReadBoolean(); _charDmaActive = br.ReadBoolean(); _bwCpuBank = br.ReadInt32();
         _bwSa1Bank = br.ReadInt32(); _bwRamRegionProtect = br.ReadInt32(); _cpuIramProtect = br.ReadInt32(); _mathControl = br.ReadInt32();
         _mathResult = br.ReadInt32(); _dmaControl = br.ReadBoolean(); _dmaPriority = br.ReadInt32(); _dmaMode = br.ReadBoolean();
@@ -263,7 +261,7 @@ public partial class SnesSa1 : Emulator, IConsole
         new("2200|0-3","Message",$"{_snesMessage:X2}"),
         new("2200|4","Nmi Request",$"{_sa1NmiRequest}"),
         new("2200|5","Reset",$"{_sa1Reset}"),
-        new("2200|6","Wait",$"{_sa1Ready}"),
+        new("2200|6","Wait",$"{_sa1Wait}"),
         new("2200|7","Sa1 Irq Request",$"{_sa1IrqRequest}"),
         new("2201","",$""),
         new("2201|5","Char Conv Irq Enabled",$"{_snesCharConvIrqEnabled}"),

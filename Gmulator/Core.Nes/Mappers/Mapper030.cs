@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Core.Nes.Mappers;
+
 public class Mapper030 : BaseMapper
 {
     public Mapper030(Header header, NesMmu mmu) : base(header, mmu)

@@ -1,5 +1,4 @@
-﻿using Gmulator.Interfaces;
-using static Gmulator.Core.Gbc.GbcCpu;
+﻿using static Gmulator.Core.Gbc.GbcCpu;
 
 namespace Gmulator.Core.Gbc;
 

@@ -62,8 +62,8 @@ public partial class SnesCpu : ISaveState, ICpu
     public bool FastMem { get; set; }
     public bool NmiEnabled { get; set; }
     public bool IrqEnabled { get; set; }
-    public ulong Cycles { get; set; }
-
+    public ulong Cycles { get => cycles; set => cycles = value; }
+    private ulong cycles;
     #endregion
 
     public bool XMem => (_ps & FX) != 0;
@@ -84,13 +84,11 @@ public partial class SnesCpu : ISaveState, ICpu
     private BaseMapper Mapper;
 
     public Action<int> SetState;
-    private ulong cycles;
+
 
     private int _stepCounter;
     private int _opCode;
     public int TestAddr { get; private set; }
-
-
 
     public SnesCpu()
     {
@@ -126,14 +124,6 @@ public partial class SnesCpu : ISaveState, ICpu
         Ppu = snes.Ppu;
         Mapper = snes.Mapper;
     }
-
-    public void Idle()
-    {
-        Snes?.HandleDma();
-        Ppu?.Step(6);
-    }
-
-    public void Idle8() => Ppu?.Step(8);
 
     public void AddCycles(int v) => Cycles++;
 
@@ -171,8 +161,17 @@ public partial class SnesCpu : ISaveState, ICpu
     private void PpuCycle()
     {
         var c = GetClockSpeed(PBPC);
-        Ppu?.Step(c);
+        Ppu.Step(c);
     }
+
+    public void Idle()
+    {
+        Snes?.HandleDma();
+        Ppu?.Step(6);
+        cycles++;
+    }
+
+    public void Idle8() => Ppu?.Step(8);
 
     public virtual int Read(int a)
     {
@@ -192,7 +191,7 @@ public partial class SnesCpu : ISaveState, ICpu
         Snes.WriteMemory(a, v);
     }
 
-    private int GetClockSpeed(int a)
+    public int GetClockSpeed(int a)
     {
         var bank = a >> 16;
         a &= 0xffff;

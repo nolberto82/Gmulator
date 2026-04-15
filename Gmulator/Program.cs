@@ -1,7 +1,8 @@
 ﻿namespace Gmulator;
+
 public partial class Program
 {
-    [STAThread]
+    //[STAThread]
     private static void Main()
     {
 #if DECKDEBUG || DECKRELEASE

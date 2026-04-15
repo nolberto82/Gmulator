@@ -1,8 +1,5 @@
-﻿using Gmulator.Interfaces;
-using Gmulator.Shared;
-using System.Threading.Channels;
+﻿namespace Gmulator.Core.Gbc.Sound;
 
-namespace Gmulator.Core.Gbc.Sound;
 public abstract class BaseChannel
 {
     public bool Enabled { get; set; }
@@ -81,7 +78,7 @@ public abstract class BaseChannel
         return 0;
     }
 
-    public virtual void Step(int channel,int cycles)
+    public virtual void Step(int channel, int cycles)
     {
         if (Dac && Enabled)
         {

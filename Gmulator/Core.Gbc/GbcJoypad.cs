@@ -1,7 +1,4 @@
-﻿using Raylib_cs;
-using System.Data;
-
-namespace Gmulator.Core.Gbc;
+﻿namespace Gmulator.Core.Gbc;
 
 public class GbcJoypad
 {

@@ -1,11 +1,8 @@
 ﻿using ImGuiNET;
-using Raylib_cs;
 using rlImGui_cs;
-using System.Numerics;
-using Color = Raylib_cs.Color;
-using Rectangle = Raylib_cs.Rectangle;
 
 namespace Gmulator.Ui;
+
 public class GraphicsWindow
 {
     private static readonly Texture2D[] TilesTex;

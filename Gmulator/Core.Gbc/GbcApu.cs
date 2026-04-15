@@ -1,7 +1,5 @@
 ﻿using Gmulator.Core.Gbc.Sound;
 using Gmulator.Interfaces;
-using Raylib_cs;
-using static Gmulator.Interfaces.IMmu;
 using Wave = Gmulator.Core.Gbc.Sound.Wave;
 
 namespace Gmulator.Core.Gbc;

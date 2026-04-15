@@ -1,6 +1,5 @@
-﻿using Gmulator.Interfaces;
+﻿namespace Gmulator.Core.Nes.Sound;
 
-namespace Gmulator.Core.Nes.Sound;
 public abstract class BaseChannel : EmuState
 {
     public bool Enabled { get; set; }

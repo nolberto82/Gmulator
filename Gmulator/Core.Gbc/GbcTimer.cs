@@ -1,6 +1,5 @@
 ﻿
 using Gmulator.Interfaces;
-using System.Runtime.Intrinsics.X86;
 
 namespace Gmulator.Core.Gbc;
 

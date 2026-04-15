@@ -1,7 +1,4 @@
-﻿using Gmulator.Ui;
-using ImGuiNET;
-using Raylib_cs;
-using System.Runtime.CompilerServices;
+﻿using ImGuiNET;
 
 namespace Gmulator.Shared;
 
@@ -39,13 +36,10 @@ internal class Input
             }
         }
 
-        //if (!emu.FastForward)
-        {
-            if (newrightstickY < 0 && OldRightThumbY == 0)
-                emu.SaveState(0, 0);
-            else if (newrightstickY > 0 && OldRightThumbY == 0)
-                emu.LoadState(0, 0);
-        }
+        if (newrightstickY < 0 && OldRightThumbY == 0)
+            emu.SaveState(0, 0);
+        else if (newrightstickY > 0 && OldRightThumbY == 0)
+            emu.LoadState(0, 0);
 
         var shift = Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift);
         if (shift)

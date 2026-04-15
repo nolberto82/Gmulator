@@ -2,8 +2,6 @@
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Interfaces;
 using ImGuiNET;
-using Raylib_cs;
-using System.Reflection.Emit;
 using static Gmulator.Shared.MemoryEditor;
 
 namespace Gmulator.Ui
@@ -104,7 +102,7 @@ namespace Gmulator.Ui
                 ImGui.SetColumnWidth(0, 215);
                 DrawDisassembly(pc, MainCpu);
                 ImGui.NextColumn();
-                DrawCpuInfo(Cpu.GetRegisters, Cpu.GetFlags);
+                DrawCpuInfo(Cpu);
                 DrawBreakpoints();
                 ImGui.Columns(1);
                 ImGui.End();
@@ -172,8 +170,7 @@ namespace Gmulator.Ui
             ImGui.SetNextWindowSize(new(395, 405));
             ImGui.Begin("Co Processors", NoScrollFlags);
             {
-                Func<List<RegisterInfo>> cpu = null;
-                Func<List<RegisterInfo>> cpuflags = null;
+                ICpu cpu = null;
                 ImGui.Columns(2);
                 DrawButtons(logging, SelectedCpu);
                 ImGui.BeginTabBar("##cputab");
@@ -185,8 +182,7 @@ namespace Gmulator.Ui
                             SnesSa1 sa1 = (Console as Snes).Sa1;
                             ImGui.SetColumnWidth(0, 210);
                             SelectedCpu = Sa1Cpu;
-                            cpu = sa1.Cpu.GetRegisters;
-                            cpuflags = sa1.Cpu.GetFlags;
+                            cpu = sa1.Cpu;
                             DrawDisassembly((Console as Snes).Sa1.Cpu.PBPC, Sa1Cpu);
                             ImGui.EndTabItem();
                         }
@@ -196,8 +192,7 @@ namespace Gmulator.Ui
                     {
                         SnesSpc spc = (Console as Snes).Spc;
                         SelectedCpu = SpcCpu;
-                        cpu = spc.GetRegisters;
-                        cpuflags = spc.GetFlags;
+                        cpu = spc;
                         DrawDisassembly(GetSpcPC(), SpcCpu);
                         ImGui.EndTabItem();
                     }
@@ -211,7 +206,7 @@ namespace Gmulator.Ui
                     //}
 
                     ImGui.NextColumn();
-                    DrawCpuInfo(cpu, cpuflags);
+                    DrawCpuInfo(cpu);
                     ImGui.Columns(1);
 
                     ImGui.EndTabBar();
@@ -240,33 +235,37 @@ namespace Gmulator.Ui
             }
         }
 
-        public virtual void DrawCpuInfo(Func<List<RegisterInfo>> cpu, Func<List<RegisterInfo>> cpuflags)
+        public virtual void DrawCpuInfo(ICpu cpu)
         {
-            if (cpu == null || cpuflags == null) return;
+            if (cpu == null) return;
             ImGui.BeginChild("Cpu Registers", new(70, 140));
             {
-                var registers = cpu();
+                var registers = cpu.GetRegisters();
                 for (int i = 0; i < registers.Count; i++)
                 {
                     var v = registers[i];
                     ImGui.Text($"{v.Name}"); ImGui.SameLine();
                     ImGui.TextColored(GREEN, $"{v.Value}");
                 }
+
                 ImGui.EndChild();
             }
             ImGui.SameLine();
             ImGui.BeginChild("##cpuflags", new(0, 140));
             {
-                var flags = cpuflags();
+                var flags = cpu.GetFlags();
                 for (int i = 0; i < flags.Count; i++)
                 {
                     var v = flags[i];
                     Checkbox(v.Name, Convert.ToBoolean(v.Value));
-                    if ((i + 1) % 2 > 0)
+                    if ((i + 1) % 2 > 0 && i != flags.Count - 1)
                         ImGui.SameLine();
                 }
+
                 ImGui.EndChild();
             }
+            ImGui.SeparatorText("");
+            ImGui.Text($"Cycles: {cpu.Cycles}");
         }
 
         public virtual void DrawStackInfo(Span<byte> data, int addr, int start, string name)

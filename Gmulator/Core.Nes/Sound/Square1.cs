@@ -1,6 +1,4 @@
-﻿using System.Threading.Channels;
-
-namespace Gmulator.Core.Nes.Sound;
+﻿namespace Gmulator.Core.Nes.Sound;
 
 public class Square1 : BaseChannel
 {

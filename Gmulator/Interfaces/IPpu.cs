@@ -1,4 +1,5 @@
 ﻿namespace Gmulator.Interfaces;
+
 public interface IPpu
 {
     int GetScanline();

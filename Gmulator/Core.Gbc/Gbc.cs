@@ -1,11 +1,6 @@
 ﻿
 using Gmulator.Core.Gbc.Mappers;
 using Gmulator.Interfaces;
-using Gmulator.Ui;
-using Raylib_cs;
-using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics.Arm;
-using System.Text;
 
 namespace Gmulator.Core.Gbc
 {

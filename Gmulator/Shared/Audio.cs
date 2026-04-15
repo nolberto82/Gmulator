@@ -1,7 +1,4 @@
-﻿using Raylib_cs;
-using System.IO;
-
-namespace Gmulator.Shared;
+﻿namespace Gmulator.Shared;
 
 public class Audio
 {

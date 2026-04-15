@@ -1,8 +1,4 @@
-﻿using Raylib_cs;
-using rlImGui_cs;
-using System.Numerics;
-
-namespace Gmulator.Ui;
+﻿namespace Gmulator.Ui;
 
 internal class GuiDeck : Gui
 {
@@ -15,6 +11,9 @@ internal class GuiDeck : Gui
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.DarkGray);
 
+            if (Emulator.FastForward)
+                Emulator?.RunFrames(Opened);
+            
             Emulator?.RunFrame(Opened);
             Emulator?.Render(MenuHeight);
             Emulator?.Update();
@@ -41,7 +40,7 @@ internal class GuiDeck : Gui
         var left = (Raylib.GetRenderWidth() - texwidth * scale) / 2;
         var renderwidth = Raylib.GetRenderWidth();
         int maxgamesview = Raylib.GetScreenHeight() / FontSize - 5;
-        int  y = 1, posx = 0;// (int)(x * scale + left);
+        int y = 1, posx = 0;// (int)(x * scale + left);
         List<FileDetails> list = [];
 
         Rectangle rectName = new(posx, y, renderwidth, FontSize);
@@ -142,10 +141,10 @@ internal class GuiDeck : Gui
         else
             _dpadCpunter = Delay;
 
-            if (oldUpPressed || newUpPressed && _dpadCpunter == 0)
-                SelOption[TabIndex]--;
-            else if (oldDownPressed || newDownPressed && _dpadCpunter == 0)
-                SelOption[TabIndex]++;
+        if (oldUpPressed || newUpPressed && _dpadCpunter == 0)
+            SelOption[TabIndex]--;
+        else if (oldDownPressed || newDownPressed && _dpadCpunter == 0)
+            SelOption[TabIndex]++;
 
         var total = TabIndex switch
         {

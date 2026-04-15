@@ -1,13 +1,9 @@
-﻿using Gmulator.Core.Gbc;
-using Gmulator.Core.Nes;
-using Gmulator.Core.Snes;
+﻿using Gmulator.Core.Snes;
 using Gmulator.Core.Snes.Mappers;
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
 using ImGuiNET;
-using Raylib_cs;
-using static Gmulator.Core.Snes.SnesLogger;
 
 namespace Gmulator.Ui;
 
@@ -64,7 +60,7 @@ internal class SnesDebugWindow : DebugWindow
         GetSpcState = Spc.GetRegisters;
         GetSpcFlags = Spc.GetFlags;
         GetPortState = snes.Apu.GetState;
-        GetSpcPC = () => Spc.State.PC;
+        GetSpcPC = () => Spc.PC;
 
         if (Sa1 != null)
         {
@@ -92,9 +88,9 @@ internal class SnesDebugWindow : DebugWindow
         ];
 
         if (Mapper.CoProcessor == BaseMapper.Sa1)
-            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3,6));
+            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, 6));
         if (Mapper.CoProcessor == BaseMapper.Gsu)
-            MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3,7));
+            MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, 7));
 
         MemRegions.Add(new("Prg", mmu.ReadByte, Mapper.WriteSram, 0x0000, Mapper.Rom.Length, 6, 8));
         MemRegions.Add(new("Register", null, null, -1, -1, -1, 9));
@@ -123,8 +119,8 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void DrawBreakpoints() => base.DrawBreakpoints();
 
-    public override void DrawCpuInfo(Func<List<RegisterInfo>> cpu, Func<List<RegisterInfo>> cpuflags) =>
-        base.DrawCpuInfo(cpu, cpuflags);
+    public override void DrawCpuInfo(ICpu cpu) =>
+        base.DrawCpuInfo(cpu);
 
     public override void DrawCartInfo(Dictionary<string, string> info) => base.DrawCartInfo(info);
 

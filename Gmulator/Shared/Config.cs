@@ -1,8 +1,7 @@
-﻿using Raylib_cs;
-using System.IO;
-using System.Text.Json;
+﻿using System.Text.Json;
 
 namespace Gmulator.Shared;
+
 public class Config
 {
     public string WorkingDir { get; set; } = "C:";

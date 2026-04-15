@@ -11,88 +11,86 @@ public class SnesDsp : ISaveState
     private SnesApu Apu;
 
     private byte[] _ram;
-    private short[] DecodeBuffer;
-    private short[] RateNums;
+    private short[] _decodeBuffer;
+    private short[] _rateNums;
 
-    private int[] Pitch;
-    private int[] Counter;
-    private bool[] PitchMod;
+    private int[] _pitch;
+    private int[] _counter;
+    private bool[] _pitchMod;
+    private int[] _srcn;
+    private int[] _decodeOffset;
+    private int[] _prevFlags;
+    private int[] _old;
+    private int[] _older;
+    private bool[] _enableNoise;
 
-    private int[] Srcn;
-    private int[] DecodeOffset;
-    private int[] PrevFlags;
-    private int[] Old;
-    private int[] Older;
-    private bool[] EnableNoise;
+    private int _noiseSample;
+    private int _noiseRate;
+    private int _noiseCounter;
 
-    private int NoiseSample;
-    private int NoiseRate;
-    private int NoiseCounter;
+    private int[] _rateCounter;
+    private int[] _adsrState;
+    private int[] _sustainLevel;
+    private bool[] _useGain;
+    private int[] _gainMode;
+    private bool[] _directGain;
+    private int[] _gainValue;
+    private int[] _gain;
+    private int[] _channelVolumeL;
+    private int[] _channelVolumeR;
 
-    private int[] RateCounter;
-    private int[] AdsrState;
-    private int[] SustainLevel;
-    private bool[] UseGain;
-    private int[] GainMode;
-    private bool[] DirectGain;
-    private int[] GainValue;
-    private int[] Gain;
-    private int[] ChannelVolumeL;
-    private int[] ChannelVolumeR;
+    private int _volumeL;
+    private int _volumeR;
+    private bool _mute;
 
-    private int VolumeL;
-    private int VolumeR;
-    private bool Mute;
+    private bool _resetFlag;
+    private bool[] _noteOff;
 
-    private bool ResetFlag;
-    private bool[] NoteOff;
+    private int[] _sampleOut;
 
-    private int[] SampleOut;
-
-    private int DirPage;
-
+    private int _dirPage;
     public void Reset()
     {
         _ram = new byte[0x80];
-        DecodeBuffer = new short[19 * 8];
-        RateNums = new short[5 * 8];
+        _decodeBuffer = new short[19 * 8];
+        _rateNums = new short[5 * 8];
 
         for (var i = 0; i < 8; i++)
-            RateNums[i * 5 + 3] = 1;
-        
+            _rateNums[i * 5 + 3] = 1;
+
         SamplesL = new float[534];
         SamplesR = new float[534];
         SampleOffset = 0;
 
-        Pitch = new int[8];
-        Counter = new int[8];
-        PitchMod = new bool[8];
-        Srcn = new int[8];
-        DecodeOffset = new int[8];
-        PrevFlags = new int[8];
-        Old = new int[8];
-        Older = new int[8];
-        EnableNoise = new bool[8];
-        NoiseSample = -0x4000;
-        NoiseRate = 0;
-        NoiseCounter = 0;
-        RateCounter = new int[8];
-        AdsrState = [3, 3, 3, 3, 3, 3, 3, 3];
-        SustainLevel = new int[8];
-        UseGain = new bool[8];
-        GainMode = new int[8];
-        DirectGain = new bool[8];
-        GainValue = new int[8];
-        Gain = new int[8];
-        ChannelVolumeL = new int[8];
-        ChannelVolumeR = new int[8];
-        VolumeL = 0;
-        VolumeR = 0;
-        Mute = true;
-        ResetFlag = true;
-        NoteOff = [true, true, true, true, true, true, true, true];
-        SampleOut = new int[8];
-        DirPage = 0;
+        _pitch = new int[8];
+        _counter = new int[8];
+        _pitchMod = new bool[8];
+        _srcn = new int[8];
+        _decodeOffset = new int[8];
+        _prevFlags = new int[8];
+        _old = new int[8];
+        _older = new int[8];
+        _enableNoise = new bool[8];
+        _noiseSample = -0x4000;
+        _noiseRate = 0;
+        _noiseCounter = 0;
+        _rateCounter = new int[8];
+        _adsrState = new int[8] { 3, 3, 3, 3, 3, 3, 3, 3 };
+        _sustainLevel = new int[8];
+        _useGain = new bool[8];
+        _gainMode = new int[8];
+        _directGain = new bool[8];
+        _gainValue = new int[8];
+        _gain = new int[8];
+        _channelVolumeL = new int[8];
+        _channelVolumeR = new int[8];
+        _volumeL = 0;
+        _volumeR = 0;
+        _mute = true;
+        _resetFlag = true;
+        _noteOff = new bool[8] { true, true, true, true, true, true, true, true };
+        _sampleOut = new int[8];
+        _dirPage = 0;
     }
 
     public void SetSnes(Snes snes) => Apu = snes.Apu;
@@ -104,17 +102,17 @@ public class SnesDsp : ISaveState
         for (var i = 0; i < 8; i++)
         {
             CycleChannel(i);
-            totalL += (SampleOut[i] * ChannelVolumeL[i]) >> 6;
-            totalR += (SampleOut[i] * ChannelVolumeR[i]) >> 6;
+            totalL += (_sampleOut[i] * _channelVolumeL[i]) >> 6;
+            totalR += (_sampleOut[i] * _channelVolumeR[i]) >> 6;
             totalL = totalL < -0x8000 ? -0x8000 : totalL > 0x7fff ? 0x7fff : totalL;
             totalR = totalR < -0x8000 ? -0x8000 : totalR > 0x7fff ? 0x7fff : totalR;
         }
-        totalL = (totalL * VolumeL) >> 7;
-        totalR = (totalR * VolumeR) >> 7;
+        totalL = (totalL * _volumeL) >> 7;
+        totalR = (totalR * _volumeR) >> 7;
         totalL = totalL < -0x8000 ? -0x8000 : totalL > 0x7fff ? 0x7fff : totalL;
         totalR = totalR < -0x8000 ? -0x8000 : totalR > 0x7fff ? 0x7fff : totalR;
 
-        if (Mute || Raylib.IsWindowResized())
+        if (_mute || Raylib.IsWindowResized())
         {
             totalL = 0;
             totalR = 0;
@@ -138,49 +136,49 @@ public class SnesDsp : ISaveState
         switch (adr)
         {
             case 0x00 or 0x10 or 0x20 or 0x30 or 0x40 or 0x50 or 0x60 or 0x70:
-                ChannelVolumeL[channel] = value > 0x7f ? value - 0x100 : value;
+                _channelVolumeL[channel] = value > 0x7f ? value - 0x100 : value;
                 break;
             case 0x01 or 0x11 or 0x21 or 0x31 or 0x41 or 0x51 or 0x61 or 0x71:
-                ChannelVolumeR[channel] = value > 0x7f ? value - 0x100 : value;
+                _channelVolumeR[channel] = value > 0x7f ? value - 0x100 : value;
                 break;
             case 0x02 or 0x12 or 0x22 or 0x32 or 0x42 or 0x52 or 0x62 or 0x72:
-                Pitch[channel] &= 0x3f00;
-                Pitch[channel] |= value;
+                _pitch[channel] &= 0x3f00;
+                _pitch[channel] |= value;
                 break;
             case 0x03 or 0x13 or 0x23 or 0x33 or 0x43 or 0x53 or 0x63 or 0x73:
-                Pitch[channel] &= 0xff;
-                Pitch[channel] |= (value << 8) & 0x3f00;
+                _pitch[channel] &= 0xff;
+                _pitch[channel] |= (value << 8) & 0x3f00;
                 break;
             case 0x04 or 0x14 or 0x24 or 0x34 or 0x44 or 0x54 or 0x64 or 0x74:
-                Srcn[channel] = value;
+                _srcn[channel] = value;
                 break;
             case 0x05 or 0x15 or 0x25 or 0x35 or 0x45 or 0x55 or 0x65 or 0x75:
-                RateNums[channel * 5 + 0] = (short)_rates[(value & 0xf) * 2 + 1];
-                RateNums[channel * 5 + 1] = (short)_rates[((value & 0x70) >> 4) * 2 + 16];
-                UseGain[channel] = (value & 0x80) == 0;
+                _rateNums[channel * 5 + 0] = (short)_rates[(value & 0xf) * 2 + 1];
+                _rateNums[channel * 5 + 1] = (short)_rates[((value & 0x70) >> 4) * 2 + 16];
+                _useGain[channel] = (value & 0x80) == 0;
                 break;
             case 0x06 or 0x16 or 0x26 or 0x36 or 0x46 or 0x56 or 0x66 or 0x76:
-                RateNums[channel * 5 + 2] = (short)_rates[value & 0x1f];
-                SustainLevel[channel] = (((value & 0xe0) >> 5) + 1) * 0x100;
+                _rateNums[channel * 5 + 2] = (short)_rates[value & 0x1f];
+                _sustainLevel[channel] = (((value & 0xe0) >> 5) + 1) * 0x100;
                 break;
             case 0x07 or 0x17 or 0x27 or 0x37 or 0x47 or 0x57 or 0x67 or 0x77:
                 if ((value & 0x80) > 0)
                 {
-                    DirectGain[channel] = false;
-                    GainMode[channel] = (value & 0x60) >> 5;
-                    RateNums[channel * 5 + 4] = (short)_rates[value & 0x1f];
+                    _directGain[channel] = false;
+                    _gainMode[channel] = (value & 0x60) >> 5;
+                    _rateNums[channel * 5 + 4] = (short)_rates[value & 0x1f];
                 }
                 else
                 {
-                    DirectGain[channel] = true;
-                    GainValue[channel] = (value & 0x7f) * 16;
+                    _directGain[channel] = true;
+                    _gainValue[channel] = (value & 0x7f) * 16;
                 }
                 break;
             case 0x0c:
-                VolumeL = value > 0x7f ? value - 0x100 : value;
+                _volumeL = value > 0x7f ? value - 0x100 : value;
                 break;
             case 0x1c:
-                VolumeR = value > 0x7f ? value - 0x100 : value;
+                _volumeR = value > 0x7f ? value - 0x100 : value;
                 break;
             case 0x2c:
                 break;
@@ -192,23 +190,20 @@ public class SnesDsp : ISaveState
                 {
                     if ((value & test) > 0)
                     {
-                        PrevFlags[i] = 0;
-                        int sampleAdr = (DirPage << 8) + Srcn[i] * 4;
+                        _prevFlags[i] = 0;
+                        int sampleAdr = (_dirPage << 8) + _srcn[i] * 4;
                         int startAdr = Apu.Ram[sampleAdr & 0xffff];
                         startAdr |= Apu.Ram[(sampleAdr + 1) & 0xffff] << 8;
-                        DecodeOffset[i] = startAdr;
-                        Gain[i] = 0;
-                        if (UseGain[i])
-                        {
-                            AdsrState[i] = 4;
-                        }
+                        _decodeOffset[i] = startAdr;
+                        _gain[i] = 0;
+                        if (_useGain[i])
+                            _adsrState[i] = 4;
                         else
-                        {
-                            AdsrState[i] = 0;
-                        }
+                            _adsrState[i] = 0;
+
                         for (var j = 0; j < 19; j++)
                         {
-                            DecodeBuffer[i * 19 + j] = 0;
+                            _decodeBuffer[i * 19 + j] = 0;
                         }
                     }
                     test <<= 1;
@@ -218,14 +213,14 @@ public class SnesDsp : ISaveState
                 var test2 = 1;
                 for (var i = 0; i < 8; i++)
                 {
-                    NoteOff[i] = (value & test2) > 0;
+                    _noteOff[i] = (value & test2) > 0;
                     test2 <<= 1;
                 }
                 break;
             case 0x6c:
-                ResetFlag = (value & 0x80) > 0;
-                Mute = (value & 0x40) > 0;
-                NoiseRate = _rates[value & 0x1f];
+                _resetFlag = (value & 0x80) > 0;
+                _mute = (value & 0x40) > 0;
+                _noiseRate = _rates[value & 0x1f];
                 break;
             case 0x7c:
                 _ram[0x7c] = 0;
@@ -237,7 +232,7 @@ public class SnesDsp : ISaveState
                 var test3 = 2;
                 for (var i = 1; i < 8; i++)
                 {
-                    PitchMod[i] = (value & test3) > 0;
+                    _pitchMod[i] = (value & test3) > 0;
                     test3 <<= 1;
                 }
                 break;
@@ -245,14 +240,14 @@ public class SnesDsp : ISaveState
                 var test4 = 1;
                 for (var i = 0; i < 8; i++)
                 {
-                    EnableNoise[i] = (value & test4) > 0;
+                    _enableNoise[i] = (value & test4) > 0;
                     test4 <<= 1;
                 }
                 break;
             case 0x4d:
                 break;
             case 0x5d:
-                DirPage = value;
+                _dirPage = value;
                 break;
             case 0x6d:
                 break;
@@ -266,35 +261,35 @@ public class SnesDsp : ISaveState
 
     private void DecodeBrr(int ch)
     {
-        DecodeBuffer[ch * 19] = DecodeBuffer[ch * 19 + 16];
-        DecodeBuffer[ch * 19 + 1] = DecodeBuffer[ch * 19 + 17];
-        DecodeBuffer[ch * 19 + 2] = DecodeBuffer[ch * 19 + 18];
-        if (PrevFlags[ch] == 1 || PrevFlags[ch] == 3)
+        _decodeBuffer[ch * 19] = _decodeBuffer[ch * 19 + 16];
+        _decodeBuffer[ch * 19 + 1] = _decodeBuffer[ch * 19 + 17];
+        _decodeBuffer[ch * 19 + 2] = _decodeBuffer[ch * 19 + 18];
+        if (_prevFlags[ch] == 1 || _prevFlags[ch] == 3)
         {
-            int sampleAdr = (DirPage << 8) + Srcn[ch] * 4;
+            int sampleAdr = (_dirPage << 8) + _srcn[ch] * 4;
             int loopAdr = Apu.Ram[(sampleAdr + 2) & 0xffff];
             loopAdr |= Apu.Ram[(sampleAdr + 3) & 0xffff] << 8;
-            DecodeOffset[ch] = loopAdr;
-            if (PrevFlags[ch] == 1)
+            _decodeOffset[ch] = loopAdr;
+            if (_prevFlags[ch] == 1)
             {
-                Gain[ch] = 0;
-                AdsrState[ch] = 3;
+                _gain[ch] = 0;
+                _adsrState[ch] = 3;
             }
             _ram[0x7c] |= (byte)(1 << ch);
         }
-        byte header = Apu.Ram[DecodeOffset[ch]++];
-        DecodeOffset[ch] &= 0xffff;
+        byte header = Apu.Ram[_decodeOffset[ch]++];
+        _decodeOffset[ch] &= 0xffff;
         int shift = header >> 4;
         int filter = (header & 0xc) >> 2;
-        PrevFlags[ch] = header & 0x3;
+        _prevFlags[ch] = header & 0x3;
         int byt = 0;
         for (var i = 0; i < 16; i++)
         {
             int s = byt & 0xf;
             if ((i & 1) == 0)
             {
-                byt = Apu.Ram[DecodeOffset[ch]++];
-                DecodeOffset[ch] &= 0xffff;
+                byt = Apu.Ram[_decodeOffset[ch]++];
+                _decodeOffset[ch] &= 0xffff;
                 s = byt >> 4;
             }
             s = s > 7 ? s - 16 : s;
@@ -306,8 +301,8 @@ public class SnesDsp : ISaveState
             {
                 s = s < 0 ? -2048 : 2048;
             }
-            int old = Old[ch];
-            int older = Older[ch];
+            int old = _old[ch];
+            int older = _older[ch];
             switch (filter)
             {
                 case 1:
@@ -324,18 +319,18 @@ public class SnesDsp : ISaveState
             s = s < -0x8000 ? -0x8000 : s;
             s &= 0x7fff;
             s = s > 0x3fff ? s - 0x8000 : s;
-            Older[ch] = Old[ch];
-            Old[ch] = s;
-            DecodeBuffer[ch * 19 + i + 3] = (short)s;
+            _older[ch] = _old[ch];
+            _old[ch] = s;
+            _decodeBuffer[ch * 19 + i + 3] = (short)s;
         }
     }
 
     private int Interpolate(int ch, int sampleNum, int offset)
     {
-        short news = DecodeBuffer[ch * 19 + sampleNum + 3];
-        short old = DecodeBuffer[ch * 19 + sampleNum + 2];
-        short older = DecodeBuffer[ch * 19 + sampleNum + 1];
-        short oldest = DecodeBuffer[ch * 19 + sampleNum];
+        short news = _decodeBuffer[ch * 19 + sampleNum + 3];
+        short old = _decodeBuffer[ch * 19 + sampleNum + 2];
+        short older = _decodeBuffer[ch * 19 + sampleNum + 1];
+        short oldest = _decodeBuffer[ch * 19 + sampleNum];
         int outR = (_gaussVals[0xff - offset] * oldest) >> 10;
         outR += (_gaussVals[0x1ff - offset] * older) >> 10;
         outR += (_gaussVals[0x100 + offset] * old) >> 10;
@@ -348,125 +343,105 @@ public class SnesDsp : ISaveState
 
     private void HandleNoise()
     {
-        if (NoiseRate != 0)
+        if (_noiseRate != 0)
+            _noiseCounter++;
+
+        if (_noiseRate != 0 && _noiseCounter >= _noiseRate)
         {
-            NoiseCounter++;
-        }
-        if (NoiseRate != 0 && NoiseCounter >= NoiseRate)
-        {
-            NoiseCounter = 0;
-            int bit0 = NoiseSample & 1;
-            int bit1 = (NoiseSample >> 1) & 1;
-            NoiseSample = ((NoiseSample >> 1) & 0x3fff) | ((bit0 ^ bit1) << 14);
-            NoiseSample = NoiseSample > 0x3fff ? NoiseSample - 0x8000 : NoiseSample;
+            _noiseCounter = 0;
+            int bit0 = _noiseSample & 1;
+            int bit1 = (_noiseSample >> 1) & 1;
+            _noiseSample = ((_noiseSample >> 1) & 0x3fff) | ((bit0 ^ bit1) << 14);
+            _noiseSample = _noiseSample > 0x3fff ? _noiseSample - 0x8000 : _noiseSample;
         }
     }
 
     private void CycleChannel(int ch)
     {
-        int pitch = Pitch[ch];
-        if (PitchMod[ch])
+        int pitch = _pitch[ch];
+        if (_pitchMod[ch])
         {
-            int factor = (SampleOut[ch - 1] >> 4) + 0x400;
+            int factor = (_sampleOut[ch - 1] >> 4) + 0x400;
             pitch = (pitch * factor) >> 10;
             pitch = pitch > 0x3fff ? 0x3fff : pitch;
         }
-        Counter[ch] += pitch;
-        if (Counter[ch] > 0xffff)
-        {
+        _counter[ch] += pitch;
+        if (_counter[ch] > 0xffff)
             DecodeBrr(ch);
-        }
-        Counter[ch] &= 0xffff;
-        int sample = EnableNoise[ch] ? NoiseSample : Interpolate(ch, Counter[ch] >> 12, (Counter[ch] >> 4) & 0xff);
-        if (NoteOff[ch] || ResetFlag)
+
+        _counter[ch] &= 0xffff;
+        int sample = _enableNoise[ch] ? _noiseSample : Interpolate(ch, _counter[ch] >> 12, (_counter[ch] >> 4) & 0xff);
+        if (_noteOff[ch] || _resetFlag)
         {
-            AdsrState[ch] = 3;
-            if (ResetFlag)
-            {
-                Gain[ch] = 0;
-            }
+            _adsrState[ch] = 3;
+            if (_resetFlag)
+                _gain[ch] = 0;
         }
-        short rate = RateNums[ch * 5 + AdsrState[ch]];
+        short rate = _rateNums[ch * 5 + _adsrState[ch]];
         if (rate != 0)
         {
-            RateCounter[ch]++;
+            _rateCounter[ch]++;
         }
-        if (rate != 0 && RateCounter[ch] >= rate)
+        if (rate != 0 && _rateCounter[ch] >= rate)
         {
-            RateCounter[ch] = 0;
-            if (!DirectGain[ch] || !UseGain[ch] || AdsrState[ch] == 3)
+            _rateCounter[ch] = 0;
+            if (!_directGain[ch] || !_useGain[ch] || _adsrState[ch] == 3)
             {
-                switch (AdsrState[ch])
+                switch (_adsrState[ch])
                 {
                     case 0:
-                        Gain[ch] += rate == 1 ? 1024 : 32;
-                        if (Gain[ch] >= 0x7e0)
-                        {
-                            AdsrState[ch] = 1;
-                        }
-                        if (Gain[ch] > 0x7ff)
-                        {
-                            Gain[ch] = 0x7ff;
-                        }
+                        _gain[ch] += rate == 1 ? 1024 : 32;
+                        if (_gain[ch] >= 0x7e0)
+                            _adsrState[ch] = 1;
+                        if (_gain[ch] > 0x7ff)
+                            _gain[ch] = 0x7ff;
                         break;
                     case 1:
-                        Gain[ch] -= ((Gain[ch] - 1) >> 8) + 1;
-                        if (Gain[ch] < SustainLevel[ch])
-                        {
-                            AdsrState[ch] = 2;
-                        }
+                        _gain[ch] -= ((_gain[ch] - 1) >> 8) + 1;
+                        if (_gain[ch] < _sustainLevel[ch])
+                            _adsrState[ch] = 2;
                         break;
                     case 2:
-                        Gain[ch] -= ((Gain[ch] - 1) >> 8) + 1;
+                        _gain[ch] -= ((_gain[ch] - 1) >> 8) + 1;
                         break;
                     case 3:
-                        Gain[ch] -= 8;
-                        if (Gain[ch] < 0)
-                        {
-                            Gain[ch] = 0;
-                        }
+                        _gain[ch] -= 8;
+                        if (_gain[ch] < 0)
+                            _gain[ch] = 0;
                         break;
                     case 4:
-                        switch (GainMode[ch])
+                        switch (_gainMode[ch])
                         {
                             case 0:
-                                Gain[ch] -= 32;
-                                if (Gain[ch] < 0)
-                                {
-                                    Gain[ch] = 0;
-                                }
+                                _gain[ch] -= 32;
+                                if (_gain[ch] < 0)
+                                    _gain[ch] = 0;
                                 break;
                             case 1:
-                                Gain[ch] -= ((Gain[ch] - 1) >> 8) + 1;
+                                _gain[ch] -= ((_gain[ch] - 1) >> 8) + 1;
                                 break;
                             case 2:
-                                Gain[ch] += 32;
-                                if (Gain[ch] > 0x7ff)
-                                {
-                                    Gain[ch] = 0x7ff;
-                                }
+                                _gain[ch] += 32;
+                                if (_gain[ch] > 0x7ff)
+                                    _gain[ch] = 0x7ff;
                                 break;
                             case 3:
-                                Gain[ch] += Gain[ch] < 0x600 ? 32 : 8;
-                                if (Gain[ch] > 0x7ff)
-                                {
-                                    Gain[ch] = 0x7ff;
-                                }
+                                _gain[ch] += _gain[ch] < 0x600 ? 32 : 8;
+                                if (_gain[ch] > 0x7ff)
+                                    _gain[ch] = 0x7ff;
                                 break;
                         }
                         break;
                 }
             }
         }
-        if (DirectGain[ch] && UseGain[ch] && AdsrState[ch] != 3)
-        {
-            Gain[ch] = GainValue[ch];
-        }
+        if (_directGain[ch] && _useGain[ch] && _adsrState[ch] != 3)
+            _gain[ch] = _gainValue[ch];
 
-        int gainedVal = (sample * Gain[ch]) >> 11;
-        _ram[(ch << 4) | 8] = (byte)(Gain[ch] >> 4);
+        int gainedVal = (sample * _gain[ch]) >> 11;
+        _ram[(ch << 4) | 8] = (byte)(_gain[ch] >> 4);
         _ram[(ch << 4) | 9] = (byte)(gainedVal >> 7);
-        SampleOut[ch] = gainedVal;
+        _sampleOut[ch] = gainedVal;
     }
 
     public float[] GetSamples()
@@ -486,42 +461,42 @@ public class SnesDsp : ISaveState
 
     public void Save(BinaryWriter bw)
     {
-        WriteArray(bw, _ram); WriteArray(bw, DecodeBuffer);
-        WriteArray(bw, RateNums); WriteArray(bw, Pitch);
-        WriteArray(bw, Counter); WriteArray(bw, PitchMod);
-        WriteArray(bw, Srcn); WriteArray(bw, DecodeOffset);
-        WriteArray(bw, PrevFlags); WriteArray(bw, Old);
-        WriteArray(bw, Older); WriteArray(bw, EnableNoise);
-        bw.Write(NoiseSample); bw.Write(NoiseRate);
-        bw.Write(NoiseCounter); WriteArray(bw, RateCounter);
-        WriteArray(bw, AdsrState); WriteArray(bw, SustainLevel);
-        WriteArray(bw, UseGain); WriteArray(bw, GainMode);
-        WriteArray(bw, DirectGain); WriteArray(bw, GainValue);
-        WriteArray(bw, Gain); WriteArray(bw, ChannelVolumeL);
-        WriteArray(bw, ChannelVolumeR); bw.Write(VolumeL);
-        bw.Write(VolumeR); bw.Write(Mute);
-        bw.Write(ResetFlag); WriteArray(bw, NoteOff);
-        WriteArray(bw, SampleOut); bw.Write(DirPage);
+        WriteArray(bw, _ram); WriteArray(bw, _decodeBuffer);
+        WriteArray(bw, _rateNums); WriteArray(bw, _pitch);
+        WriteArray(bw, _counter); WriteArray(bw, _pitchMod);
+        WriteArray(bw, _srcn); WriteArray(bw, _decodeOffset);
+        WriteArray(bw, _prevFlags); WriteArray(bw, _old);
+        WriteArray(bw, _older); WriteArray(bw, _enableNoise);
+        bw.Write(_noiseSample); bw.Write(_noiseRate);
+        bw.Write(_noiseCounter); WriteArray(bw, _rateCounter);
+        WriteArray(bw, _adsrState); WriteArray(bw, _sustainLevel);
+        WriteArray(bw, _useGain); WriteArray(bw, _gainMode);
+        WriteArray(bw, _directGain); WriteArray(bw, _gainValue);
+        WriteArray(bw, _gain); WriteArray(bw, _channelVolumeL);
+        WriteArray(bw, _channelVolumeR); bw.Write(_volumeL);
+        bw.Write(_volumeR); bw.Write(_mute);
+        bw.Write(_resetFlag); WriteArray(bw, _noteOff);
+        WriteArray(bw, _sampleOut); bw.Write(_dirPage);
     }
 
     public void Load(BinaryReader br)
     {
-        _ram = ReadArray<byte>(br, _ram.Length); DecodeBuffer = ReadArray<short>(br, DecodeBuffer.Length);
-        RateNums = ReadArray<short>(br, RateNums.Length); Pitch = ReadArray<int>(br, Pitch.Length);
-        Counter = ReadArray<int>(br, Counter.Length); PitchMod = ReadArray<bool>(br, PitchMod.Length);
-        Srcn = ReadArray<int>(br, Srcn.Length); DecodeOffset = ReadArray<int>(br, DecodeOffset.Length);
-        PrevFlags = ReadArray<int>(br, PrevFlags.Length); Old = ReadArray<int>(br, Old.Length);
-        Older = ReadArray<int>(br, Older.Length); EnableNoise = ReadArray<bool>(br, EnableNoise.Length);
-        NoiseSample = br.ReadInt32(); NoiseRate = br.ReadInt32();
-        NoiseCounter = br.ReadInt32(); RateCounter = ReadArray<int>(br, RateCounter.Length);
-        AdsrState = ReadArray<int>(br, AdsrState.Length); SustainLevel = ReadArray<int>(br, SustainLevel.Length);
-        UseGain = ReadArray<bool>(br, UseGain.Length); GainMode = ReadArray<int>(br, GainMode.Length);
-        DirectGain = ReadArray<bool>(br, DirectGain.Length); GainValue = ReadArray<int>(br, GainValue.Length);
-        Gain = ReadArray<int>(br, Gain.Length); ChannelVolumeL = ReadArray<int>(br, ChannelVolumeL.Length);
-        ChannelVolumeR = ReadArray<int>(br, ChannelVolumeR.Length); VolumeL = br.ReadInt32();
-        VolumeR = br.ReadInt32(); Mute = br.ReadBoolean();
-        ResetFlag = br.ReadBoolean(); NoteOff = ReadArray<bool>(br, NoteOff.Length);
-        SampleOut = ReadArray<int>(br, SampleOut.Length); DirPage = br.ReadInt32();
+        _ram = ReadArray<byte>(br, _ram.Length); _decodeBuffer = ReadArray<short>(br, _decodeBuffer.Length);
+        _rateNums = ReadArray<short>(br, _rateNums.Length); _pitch = ReadArray<int>(br, _pitch.Length);
+        _counter = ReadArray<int>(br, _counter.Length); _pitchMod = ReadArray<bool>(br, _pitchMod.Length);
+        _srcn = ReadArray<int>(br, _srcn.Length); _decodeOffset = ReadArray<int>(br, _decodeOffset.Length);
+        _prevFlags = ReadArray<int>(br, _prevFlags.Length); _old = ReadArray<int>(br, _old.Length);
+        _older = ReadArray<int>(br, _older.Length); _enableNoise = ReadArray<bool>(br, _enableNoise.Length);
+        _noiseSample = br.ReadInt32(); _noiseRate = br.ReadInt32();
+        _noiseCounter = br.ReadInt32(); _rateCounter = ReadArray<int>(br, _rateCounter.Length);
+        _adsrState = ReadArray<int>(br, _adsrState.Length); _sustainLevel = ReadArray<int>(br, _sustainLevel.Length);
+        _useGain = ReadArray<bool>(br, _useGain.Length); _gainMode = ReadArray<int>(br, _gainMode.Length);
+        _directGain = ReadArray<bool>(br, _directGain.Length); _gainValue = ReadArray<int>(br, _gainValue.Length);
+        _gain = ReadArray<int>(br, _gain.Length); _channelVolumeL = ReadArray<int>(br, _channelVolumeL.Length);
+        _channelVolumeR = ReadArray<int>(br, _channelVolumeR.Length); _volumeL = br.ReadInt32();
+        _volumeR = br.ReadInt32(); _mute = br.ReadBoolean();
+        _resetFlag = br.ReadBoolean(); _noteOff = ReadArray<bool>(br, _noteOff.Length);
+        _sampleOut = ReadArray<int>(br, _sampleOut.Length); _dirPage = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() =>

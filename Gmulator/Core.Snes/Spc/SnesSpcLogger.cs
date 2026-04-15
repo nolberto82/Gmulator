@@ -6,7 +6,6 @@ public class SnesSpcLogger()
 {
     private SnesSpc Spc;
     private SnesApu Apu;
-    private CpuState _state;
     public bool Logging { get; private set; }
     public StreamWriter Outfile { get; private set; }
     public Func<ushort> GetDp;
@@ -16,7 +15,6 @@ public class SnesSpcLogger()
     {
         Spc = snes.Spc;
         Apu = snes.Apu;
-        _state = Spc.State;
     }
 
     private readonly Dictionary<int, string> Labels = new()
@@ -130,8 +128,8 @@ public class SnesSpcLogger()
         if (!Logging) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var (disasm, _, _, size) = Disassemble(_state.PC, true);
-            Outfile.WriteLine($"{_state.PC:X4}  {disasm,-31}");
+            var (disasm, _, _, size) = Disassemble(Spc.PC, true);
+            Outfile.WriteLine($"{Spc.PC:X4}  {disasm,-31}");
         }
     }
 

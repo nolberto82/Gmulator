@@ -1,8 +1,8 @@
 ﻿using ImGuiNET;
-using Raylib_cs;
 using System.Numerics;
 
 namespace Gmulator.Shared;
+
 public static class Constants
 {
     public const int FC = 0x10;
@@ -66,8 +66,6 @@ public static class Constants
     public const int SnesAudioFreq = 44100;
 
     public const int SnesMaxSamples = 4096;
-
-    public const double apuCyclesPerMaster = 32040 * 32 / (1364 * 262 * 60.0);
 
     public const int GameGenie = 0;
     public const int ProAction = 1;
