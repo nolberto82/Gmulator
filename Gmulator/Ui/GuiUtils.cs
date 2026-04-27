@@ -75,7 +75,7 @@ public static class GuiUtils
     }
 
     public static void Checkbox(string name, bool chk) => ImGui.Checkbox(name, ref chk);
-    public static void Checkbox(string name, bool chk, ref Breakpoint bp, int type)
+    public static void Checkbox(string name, bool chk, ref Breakpoint bp, BpType type)
     {
         if (ImGui.Checkbox(name, ref chk))
             bp.Type ^= type;

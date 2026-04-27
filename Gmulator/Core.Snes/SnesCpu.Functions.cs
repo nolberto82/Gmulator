@@ -2,172 +2,180 @@
 
 public partial class SnesCpu
 {
-    private void Adc(int a)
+    private ushort SetValue(ushort register, int value, bool memoryMode)
     {
-        int v, b;
-        bool decimalMode = (PS & FD) != 0;
+        if (memoryMode)
+            return (ushort)((register & 0xff00) | value & 0xff);
+        else
+            return (ushort)value;
+    }
+
+    private void Adc(int addr, int op)
+    {
+        int value, b;
+        bool decimalMode = (_ps & FD) != 0;
         bool mmem = MMem;
         if (mmem)
         {
-            v = GetGet8bitImm(a);
+            value = GetGet8bitImm(addr, op);
 
             if (decimalMode)
             {
-                b = (A & 0xf) + (v & 0xf) + (PS & FC);
+                b = (_ra & 0xf) + (value & 0xf) + (_ps & FC);
                 if (b > 0x09) b += 0x06;
                 SetFlagC(b >= 0x10);
-                b = (A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf);
+                b = (_ra & 0xf0) + (value & 0xf0) + (b & 0x10) + (b & 0xf);
             }
             else
-                b = (byte)A + v + (PS & FC);
+                b = (byte)_ra + value + (_ps & FC);
 
-            SetFlagV((~(A & 0xff ^ v) & (A & 0xff ^ b) & 0x80) == 0x80);
+            SetFlagV((~(_ra & 0xff ^ value) & (_ra & 0xff ^ b) & 0x80) == 0x80);
 
             if (decimalMode && (byte)b > 0x9f) b += 0x60;
 
             SetFlagC(b >= 0x100);
-            A = (A & 0xff00) | (b & 0xff);
+            _ra = (ushort)((_ra & 0xff00) | (b & 0xff));
         }
         else
         {
-            v = GetGet16bitImm(a);
+            value = GetGet16bitImm(addr, op);
             if (decimalMode)
             {
-                b = (A & 0xf) + (v & 0xf) + (PS & FC);
+                b = (_ra & 0xf) + (value & 0xf) + (_ps & FC);
                 if (b > 0x09) b += 0x06;
                 SetFlagC(b >= 0x10);
-                b = (A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf);
+                b = (_ra & 0xf0) + (value & 0xf0) + (b & 0x10) + (b & 0xf);
                 if (b > 0x9f) b += 0x60;
-                b = (A & 0xf00) + (v & 0xf00) + (b & 0x100) + (b & 0xff);
+                b = (_ra & 0xf00) + (value & 0xf00) + (b & 0x100) + (b & 0xff);
                 if (b > 0x9ff) b += 0x600;
-                b = (A & 0xf000) + (v & 0xf000) + (b & 0x1000) + (b & 0xfff);
+                b = (_ra & 0xf000) + (value & 0xf000) + (b & 0x1000) + (b & 0xfff);
             }
             else
             {
-                b = A + v + (PS & FC);
+                b = _ra + value + (_ps & FC);
             }
 
-            SetFlagV((~(A ^ v) & (A ^ b) & 0x8000) == 0x8000);
+            SetFlagV((~(_ra ^ value) & (_ra ^ b) & 0x8000) == 0x8000);
 
             if (decimalMode && b > 0x9fff) b += 0x6000;
 
             SetFlagC(b >= 0x10000);
-            A = b & 0xffff;
+            _ra = (ushort)(b & 0xffff);
         }
         SetFlagZN(b, mmem);
     }
 
-    private void And(int a)
+    private void And(int a, int op)
     {
         bool mmem = MMem;
-        if (Imme)
+        if (Disasm[op].Immediate)
         {
             if (mmem)
-                A = (A & 0xff00) | A & a;
+                _ra = (ushort)((_ra & 0xff00) | _ra & a);
             else
-                A &= a;
+                _ra &= (ushort)a;
         }
         else
         {
             if (mmem)
-                A = A & 0xff00 | Read(a) & A;
+                _ra = (ushort)(_ra & 0xff00 | Read(a) & _ra);
             else
-                A &= ReadWord(a);
+                _ra &= ReadWord(a);
         }
-        SetFlagZN(A, mmem);
+        SetFlagZN(_ra, mmem);
     }
 
-    private void Asl(int a, int mode)
+    private void Asl(int value, int op)
     {
-        int b;
+        int result;
         bool mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x0a)
         {
             if (mmem)
             {
-                SetFlagC((A & 0x80) != 0);
-                b = A & 0xff00 | ((A & 0xff) << 1) & 0xfe;
+                SetFlagC((_ra & 0x80) != 0);
+                result = _ra & 0xff00 | ((_ra & 0xff) << 1) & 0xfe;
             }
             else
             {
-                SetFlagC((A & 0x8000) != 0);
-                b = (A << 1) & 0xfffe;
+                SetFlagC((_ra & 0x8000) != 0);
+                result = (_ra << 1) & 0xfffe;
             }
-            A = b;
+            _ra = (ushort)result;
         }
         else
         {
             if (mmem)
             {
-                b = Read(a);
-                SetFlagC((b & 0x80) != 0);
-                b = (b << 1) & 0xfe;
-                Write(a, b);
+                result = Read(value);
+                SetFlagC((result & 0x80) != 0);
+                result = (result << 1) & 0xfe;
+                Write(value, (byte)result);
             }
             else
             {
-                b = ReadWord(a);
-                SetFlagC((b & 0x8000) == 0x8000);
-                b = (b << 1) & 0xfffe;
-                WriteWord(a, b);
+                result = ReadWord(value);
+                SetFlagC((result & 0x8000) == 0x8000);
+                result = (result << 1) & 0xfffe;
+                WriteWord(value, result);
                 Idle(); Idle();
             }
         }
-        SetFlagZN(b, mmem);
+        SetFlagZN(result, mmem);
     }
 
     private void Brp(int m, int f)
     {
-        if ((PS & (1 << f)) != 0)
+        if ((_ps & (1 << f)) != 0)
         {
             Bra(m);
             Idle();
         }
         else
         {
-            PC++;
-            Read(PC);
+            _pc++;
+            Read(_pc);
         }
     }
 
     private void Brn(int m, int f)
     {
-        if ((PS & (1 << f)) == 0)
+        if ((_ps & (1 << f)) == 0)
         {
             Bra(m);
             Idle();
         }
         else
         {
-            PC++;
-            Read(PC);
+            _pc++;
+            Read(_pc);
         }
     }
 
-    private void Bra(int m)
+    private void Bra(int op)
     {
-        PC = GetMode(m);
-        if (E)
+        _pc = (ushort)GetAddressMode(Disasm[op].Mode);
+        if (_emulationMode)
             Idle();
     }
 
-    private void Bit(int a, int mode)
+    private void Bit(int a, int op)
     {
         int v, b;
         bool mmem = MMem;
-        if (Imme)
+        if (Disasm[op].Immediate)
         {
             if (mmem)
             {
-                b = GetGet8bitImm(a);
-                v = (byte)A & b;
-                PS = ((v & 0xFF) == 0) ? (PS | FZ) : (PS & ~FZ);
+                b = GetGet8bitImm(a, op);
+                v = (byte)_ra & b;
+                _ps = (byte)(((v & 0xFF) == 0) ? (_ps | FZ) : (_ps & ~FZ));
             }
             else
             {
-                b = GetGet16bitImm(a);
-                v = A & b;
-                PS = ((v & 0xFFFF) == 0) ? (PS | FZ) : (PS & ~FZ);
+                b = GetGet16bitImm(a, op);
+                v = _ra & b;
+                _ps = (byte)(((v & 0xFFFF) == 0) ? (_ps | FZ) : (_ps & ~FZ));
             }
         }
         else
@@ -175,80 +183,83 @@ public partial class SnesCpu
             if (mmem)
             {
                 b = Read(a);
-                v = (byte)A & b;
-                PS = ((v & 0xFF) == 0) ? (PS | FZ) : (PS & ~FZ);
-                PS = ((b & FN) != 0) ? (PS | FN) : (PS & ~FN);
+                v = (byte)_ra & b;
+                _ps = (byte)(((v & 0xFF) == 0) ? (_ps | FZ) : (_ps & ~FZ));
+                _ps = (byte)(((b & FN) != 0) ? (_ps | FN) : (_ps & ~FN));
                 SetFlagV((b & FV) != 0);
             }
             else
             {
                 b = ReadWord(a);
-                v = A & b;
-                PS = ((v & 0xFFFF) == 0) ? (PS | FZ) : (PS & ~FZ);
-                PS = ((b & 0x8000) != 0) ? (PS | FN) : (PS & ~FN);
+                v = _ra & b;
+                _ps = (byte)(((v & 0xFFFF) == 0) ? (_ps | FZ) : (_ps & ~FZ));
+                _ps = (byte)(((b & 0x8000) != 0) ? (_ps | FN) : (_ps & ~FN));
                 SetFlagV((b & 0x4000) != 0);
                 Idle();
             }
         }
     }
 
-    private void Cmp(int a)
+    private void Cmp(int a, int op)
     {
         int v, r;
         bool mmem = MMem;
         if (mmem)
-            v = GetGet8bitImm(a);
+            v = GetGet8bitImm(a, op);
         else
-            v = GetGet16bitImm(a);
+            v = GetGet16bitImm(a, op);
 
-        r = A - v;
-        SetFlagC(mmem ? (A & 0xff) >= v : (A & 0xffff) >= v);
+        r = _ra - v;
+        SetFlagC(mmem ? (_ra & 0xff) >= v : (_ra & 0xffff) >= v);
         SetFlagZN(r, mmem);
     }
 
-    private void Cpx(int a)
+    private void Cpx(int a, int op)
     {
         int v, r;
         bool xmem = XMem;
         if (xmem)
-            v = GetGet8bitImm(a);
+            v = GetGet8bitImm(a, op);
         else
-            v = GetGet16bitImm(a);
+            v = GetGet16bitImm(a, op);
 
-        r = X - v;
-        SetFlagC(X >= v);
+        r = _rx - v;
+        SetFlagC(_rx >= v);
         SetFlagZN(r, xmem);
     }
 
-    private void Cpy(int a)
+    private void Cpy(int a, int op)
     {
         int v, r;
         bool xmem = XMem;
         if (xmem)
-            v = GetGet8bitImm(a);
+            v = GetGet8bitImm(a, op);
         else
-            v = GetGet16bitImm(a);
+            v = GetGet16bitImm(a, op);
 
-        r = Y - v;
-        SetFlagC(Y >= v);
+        r = _ry - v;
+        SetFlagC(_ry >= v);
         SetFlagZN(r, xmem);
     }
 
-    private void Dec(int a, int mode)
+    private void Dec(int a, int op)
     {
         int b;
         var mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x3a)
         {
-            A--;
-            SetFlagZN(A, mmem);
+            if (mmem)
+                _ra = (ushort)(_ra & 0xff00 | (_ra - 1) & 0xff);
+            else
+                _ra--;
+            SetFlagZN(_ra, mmem);
         }
         else
         {
             if (mmem)
             {
                 b = (byte)(Read(a) - 1);
-                Write(a, b);
+                Write(a, (byte)b);
             }
             else
             {
@@ -261,47 +272,47 @@ public partial class SnesCpu
 
     private void Dex()
     {
-        X--;
-        SetFlagZN(X, XMem);
+        _rx = SetValue(_rx, _rx - 1, XMem);
+        SetFlagZN(_rx, XMem);
     }
 
     private void Dey()
     {
-        Y--;
-        SetFlagZN(Y, XMem);
+        _ry = SetValue(_ry, _ry - 1, XMem);
+        SetFlagZN(_ry, XMem);
     }
 
-    private void Eor(int v)
+    private void Eor(int addr, int op)
     {
         var mmem = MMem;
-        if (Imme)
+        if (Disasm[op].Immediate)
         {
-            v = A ^ v;
-            A = v;
+            addr = _ra ^ addr;
+            _ra = (ushort)addr;
         }
         else
         {
             if (mmem)
-                A ^= Read(v);
+                _ra ^= GetGet8bitImm(addr, op);
             else
-                A ^= ReadWord(v);
+                _ra ^= GetGet16bitImm(addr, op);
         }
-        SetFlagZN(A, mmem);
+        SetFlagZN(_ra, mmem);
     }
 
-    private void Inc(int a, int mode)
+    private void Inc(int a, int op)
     {
         var mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x1a)
         {
             if (mmem)
             {
-                int v = A + 1;
-                A = (A & 0xff00) | (byte)v;
+                int v = _ra + 1;
+                _ra = (ushort)((_ra & 0xff00) | (byte)v);
             }
             else
-                A++;
-            SetFlagZN(A, mmem);
+                _ra++;
+            SetFlagZN(_ra, mmem);
         }
         else
         {
@@ -309,7 +320,7 @@ public partial class SnesCpu
             if (mmem)
             {
                 b = (byte)(Read(a) + 1);
-                Write(a, b);
+                Write(a, (byte)b);
             }
             else
             {
@@ -322,151 +333,143 @@ public partial class SnesCpu
 
     private void Inx()
     {
-        X++;
-        SetFlagZN(X, XMem);
+        _rx = SetValue(_rx, _rx + 1, XMem);
+        SetFlagZN(_rx, XMem);
     }
 
     private void Iny()
     {
-        Y++;
-        SetFlagZN(Y, XMem);
+        _ry = SetValue(_ry, _ry + 1, XMem);
+        SetFlagZN(_ry, XMem);
     }
 
-    private void Jml(int v, int mode)
+    private void Jml(int value, int op)
     {
-        if (mode == AbsoluteLong)
+        if (op == 0x5c)
         {
-            PB = v >> 16;
-            PC = v;
+            _pbr = (byte)(value >> 16);
+            _pc = (ushort)value;
         }
-        else if (mode == AbsoluteIndirectLong)
+        else if (op == 0x6c)
         {
-            var a = ReadLong(v);
-            PC = a;
-            PB = a >> 16;
+            var addr = ReadLong(value);
+            _pc = (ushort)addr;
+            _pbr = (byte)(addr >> 16);
         }
+
     }
 
-    private void Jmp(int v, int mode)
+    private void Jmp(int value, int op)
     {
-        if (mode == Absolute)
-            PC = v;
-        else if (mode == AbsoluteIndirectLong)
+        if (op == 0x4c)
+            _pc = (ushort)value;
+        else if (op == 0xdc)
         {
-            var a = ReadLong(v);
-            PC = a;
-            PB = a >> 16;
+            var addr = ReadLong(value);
+            _pc = (ushort)addr;
+            _pbr = (byte)(addr >> 16);
         }
         else
-            PC = ReadWord(v);
+            _pc = ReadWord(value);
     }
 
-    private void Jsr(int v, int mode)
+    private void Jsr(int v, int op)
     {
-        PC--;
-        if (mode == Absolute || mode == AbsoluteLong)
+        _pc--;
+        if (op == 0x20 || op == 0x22)
         {
-            PushWord(PC, true);
-            PC = PB << 16 | (ushort)v;
+            PushWord(_pc, true);
+            _pc = (ushort)(_pbr << 16 | (ushort)v);
         }
         else
         {
-            PushWord(PC);
-            PC = ReadWord(v);
-            WrapSp();
+            PushWord(_pc);
+            _pc = ReadWord(v);
+            WrapStackPointer();
         }
     }
 
-    private void Jsl(int v, int mode)
+    private void Jsl(int v)
     {
-        var pc = PC - 1;
-        var pb = PB;
-        Push((byte)pb);
+        var pc = this._pc - 1;
+        Push(_pbr);
         Push((byte)(pc >> 8));
         Push((byte)pc);
-        PC = v;
-        PB = v >> 16;
-        WrapSp();
+        this._pc = (ushort)v;
+        _pbr = (byte)(v >> 16);
+        WrapStackPointer();
     }
 
-    private void Lda(int v)
+    private void Lda(int value, int op)
     {
-        if (Imme)
-            A = v;
+        var mmem = MMem;
+        if (Disasm[op].Immediate)
+            _ra = SetValue(_ra, value, MMem);
         else
         {
-            if (MMem)
-                A = Read(v);
+            if (mmem)
+                _ra = (ushort)((_ra & 0xff00) | GetGet8bitImm(value, op));
             else
-                A = ReadWord(v);
+                _ra = GetGet16bitImm(value, op);
         }
-        SetFlagZN(A, MMem);
+        SetFlagZN(_ra, mmem);
     }
 
-    private void Ldx(int v)
+    private void Ldx(int value, int op)
     {
         var xmem = XMem;
-        if (Imme)
-            X = v;
+        if (Disasm[op].Immediate)
+            _rx = SetValue(_rx, value, xmem);
         else
-        {
-            if (xmem)
-                X = Read(v);
-            else
-                X = ReadWord(v);
-        }
-        SetFlagZN(X, xmem);
+            _rx = xmem ? SetValue(_rx, Read(value), xmem) : ReadWord(value);
+        SetFlagZN(_rx, xmem);
     }
 
-    private void Ldy(int v)
+    private void Ldy(int value, int op)
     {
         var xmem = XMem;
-        if (Imme)
-            Y = v;
+        if (Disasm[op].Immediate)
+            _ry = SetValue(_ry, value, xmem);
         else
-        {
-            if (xmem)
-                Y = Read(v);
-            else
-                Y = ReadWord(v);
-        }
-        SetFlagZN(Y, xmem);
+            _ry = xmem ? SetValue(_ry, Read(value), xmem) : ReadWord(value);
+
+        SetFlagZN(_ry, xmem);
     }
 
-    private void Lsr(int a, int mode)
+    private void Lsr(int value, int op)
     {
-        int b;
+        int result;
         bool mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x4a)
         {
-            SetFlagC(((byte)A & 0x01) != 0);
+            SetFlagC(((byte)_ra & 0x01) != 0);
             if (mmem)
             {
-                b = A & 0xff;
-                b = (b >> 1) & 0x7f;
+                result = _ra & 0xff;
+                result = (result >> 1) & 0x7f;
             }
             else
-                b = (A >> 1) & 0x7fff;
-            A = b;
+                result = (_ra >> 1) & 0x7fff;
+            _ra = SetValue(_ra, result, mmem);
         }
         else
         {
             if (mmem)
             {
-                b = Read(a);
-                SetFlagC((b & 0x01) != 0);
-                b = (byte)((b >> 1) & 0x7f);
-                Write(a, b);
+                result = Read(value);
+                SetFlagC((result & 0x01) != 0);
+                result = (byte)((result >> 1) & 0x7f);
+                Write(value, (byte)result);
             }
             else
             {
-                b = ReadWord(a);
-                SetFlagC((b & 0x01) != 0);
-                b = (ushort)((b >> 1) & 0x7fff);
-                WriteWord(a, b);
+                result = ReadWord(value);
+                SetFlagC((result & 0x01) != 0);
+                result = (ushort)((result >> 1) & 0x7fff);
+                WriteWord(value, result);
             }
         }
-        SetFlagZN(b, mmem);
+        SetFlagZN(result, mmem);
     }
 
     private void Mvn()
@@ -474,392 +477,392 @@ public partial class SnesCpu
         bool xmem = XMem;
         int src = Read(PBPC + 1);
         int dst = Read(PBPC);
-        DB = dst;
-        int v = Read((src << 16) | (xmem ? (byte)X : X));
-        Write((dst << 16) | (xmem ? (byte)Y : Y), v);
-        X++;
-        Y++;
-        _ra = (_ra - 1) & 0xffff;
-        PC = (_ra != 0xffff) ? (PC - 1) : (PC + 2);
+        _dbr = (byte)dst;
+        int v = Read((src << 16) | (xmem ? (byte)_rx : _rx));
+        Write((dst << 16) | (xmem ? (byte)_ry : _ry), (byte)v);
+        _rx++;
+        _ry++;
+        _ra = (ushort)(_ra - 1);
+        _pc = (ushort)((_ra != 0xffff) ? (_pc - 1) : (_pc + 2));
         Idle();
     }
 
     private void Mvp()
     {
         bool xmem = XMem;
-        int src = Read(PB << 16 | (PC + 1));
-        int dst = Read(PB << 16 | PC);
-        DB = dst;
-        int v = Read((src << 16) | (xmem ? (byte)X : X));
-        Write((dst << 16) | (xmem ? (byte)Y : Y), v);
-        X--;
-        Y--;
-        _ra = (_ra - 1) & 0xffff;
-        PC = (_ra != 0xffff) ? (PC - 1) : (PC + 2);
+        int src = Read(_pbr << 16 | (_pc + 1));
+        int dst = Read(_pbr << 16 | _pc);
+        _dbr = (byte)dst;
+        byte value = Read((src << 16) | (xmem ? (byte)_rx : _rx));
+        Write((dst << 16) | (xmem ? (byte)_ry : _ry), value);
+        _rx--;
+        _ry--;
+        _ra = (ushort)(_ra - 1);
+        _pc = (ushort)((_ra != 0xffff) ? (_pc - 1) : (_pc + 2));
         Idle();
     }
 
     public virtual void Irq()
     {
-        if (!E)
+        if (!_emulationMode)
         {
-            Push((byte)PB);
-            Push((byte)(PC >> 8));
-            Push((byte)(PC & 0xff));
-            Push((byte)PS);
-            PS |= FI;
+            Push(_pbr);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+            _ps |= FI;
             Idle();
         }
         else
         {
-            Push((byte)(PC >> 8));
-            Push((byte)(PC & 0xff));
-            Push((byte)PS);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
         }
-        PC = ReadWord(IRQn);
-        PB = 0;
+        _pc = ReadWord(IRQn);
+        _pbr = 0;
     }
 
     public virtual void Nmi()
     {
-        if (!E)
+        if (!_emulationMode)
         {
-            Push((byte)PB);
-            Push((byte)(PC >> 8));
-            Push((byte)(PC & 0xff));
-            Push((byte)PS);
-            PS |= FI;
+            Push(_pbr);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+            _ps |= FI;
             Idle();
         }
         else
         {
-            Push((byte)(PC >> 8));
-            Push((byte)(PC & 0xff));
-            Push((byte)PS);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
         }
-        PC = ReadWord(NMIn);
-        PB = 0;
+        _pc = ReadWord(NMIn);
+        _pbr = 0;
     }
 
-    private void Ora(int v)
+    private void Ora(int addr, int op)
     {
         bool mmem = MMem;
-        if (Imme)
+        if (Disasm[op].Immediate)
         {
-            v = A | v;
-            A = v;
+            addr = _ra | addr;
+            _ra = (ushort)addr;
         }
         else
         {
             if (mmem)
-                A |= Read(v);
+                _ra |= GetGet8bitImm(addr, op);
             else
-                A |= ReadWord(v);
+                _ra |= GetGet16bitImm(addr, op);
         }
-        SetFlagZN(A, mmem);
+        SetFlagZN(_ra, mmem);
     }
 
     private void Pea(int v)
     {
         PushWord(v);
-        WrapSp();
+        WrapStackPointer();
     }
 
     private void Pei(int v)
     {
         PushWord(ReadWord(v));
-        WrapSp();
+        WrapStackPointer();
     }
 
     private void Per(int v)
     {
-        PushWord(PC + v);
-        WrapSp();
+        PushWord(_pc + v);
+        WrapStackPointer();
     }
 
     private void Pha()
     {
-        PushM(A);
-        WrapSp();
+        PushM(_ra);
+        WrapStackPointer();
     }
 
     private void Phd()
     {
-        PushWord(D);
-        WrapSp();
+        PushWord(dpr);
+        WrapStackPointer();
     }
 
     private void Phk()
     {
-        Push(PB);
-        WrapSp();
+        Push(_pbr);
+        WrapStackPointer();
     }
 
     private void Php()
     {
-        Push(PS);
-        WrapSp();
+        Push(_ps);
+        WrapStackPointer();
     }
 
     private void Pla()
     {
         bool mmem = MMem;
         if (mmem)
-            A = A & 0xff00 | Pop(true);
+            _ra = (ushort)(_ra & 0xff00 | Pop(true));
         else
-            A = PopWord();
-        SetFlagZN(A, mmem);
+            _ra = PopWord();
+        SetFlagZN(_ra, mmem);
     }
 
     private void Pld()
     {
-        D = PopWord();
-        SetFlagZN(D, false);
-        WrapSp();
+        dpr = PopWord();
+        SetFlagZN(dpr, false);
+        WrapStackPointer();
     }
 
     private void Plx()
     {
         bool xmem = XMem;
         if (xmem)
-            X = X & 0xff00 | Pop(true);
+            _rx = SetValue(_rx, Pop(true), xmem);
         else
-            X = PopWord();
-        SetFlagZN(X, xmem);
+            _rx = PopWord();
+        SetFlagZN(_rx, xmem);
     }
 
     private void Ply()
     {
         bool xmem = XMem;
         if (xmem)
-            Y = Y & 0xff00 | Pop(true);
+            _ry = SetValue(_ry, Pop(true), xmem);
         else
-            Y = PopWord();
-        SetFlagZN(Y, xmem);
+            _ry = PopWord();
+        SetFlagZN(_ry, xmem);
     }
 
     private void Plb()
     {
-        DB = Pop();
-        SetFlagZN(DB, true);
-        WrapSp();
+        _dbr = Pop();
+        SetFlagZN(_dbr, true);
+        WrapStackPointer();
         Idle(); Idle();
     }
 
     private void Plp()
     {
-        if (E)
-            PS = Pop(true) | 0x30;
+        if (_emulationMode)
+            _ps = (byte)(Pop(true) | 0x30);
         else
-            PS = Pop();
+            _ps = Pop();
 
         if (XMem)
         {
-            X &= 0xff;
-            Y &= 0xff;
+            _rx &= 0xff;
+            _ry &= 0xff;
         }
-        WrapSp();
+        WrapStackPointer();
     }
 
     private void Rep(int v)
     {
-        PS &= ~v;
-        if (E)
-            PS |= FX | FM;
+        _ps &= (byte)~v;
+        if (_emulationMode)
+            _ps |= FX | FM;
     }
 
-    private void Rol(int a, int mode)
+    private void Rol(int value, int op)
     {
         int msb;
-        int b;
+        int result;
         bool mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x2a)
         {
             if (mmem)
             {
-                msb = A & 0x80;
-                b = A & 0xff;
-                b <<= 1;
-                if ((PS & FC) != 0)
-                    b |= 0x01;
-                A = b;
+                msb = _ra & 0x80;
+                result = _ra & 0xff;
+                result <<= 1;
+                if ((_ps & FC) != 0)
+                    result |= 0x01;
+                _ra = SetValue(_ra, result, mmem);
             }
             else
             {
-                msb = A & 0x8000;
-                A <<= 1;
-                if ((PS & FC) == FC)
-                    A |= 0x01;
-                b = A & 0xffff;
+                msb = _ra & 0x8000;
+                _ra <<= 1;
+                if ((_ps & FC) == FC)
+                    _ra |= 0x01;
+                result = _ra & 0xffff;
             }
         }
         else
         {
             if (mmem)
             {
-                b = Read(a);
-                msb = b & 0x80;
-                b = (byte)(b << 1);
-                if ((PS & FC) != 0)
-                    b |= 0x01;
-                Write(a, b);
+                result = Read(value);
+                msb = result & 0x80;
+                result = (byte)(result << 1);
+                if ((_ps & FC) != 0)
+                    result |= 0x01;
+                Write(value, (byte)result);
             }
             else
             {
-                b = ReadWord(a);
-                msb = b & 0x8000;
-                b = (ushort)(b << 1);
-                if ((PS & FC) == FC)
-                    b |= 0x01;
-                WriteWord(a, b);
+                result = ReadWord(value);
+                msb = result & 0x8000;
+                result = (ushort)(result << 1);
+                if ((_ps & FC) == FC)
+                    result |= 0x01;
+                WriteWord(value, result);
             }
         }
         SetFlagC(msb != 0);
-        SetFlagZN(b, mmem);
+        SetFlagZN(result, mmem);
     }
 
-    private void Ror(int a, int mode)
+    private void Ror(int value, int op)
     {
-        int bit0, b;
+        int bit0, result;
         bool mmem = MMem;
-        if (mode == Accumulator)
+        if (op == 0x6a)
         {
             if (mmem)
             {
-                b = A & 0xff;
-                bit0 = b & 0x01;
-                b >>= 1;
-                if ((PS & FC) != 0)
-                    b |= 0x80;
-                A = b;
+                result = _ra & 0xff;
+                bit0 = result & 0x01;
+                result >>= 1;
+                if ((_ps & FC) != 0)
+                    result |= 0x80;
+                _ra = SetValue(_ra, result, mmem);
             }
             else
             {
-                bit0 = A & 0x01;
-                A >>= 1;
-                if ((PS & FC) == FC)
-                    A |= 0x8000;
-                b = A & 0xffff;
+                bit0 = _ra & 0x01;
+                _ra >>= 1;
+                if ((_ps & FC) == FC)
+                    _ra |= 0x8000;
+                result = _ra & 0xffff;
             }
         }
         else
         {
             if (mmem)
             {
-                b = Read(a);
-                bit0 = b & 0x01;
-                b = (byte)(b >> 1);
-                if ((PS & FC) != 0)
-                    b |= 0x80;
-                Write(a, b);
+                result = Read(value);
+                bit0 = result & 0x01;
+                result = (byte)(result >> 1);
+                if ((_ps & FC) != 0)
+                    result |= 0x80;
+                Write(value, (byte)result);
             }
             else
             {
-                b = ReadWord(a);
-                bit0 = b & 0x01;
-                b = (ushort)(b >> 1);
-                if ((PS & FC) != 0)
-                    b |= 0x8000;
-                WriteWord(a, b);
+                result = ReadWord(value);
+                bit0 = result & 0x01;
+                result = (ushort)(result >> 1);
+                if ((_ps & FC) != 0)
+                    result |= 0x8000;
+                WriteWord(value, result);
             }
 
         }
         SetFlagC(bit0 != 0);
-        SetFlagZN(b, mmem);
+        SetFlagZN(result, mmem);
     }
 
     private void Rti()
     {
-        if (E)
+        if (_emulationMode)
         {
-            PS = Pop(true) | 0x30;
-            PC = PopWord();
+            _ps = (byte)(Pop(true) | 0x30);
+            _pc = PopWord();
         }
         else
         {
-            PS = Pop();
-            PC = PopWord();
-            PB = Pop();
+            _ps = Pop();
+            _pc = PopWord();
+            _pbr = Pop();
         }
     }
 
     private void Rtl()
     {
-        var v = PB << 16 | PopWord();
-        PB = Pop();
-        PC = v | PB << 16;
-        PC++;
-        WrapSp();
+        var v = _pbr << 16 | PopWord();
+        _pbr = Pop();
+        _pc = (ushort)(v | _pbr << 16);
+        _pc++;
+        WrapStackPointer();
     }
 
     private void Rts()
     {
-        PC = Pop(true);
-        PC |= Pop(true) << 8;
-        PC |= PB << 16;
-        PC++;
+        _pc = Pop(true);
+        _pc |= (ushort)(Pop(true) << 8);
+        _pc |= (ushort)(_pbr << 16);
+        _pc++;
     }
 
     private void Sep(int v)
     {
-        PS |= v;
-        if (E)
-            PS |= FX | FM;
+        _ps |= (byte)v;
+        if (_emulationMode)
+            _ps |= FX | FM;
 
         if (XMem)
         {
-            X &= 0xFF;
-            Y &= 0xFF;
+            _rx &= 0xFF;
+            _ry &= 0xFF;
         }
     }
 
-    private void Sbc(int a)
+    private void Sbc(int a, int op)
     {
         int v, b;
-        bool decimalMode = (PS & FD) != 0;
+        bool decimalMode = (_ps & FD) != 0;
         bool mmem = MMem;
         if (mmem)
         {
-            v = ~GetGet8bitImm(a) & 0xff;
+            v = ~GetGet8bitImm(a, op) & 0xff;
             if (decimalMode)
             {
-                b = (ushort)((A & 0xf) + (v & 0xf) + FlagC);
+                b = (ushort)((_ra & 0xf) + (v & 0xf) + FlagC);
                 if (b < 0x10) b -= 0x06;
                 SetFlagC(b >= 0x10);
-                b = (ushort)((A & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
+                b = (ushort)((_ra & 0xf0) + (v & 0xf0) + (b & 0x10) + (b & 0xf));
             }
             else
-                b = (A & 0xff) + v + FlagC;
+                b = (_ra & 0xff) + v + FlagC;
 
-            SetFlagV((~(A & 0xff ^ v) & (A & 0xff ^ b) & 0x80) == 0x80);
+            SetFlagV((~(_ra & 0xff ^ v) & (_ra & 0xff ^ b) & 0x80) == 0x80);
             if (decimalMode && b < 0x100) b -= 0x60;
 
             SetFlagC(b > 0xff);
-            A = A & 0xff00 | b & 0xff;
+            _ra = (ushort)(_ra & 0xff00 | b & 0xff);
         }
         else
         {
-            v = (ushort)~GetGet16bitImm(a);
+            v = (ushort)~GetGet16bitImm(a, op);
             if (decimalMode)
             {
-                b = (A & 0xf) + (v & 0xf) + FlagC;
+                b = (_ra & 0xf) + (v & 0xf) + FlagC;
                 if (b < 0x10) b -= 0x06;
                 SetFlagC(b >= 0x10);
-                b = (A & 0xf0) + (v & 0xf0) + (b > 0xf ? 0x10 : 0) + (b & 0xf);
+                b = (_ra & 0xf0) + (v & 0xf0) + (b > 0xf ? 0x10 : 0) + (b & 0xf);
                 if (b < 0x100) b -= 0x60;
-                b = (A & 0xf00) + (v & 0xf00) + (b > 0xff ? 0x100 : 0) + (b & 0xff);
+                b = (_ra & 0xf00) + (v & 0xf00) + (b > 0xff ? 0x100 : 0) + (b & 0xff);
                 if (b < 0x1000) b -= 0x600;
-                b = (A & 0xf000) + (v & 0xf000) + (b > 0xfff ? 0x1000 : 0) + (b & 0xfff);
+                b = (_ra & 0xf000) + (v & 0xf000) + (b > 0xfff ? 0x1000 : 0) + (b & 0xfff);
             }
             else
-                b = A + v + FlagC;
+                b = _ra + v + FlagC;
 
-            SetFlagV((~(A ^ v) & (A ^ b) & 0x8000) == 0x8000);
+            SetFlagV((~(_ra ^ v) & (_ra ^ b) & 0x8000) == 0x8000);
             if (decimalMode && b < 0x10000) b -= 0x6000;
 
             SetFlagC(b > 0xffff);
 
-            A = b & 0xffff;
+            _ra = (ushort)(b & 0xffff);
         }
         SetFlagZN(b, mmem);
     }
@@ -867,25 +870,25 @@ public partial class SnesCpu
     private void Sta(int a)
     {
         if (MMem)
-            Write(a, A);
+            Write(a, (byte)_ra);
         else
-            WriteWord(a, A);
+            WriteWord(a, _ra);
     }
 
     private void Stx(int a)
     {
         if (XMem)
-            Write(a, X);
+            Write(a, (byte)_rx);
         else
-            WriteWord(a, X);
+            WriteWord(a, _rx);
     }
 
     private void Sty(int a)
     {
         if (XMem)
-            Write(a, Y);
+            Write(a, (byte)_ry);
         else
-            WriteWord(a, Y);
+            WriteWord(a, _ry);
     }
 
     private void Stz(int a)
@@ -898,16 +901,16 @@ public partial class SnesCpu
 
     private void Tcd()
     {
-        D = A;
+        dpr = _ra;
         Idle();
-        SetFlagZN(D, false);
+        SetFlagZN(dpr, false);
     }
 
     private void Tdc()
     {
-        _ra = D & 0xffff;
+        _ra = dpr;
         Idle();
-        SetFlagZN(A, false);
+        SetFlagZN(_ra, false);
     }
 
     private void Trb(int a)
@@ -917,14 +920,14 @@ public partial class SnesCpu
         if (mmem)
         {
             v = Read(a);
-            Write(a, v & 0xff & ~A);
-            v &= A;
+            Write(a, (byte)(v & 0xff & ~_ra));
+            v &= _ra;
         }
         else
         {
             v = ReadWord(a);
-            WriteWord(a, v & ~A);
-            v &= A;
+            WriteWord(a, v & ~_ra);
+            v &= _ra;
         }
         SetFlagZ(v, mmem);
     }
@@ -935,126 +938,126 @@ public partial class SnesCpu
         if (mmem)
         {
             int v = Read(a);
-            Write(a, v | A);
-            v &= A;
+            Write(a, (byte)(v | _ra));
+            v &= _ra;
             SetFlagZ(v, mmem);
         }
         else
         {
             int v = ReadWord(a);
-            WriteWord(a, v | A);
-            v &= A;
+            WriteWord(a, v | _ra);
+            v &= _ra;
             SetFlagZ(v, mmem);
         }
     }
 
     private void Tcs()
     {
-        if (E)
-            SetSp(A, true);
+        if (_emulationMode)
+            SetSp(_ra, true);
         else
-            SP = A;
+            _sp = _ra;
         Idle();
     }
 
     private void Tsc()
     {
-        _ra = SP & 0xffff;
+        _ra = _sp;
         Idle();
-        SetFlagZN(A, false);
+        SetFlagZN(_ra, false);
     }
 
     private void Tax()
     {
-        X = A;
-        SetFlagZN(X, XMem);
+        _rx = SetValue(_rx, _ra, XMem);
+        SetFlagZN(_rx, XMem);
         Idle();
     }
 
     private void Tay()
     {
-        Y = A;
-        SetFlagZN(Y, XMem);
+        _ry = SetValue(_ry, _ra, XMem); ;
+        SetFlagZN(_ry, XMem);
         Idle();
     }
 
     private void Tsx()
     {
-        X = SP;
-        SetFlagZN(X, XMem);
+        _rx = _sp;
+        SetFlagZN(_rx, XMem);
         Idle();
     }
 
     private void Txa()
     {
-        A = !MMem ? X & 0xffff : A & 0xff00 | X & 0xff;
-        SetFlagZN(A, MMem);
+        _ra = MMem ? SetValue(_ra, _rx, MMem) : _rx;
+        SetFlagZN(_ra, MMem);
         Idle();
     }
 
     private void Txs()
     {
-        SP = E ? X | 0x100 : X;
+        _sp = (ushort)(_emulationMode ? _rx | 0x100 : _rx);
         Idle();
     }
 
     private void Txy()
     {
-        Y = X;
-        SetFlagZN(X, XMem);
+        _ry = _rx;
+        SetFlagZN(_rx, XMem);
         Idle();
     }
 
     private void Tyx()
     {
-        X = Y;
-        SetFlagZN(X, XMem);
+        _rx = _ry;
+        SetFlagZN(_rx, XMem);
         Idle();
     }
 
     private void Tya()
     {
-        A = Y;
-        SetFlagZN(A, MMem);
+        _ra = SetValue(_ra, _ry, MMem);
+        SetFlagZN(_ra, MMem);
         Idle();
     }
 
     private void Xba()
     {
         int al, ah;
-        (al, ah) = (A >> 8, (byte)A);
-        _ra = ah << 8 | al;
+        (al, ah) = (_ra >> 8, (byte)_ra);
+        _ra = (ushort)(ah << 8 | al);
         Idle(); Idle();
-        SetFlagZN(A, true);
+        SetFlagZN(_ra, true);
     }
 
     private void Xce()
     {
-        (E, bool c) = (FlagC != 0, E);
-        PS = c ? PS |= FC : PS &= ~FC;
-        if (E)
+        (_emulationMode, bool c) = (FlagC != 0, _emulationMode);
+        _ps = c ? _ps |= FC : _ps &= unchecked((byte)~FC);
+        if (_emulationMode)
         {
-            PS |= FX | FM;
-            X &= 0xff;
-            Y &= 0xff;
-            SP &= 0xff | 1 << 8;
+            _ps |= FX | FM;
+            _rx &= 0xff;
+            _ry &= 0xff;
+            _sp &= 0xff | 1 << 8;
         }
         Idle();
     }
 
-    private int Pop(bool e = false)
+    private byte Pop(bool e = false)
     {
-        SetSp(SP + 1, e);
-        return Read(SP);
+        SetSp(_sp + 1, e);
+        return Read(_sp);
     }
 
-    private ushort PopWord() => (ushort)(Read(++SP) | Read(++SP) << 8);
+    private ushort PopWord() => (ushort)(Read(++_sp) | Read(++_sp) << 8);
 
     public void Push(int v, bool e = false)
     {
         Idle();
-        Write(SP, v & 0xff);
-        SetSp(SP - 1, e);
+        Write(_sp, (byte)(v & 0xff));
+        SetSp(_sp - 1, e);
     }
 
     private void PushWord(int v, bool e = false)
@@ -1079,68 +1082,68 @@ public partial class SnesCpu
             Push(v >> 8);
             Push(v);
         }
-        WrapSp();
+        WrapStackPointer();
     }
 
     private void Brk()
     {
-        Read(PC++);
-        if (E)
+        Read(_pc++);
+        if (_emulationMode)
         {
-            PushWord(PC, true);
-            Push(PS | FM, true);
-            PC = ReadWord(BRKe);
+            PushWord(_pc, true);
+            Push(_ps | FM, true);
+            _pc = ReadWord(BRKe);
         }
         else
         {
-            Push(PB);
-            PushWord(PC);
-            Push(PS, true);
-            PC = ReadWord(BRKn);
+            Push(_pbr);
+            PushWord(_pc);
+            Push(_ps, true);
+            _pc = ReadWord(BRKn);
         }
-        PS |= FI;
-        PS &= ~FD;
-        PB = 0;
+        _ps |= FI;
+        _ps &= unchecked((byte)~FD);
+        _pbr = 0;
     }
 
     private void Cop()
     {
-        Read((ushort)PC++);
-        if (E)
+        Read(_pc++);
+        if (_emulationMode)
         {
-            PushWord(PC);
-            Push(PS | FM, true);
-            PC = ReadWord(COPe);
+            PushWord(_pc);
+            Push(_ps | FM, true);
+            _pc = ReadWord(COPe);
         }
         else
         {
-            Push(PB);
-            PushWord(PC);
-            Push(PS, true);
-            PC = ReadWord(COPn);
+            Push(_pbr);
+            PushWord(_pc);
+            Push(_ps, true);
+            _pc = ReadWord(COPn);
             Idle();
         }
-        PS |= FI;
-        PS &= ~FD;
-        PB = 0;
+        _ps |= FI;
+        _ps &= unchecked((byte)~FD);
+        _pbr = 0;
     }
 
     public virtual void Reset(bool isSa1)
     {
-        SP = 0x0200;
+        _sp = 0x0200;
         Read(0);
         Idle();
-        Read(0x100 | SP--);
-        Read(0x100 | SP--);
+        Read(0x100 | _sp--);
+        Read(0x100 | _sp--);
         if (!isSa1)
-            PC = Read(RESETe) | Read(RESETe + 1) << 8;
+            _pc = (ushort)(Read(RESETe) | Read(RESETe + 1) << 8);
 
-        A = X = Y = 0;
-        PS = 0x34;
-        DB = 0x00;
-        PB = 0x00;
-        D = 0x0000;
-        E = true;
+        _ra = _rx = _ry = 0;
+        _ps = 0x34;
+        _dbr = 0x00;
+        _pbr = 0x00;
+        dpr = 0x0000;
+        _emulationMode = true;
         FastMem = false;
         NmiEnabled = false;
         IrqEnabled = false;
@@ -1151,21 +1154,21 @@ public partial class SnesCpu
 
     private void SetFlagC(bool flag)
     {
-        if (flag) PS |= FC;
-        else PS &= ~FC;
+        if (flag) _ps |= FC;
+        else _ps &= unchecked((byte)~FC);
     }
 
     private void SetFlagZ(int v, bool isbyte)
     {
         if (isbyte)
         {
-            if ((v & 0xff) == 0) PS |= FZ;
-            else PS &= ~FZ;
+            if ((v & 0xff) == 0) _ps |= FZ;
+            else _ps &= unchecked((byte)~FZ);
         }
         else
         {
-            if ((v & 0xffff) == 0) PS |= FZ;
-            else PS &= ~FZ;
+            if ((v & 0xffff) == 0) _ps |= FZ;
+            else _ps &= unchecked((byte)~FZ);
         }
     }
 
@@ -1173,23 +1176,23 @@ public partial class SnesCpu
     {
         if (isbyte)
         {
-            if ((v & 0xff) == 0) PS |= FZ;
-            else PS &= ~FZ;
-            if ((v & FN) != 0) PS |= FN;
-            else PS &= ~FN;
+            if ((v & 0xff) == 0) _ps |= FZ;
+            else _ps &= unchecked((byte)~FZ);
+            if ((v & FN) != 0) _ps |= FN;
+            else _ps &= unchecked((byte)~FN);
         }
         else
         {
-            if ((v & 0xffff) == 0) PS |= FZ;
-            else PS &= ~FZ;
-            if ((v & FN << 8) != 0) PS |= FN;
-            else PS &= ~FN;
+            if ((v & 0xffff) == 0) _ps |= FZ;
+            else _ps &= unchecked((byte)~FZ);
+            if ((v & FN << 8) != 0) _ps |= FN;
+            else _ps &= unchecked((byte)~FN);
         }
     }
 
     private void SetFlagV(bool flag)
     {
-        if (flag) PS |= FV;
-        else PS &= ~FV;
+        if (flag) _ps |= FV;
+        else _ps &= unchecked((byte)~FV);
     }
 }

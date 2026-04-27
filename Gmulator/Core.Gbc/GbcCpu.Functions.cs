@@ -6,20 +6,20 @@
         private void OpAdc8(int r1)
         {
             int c = (byte)(F & FC) >> 4;
-            int v = A + r1 + c;
+            int v = _a + r1 + c;
             SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-            SetF((((A & 0xf) + (r1 & 0xf) + c) & 0x10) != 0, FH);
+            SetF((((_a & 0xf) + (r1 & 0xf) + c) & 0x10) != 0, FH);
             SetF(v > 0xff, FC);
-            A = (byte)v;
+            _a = (byte)v;
         }
 
         private void OpAdd8(int r1)
         {
-            int v = A + r1;
+            int v = _a + r1;
             SetF((v & 0xff) == 0, FZ); SetF(false, FN);
-            SetF(((A & 0xf) + (r1 & 0xf) & 0x10) != 0, FH);
+            SetF(((_a & 0xf) + (r1 & 0xf) & 0x10) != 0, FH);
             SetF(v > 0xff, FC);
-            A = (byte)v;
+            _a = (byte)v;
         }
 
         private ushort OpAdd(int r1, int r2)
@@ -49,11 +49,11 @@
 
         private void OpAnd(int r1)
         {
-            int v = A & r1;
+            int v = _a & r1;
             SetF(v == 0, FZ); SetF(false, FN);
             SetF(true, FH); SetF(false, FC);
 
-            A = (byte)v;
+            _a = (byte)v;
         }
 
         private void OpCall(bool flag)
@@ -79,21 +79,21 @@
 
         private void OpCp(int r1)
         {
-            int v = A - r1;
+            int v = _a - r1;
             SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-            SetF(((A & 0xf) - (r1 & 0xf) & 0x10) != 0, FH);
+            SetF(((_a & 0xf) - (r1 & 0xf) & 0x10) != 0, FH);
         }
 
         private void OpCpl()
         {
-            int r1 = A ^ 0xff;
+            int r1 = _a ^ 0xff;
             SetF(true, FN); SetF(true, FH);
-            A = (byte)r1;
+            _a = (byte)r1;
         }
 
         private void OpDaa()
         {
-            int v = A;
+            int v = _a;
             if ((F & FN) != 0)
             {
                 if ((F & FH) != 0)
@@ -103,9 +103,9 @@
             }
             else
             {
-                if ((F & FH) != 0 || (A & 0xf) > 9)
+                if ((F & FH) != 0 || (_a & 0xf) > 9)
                     v += 6;
-                if ((F & FC) != 0 || A > 0x99)
+                if ((F & FC) != 0 || _a > 0x99)
                 {
                     v += 0x60;
                     SetF(true, FC);
@@ -114,7 +114,7 @@
 
             SetF((v & 0xff) == 0, FZ); SetF(false, FH);
 
-            A = (byte)v;
+            _a = (byte)v;
         }
 
         private byte OpDec8(int r1)
@@ -177,8 +177,8 @@
         }
 
         private ushort OpLdHLSP(int r1, int r2) => OpAddSP(r1, r2, true);
-        private int OpLdReg(int a) => ReadCycle(a);
-        private int OpLdImm8() => ReadCycle(PC++);
+        private byte OpLdReg(int addr) => ReadCycle(addr);
+        private byte OpLdImm8() => ReadCycle(PC++);
         private int OpLdImm16() => (ReadCycle(PC++) | ReadCycle(PC++) << 8) & 0xffff;
         private void OpLdWr(int a, int v) => WriteCycle(a, (byte)v);
 
@@ -191,10 +191,10 @@
 
         private void OpOr(int r1)
         {
-            int v = A | r1;
+            int v = _a | r1;
             SetF(v == 0, FZ); SetF(false, FN);
             SetF(false, FH); SetF(false, FC);
-            A = (byte)v;
+            _a = (byte)v;
         }
 
         private ushort OpPop(bool af = false)
@@ -250,23 +250,23 @@
 
         private void OpRla()
         {
-            int v = (ushort)(A << 1);
+            int v = (ushort)(_a << 1);
             int oc = (byte)(F & FC) >> 4;
             int c = (byte)(v >> 8);
 
             SetF(false, FZ); SetF(false, FN);
             SetF(false, FH); SetF(c != 0, FC);
-            A = (byte)(v | oc);
+            _a = (byte)(v | oc);
         }
 
         private void OpRlca()
         {
-            int v = (ushort)(A << 1);
+            int v = (ushort)(_a << 1);
             int c = (byte)(v >> 8);
 
             SetF(false, FZ); SetF(false, FN);
             SetF(false, FH); SetF(c != 0, FC);
-            A = (byte)(v | c);
+            _a = (byte)(v | c);
         }
 
         private byte OpRr(int r1)
@@ -282,21 +282,21 @@
         private void OpRra()
         {
             int oc = (F & FC) >> 4;
-            int v = A >> 1;
+            int v = _a >> 1;
 
             SetF(false, FZ); SetF(false, FN);
-            SetF(false, FH); SetF((A & 1) != 0, FC);
-            A = (byte)(v | (oc << 7));
+            SetF(false, FH); SetF((_a & 1) != 0, FC);
+            _a = (byte)(v | (oc << 7));
         }
 
         private void OpRrca()
         {
-            int c = (byte)(A & 1);
-            A = (byte)(A >> 1);
+            int c = (byte)(_a & 1);
+            _a = (byte)(_a >> 1);
 
             SetF(false, FZ); SetF(false, FN);
             SetF(false, FH); SetF(c != 0, FC);
-            A = (byte)(A | (c << 7));
+            _a = (byte)(_a | (c << 7));
         }
 
         private void OpRst(ushort r1, bool interrupt = false)
@@ -312,11 +312,11 @@
         private void OpSbc8(int r1)
         {
             int c = (byte)(F & FC) >> 4;
-            int v = A - r1 - c;
+            int v = _a - r1 - c;
 
             SetF((byte)v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-            SetF((((A & 0xf) - (r1 & 0xf) - c) & 0x10) != 0, FH);
-            A = (byte)v;
+            SetF((((_a & 0xf) - (r1 & 0xf) - c) & 0x10) != 0, FH);
+            _a = (byte)v;
         }
 
         private void OpScf()
@@ -326,20 +326,20 @@
 
         private void OpSub8(int r1)
         {
-            int v = A - r1;
+            int v = _a - r1;
 
             SetF(v == 0, FZ); SetF(true, FN); SetF(v < 0, FC);
-            SetF((((A & 0xf) - (r1 & 0xf)) & FH) != 0, FH);
-            A = (byte)v;
+            SetF((((_a & 0xf) - (r1 & 0xf)) & FH) != 0, FH);
+            _a = (byte)v;
         }
 
         private void OpXor(int r1)
         {
-            int v = A ^ r1;
+            int v = _a ^ r1;
 
             SetF(v == 0, FZ); SetF(false, FN);
             SetF(false, FH); SetF(false, FC);
-            A = (byte)v;
+            _a = (byte)v;
         }
         #endregion
 
@@ -421,9 +421,9 @@
             return (byte)v;
         }
 
-        private static int OpRes(int r1, int r2) => r2 & ~(1 << r1) & 0xff;
+        private static byte OpRes(int r1, int r2) => (byte)(r2 & ~(1 << r1));
         private void OpResHL(int r1) => OpLdWr(HL, OpLdReg(HL) & ~(1 << r1));
-        private static int OpSet(int r1, int r2) => (r2 | (1 << r1)) & 0xff;
+        private static byte OpSet(int r1, int r2) => (byte)(r2 | (1 << r1));
         private void OpSetHL(int r1) => OpLdWr(HL, OpLdReg(HL) | (1 << r1));
         #endregion
     }

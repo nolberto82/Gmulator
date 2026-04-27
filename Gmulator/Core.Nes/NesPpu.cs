@@ -1,4 +1,5 @@
 ﻿using Gmulator.Interfaces;
+using Gmulator.Shared.LuaScript;
 
 namespace Gmulator.Core.Nes
 {
@@ -66,6 +67,8 @@ namespace Gmulator.Core.Nes
 
         private List<SpriteData> SpriteScan;
 
+        private LuaManager Lua => Nes.Lua;
+
         private enum CycleState
         {
             Start = 1, End = 257, Pre1 = 321, Pre2 = 336,
@@ -81,7 +84,7 @@ namespace Gmulator.Core.Nes
         public bool IsRendering => _background || _sprite;
         public int FineY => ((_vramAddr & 0x7000) >> 12) & 0xff;
         public int GetScanline() => Scanline;
-        public int ReadOam(int a) => Oram[a & 0xff];
+        public byte ReadOam(int addr) => Oram[addr & 0xff];
         public void WriteOam(int a, int v) => Oram[a & 0xff] = (byte)v;
         public int ReadVram(int a) => Vram[a & 0x3fff];
 
@@ -139,10 +142,7 @@ namespace Gmulator.Core.Nes
             Cycle = 25;
             Totalcycles = 7;
             FrameCounter = 1;
-            //if (Cart.Region == 0)
             ScanlineFrameEnd = 261;
-            //else
-            //    ScanlineFrameEnd = 311;
 
             Array.Fill<byte>(Vram, 0x00);
             for (int i = 0; i < palBuffer.Length; i += 3)
@@ -152,14 +152,10 @@ namespace Gmulator.Core.Nes
             SpriteScan = [];
         }
 
-        public void Step(int c)
+        public void Step(int cycles)
         {
             Apu.Step(1);
-
-            //if (Cart.Region == 1)
-            //    c = 2;
-
-            while (c-- > 0)
+            while (cycles-- > 0)
             {
                 if ((Scanline < 240 || Scanline == (int)ScanlineState.Pre) && Cycle == 324 && IsRendering)
                     Mmu.Mapper.Scanline();
@@ -244,14 +240,14 @@ namespace Gmulator.Core.Nes
             Cycles++;
         }
 
-        public int ReadRegister(int a)
+        public byte ReadRegister(int addr)
         {
-            switch (a)
+            switch (addr)
             {
                 case 0x2002:
                 {
-                    int v = ((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
-                        | _dummy2007 & 0x1f;
+                    byte v = (byte)(((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
+                        | _dummy2007 & 0x1f);
 
                     if (Scanline == 241)
                     {
@@ -267,7 +263,7 @@ namespace Gmulator.Core.Nes
                         {
                             NoNmi = false;
                             _vBlank = false;
-                            return v & 0x7f;
+                            return (byte)(v & 0x7f);
                         }
                     }
                     _vBlank = false;
@@ -286,25 +282,25 @@ namespace Gmulator.Core.Nes
                         v = _dummy2007 = Read(_vramAddr);
 
                     _vramAddr += _vaddrIncrease != 0 ? 32 : 1;
-                    return v & 0xff;
+                    return (byte)v;
                 }
                 default: return 0;
             }
         }
 
-        public void WriteRegister(int a, int v)
+        public void WriteRegister(int addr, byte value)
         {
-            switch (a)
+            switch (addr)
             {
                 case 0x2000:
                 {
-                    _tempAddr = _tempAddr & ~0xc00 | (v & 3) << 10;
-                    _nametable = v >> 1 & 3;
-                    _vaddrIncrease = v >> 2 & 1;
-                    _sprTable = (v >> 3 & 1) != 0;
-                    _bgTable = v >> 4 & 1;
-                    _spriteSize = (v >> 5 & 1) != 0;
-                    _nmi = v >> 7 != 0;
+                    _tempAddr = _tempAddr & ~0xc00 | (value & 3) << 10;
+                    _nametable = value >> 1 & 3;
+                    _vaddrIncrease = value >> 2 & 1;
+                    _sprTable = (value >> 3 & 1) != 0;
+                    _bgTable = value >> 4 & 1;
+                    _spriteSize = (value >> 5 & 1) != 0;
+                    _nmi = value >> 7 != 0;
 
                     if (Header.MapperId == 5)
                         Mmu.Mapper.SpriteSize = _spriteSize;
@@ -312,16 +308,16 @@ namespace Gmulator.Core.Nes
                 }
                 case 0x2001:
                 {
-                    _backgroundLeft = (v & 0x02) != 0;
-                    _spriteLeft = (v & 0x04) != 0;
-                    _background = (v & 0x08) != 0;
-                    _sprite = (v & 0x10) != 0;
+                    _backgroundLeft = (value & 0x02) != 0;
+                    _spriteLeft = (value & 0x04) != 0;
+                    _background = (value & 0x08) != 0;
+                    _sprite = (value & 0x10) != 0;
                     break;
                 }
-                case 0x2003: _oamAddr = v; break;
+                case 0x2003: _oamAddr = value; break;
                 case 0x2004:
                 {
-                    _oamData = v & 0xff;
+                    _oamData = value & 0xff;
                     _oamAddr++;
                     break;
                 }
@@ -330,11 +326,11 @@ namespace Gmulator.Core.Nes
                     if (!_writeToggle)
                     {
                         _tempAddr &= 0x7fe0;
-                        _tempAddr |= (v & 0xf8) >> 3;
-                        _fineX = (byte)(v & 0x07);
+                        _tempAddr |= (value & 0xf8) >> 3;
+                        _fineX = (byte)(value & 0x07);
                     }
                     else
-                        _tempAddr = _tempAddr & 0xc1f | (v & 0xf8) << 2 | (v & 7) << 12;
+                        _tempAddr = _tempAddr & 0xc1f | (value & 0xf8) << 2 | (value & 7) << 12;
                     _writeToggle ^= true;
                     break;
                 }
@@ -342,11 +338,11 @@ namespace Gmulator.Core.Nes
                 {
                     if (!_writeToggle)
                     {
-                        _tempAddr = (ushort)(_tempAddr & 0x80ff | (v & 0x3f) << 8);
+                        _tempAddr = (ushort)(_tempAddr & 0x80ff | (value & 0x3f) << 8);
                     }
                     else
                     {
-                        _tempAddr = _tempAddr & 0xff00 | v;
+                        _tempAddr = _tempAddr & 0xff00 | value;
                         _vramAddr = _tempAddr;
                     }
                     _writeToggle ^= true;
@@ -354,7 +350,7 @@ namespace Gmulator.Core.Nes
                 }
                 case 0x2007:
                 {
-                    Write(_vramAddr, v);
+                    Write(_vramAddr, value);
                     _vramAddr += _vaddrIncrease != 0 ? 32 : 1;
 
                     if (((_vramAddr ^ _a12) & 0x1000) != 0)
@@ -368,11 +364,11 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        public void Write4014(int a, int v) //4014
+        public void Write4014(int addr, byte value) //4014
         {
             for (int i = 0; i < 256; i++)
             {
-                int oamaddr = v << 8; _oamDma = v;
+                int oamaddr = value << 8; _oamDma = value;
                 Mmu.Oram[i] = Mmu.Wram[oamaddr + i];
                 Step(3); Step(3);
                 Totalcycles++;
@@ -578,14 +574,14 @@ namespace Gmulator.Core.Nes
             _atShiftHi = (_atShiftHi << 1) | _atHi;
         }
 
-        public int Read(int a) => a switch
+        public byte Read(int a) => a switch
         {
             < 0x2000 => ReadPattern(a),
             < 0x3f00 => ReadNametable(a),
             _ => ReadPalette(a)
         };
 
-        public void Write(int a, int v)
+        public void Write(int a, byte v)
         {
             switch (a)
             {
@@ -595,7 +591,7 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        private int ReadNametable(int addr)
+        private byte ReadNametable(int addr)
         {
             int a = addr % 0x400;
             if (Header.Mirror == SingleNt0)
@@ -625,7 +621,7 @@ namespace Gmulator.Core.Nes
             return 0;
         }
 
-        public int ReadPattern(int a)
+        public byte ReadPattern(int a)
         {
             if (Header.MapperId == 9)
                 Mmu.Mapper.SetLatch(a, 0);
@@ -635,7 +631,7 @@ namespace Gmulator.Core.Nes
                 return Vram[a];
         }
 
-        public int ReadPalette(int a) => Vram[a & 0x3fff];
+        public byte ReadPalette(int a) => Vram[a & 0x3fff];
 
         public void WriteNametable(int addr, int v)
         {

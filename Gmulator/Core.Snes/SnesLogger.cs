@@ -1,11 +1,13 @@
-﻿using static Gmulator.Core.Snes.SnesCpu;
+﻿using Gmulator.Interfaces;
+using static Gmulator.Core.Snes.SnesCpu;
 
 namespace Gmulator.Core.Snes;
 
-public class SnesLogger(Snes snes)
+public sealed class SnesLogger(Snes snes)
 {
     public bool LogMain { get; private set; }
     public bool LogSa1 { get; private set; }
+    public bool IsSa1 { get; set; }
 
     private StreamWriter Outfile;
     private readonly Snes Snes = snes;
@@ -19,14 +21,19 @@ public class SnesLogger(Snes snes)
 
     public (string, string, int, int) Disassemble(int pc, bool getRegisters)
     {
-        int x = Cpu.X; int y = Cpu.Y;
+        var Cpu = !IsSa1 ? Snes.Cpu : Snes?.Sa1;
+        int x = Cpu.X;
+        int y = Cpu.Y;
+        int d = Cpu.DirectPageReg;
+        int db = Cpu.DataBank;
+        bool mmem = Cpu.MMem;
+        bool xmem = Cpu.XMem;
         int op = Read(pc);
         int a;
 
         Opcode opcode = opcodes[op];
 
         int size = opcode.Size;
-        int mode = opcode.Mode;
         string bytedata = "";
 
         string data = $"{opcode.Name} ";
@@ -53,10 +60,10 @@ public class SnesLogger(Snes snes)
             MMode = (b[1] & FM) == 0;
         }
 
-        if (Cpu.MMem)
+        if (mmem)
             MMode = true;
 
-        switch (mode)
+        switch (opcode.Mode)
         {
             case Absolute:
                 a = ReadWord(pc + 1);
@@ -65,7 +72,7 @@ public class SnesLogger(Snes snes)
                 else
                 {
                     data += $"${a:x4}";
-                    access += $"${Cpu.DB:x2}{a:x4} = #${Read(a):x2}";
+                    access += $"${db:x2}{a:x4} = #${Read(a):x2}";
                 }
                 break;
             case AbsoluteIndexedIndirect:
@@ -75,12 +82,12 @@ public class SnesLogger(Snes snes)
             case AbsoluteIndexedX:
                 a = ReadWord(pc + 1);
                 data += $"${a:x4},x";
-                access += $"${a + Cpu.X:x4} = #${Read(a + Cpu.X):x2}";
+                access += $"${a + x:x4} = #${Read(a + x):x2}";
                 break;
             case AbsoluteIndexedY:
                 a = ReadWord(pc + 1);
                 data += $"${a:x4},y";
-                access += $"${a + Cpu.Y:x4} = #${Read(a + Cpu.Y):x2}";
+                access += $"${a + y:x4} = #${Read(a + y):x2}";
                 break;
             case AbsoluteIndirect:
                 a = ReadWord(pc + 1);
@@ -98,7 +105,7 @@ public class SnesLogger(Snes snes)
             case AbsoluteLongIndexedX:
                 a = ReadLong(pc + 1);
                 data += $"${a:x6},x";
-                access += $"${a + Cpu.X:x6} = #${Read(a + Cpu.X):x2}";
+                access += $"${a + x:x6} = #${Read(a + x):x2}";
                 break;
             case BlockMove:
                 data += $"${Read(pc + 2):x2},${Read(pc + 1):x2}";
@@ -132,8 +139,8 @@ public class SnesLogger(Snes snes)
             case DPIndirectLongIndexedY:
                 a = Read(pc + 1);
                 data += $"[${a:x2}],y";
-                a = ReadLong(a + Cpu.D);
-                access += $"${a + Cpu.Y:x6} = #${Read(a + Cpu.Y):x2}";
+                a = ReadLong(a + d);
+                access += $"${a + y:x6} = #${Read(a + y):x2}";
                 break;
             case DirectPage:
                 a = Read(pc + 1);
@@ -153,7 +160,7 @@ public class SnesLogger(Snes snes)
                 //}
                 break;
             case ImmediateIndex:
-                if (!Cpu.XMem)
+                if (!xmem)
                 {
                     a = Read(pc + 1) | Read(pc + 2) << 8;
                     data += $"#${a:x4}";
@@ -166,7 +173,7 @@ public class SnesLogger(Snes snes)
                 }
                 break;
             case ImmediateMemory:
-                if (!Cpu.MMem)
+                if (!mmem)
                 {
                     a = Read(pc + 1) | Read(pc + 2) << 8;
                     data += $"#${a:x4}";
@@ -251,8 +258,8 @@ public class SnesLogger(Snes snes)
         if (!LogSa1) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var (disasm, _, _, _) = Disassemble(Snes.Sa1.Cpu.PBPC, true);
-            Outfile.WriteLine($"{Snes.Sa1.Cpu.PBPC:x6} {disasm,-13} {hpos}");
+            var (disasm, _, _, _) = Disassemble((int)(Snes?.Sa1?.PBPC), true);
+            Outfile.WriteLine($"{Snes.Sa1.PBPC:x6} {disasm,-13} {hpos}");
         }
     }
 

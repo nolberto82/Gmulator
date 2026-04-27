@@ -2,7 +2,7 @@
 {
     public partial class GbcPpu
     {
-        public int Read(int a) => a switch
+        public byte Read(int a) => a switch
         {
             0xff40 => _lcdc,
             0xff41 => _stat,
@@ -31,7 +31,7 @@
             _ => 0xff,
         };
 
-        public void Write(int a, int v)
+        public void Write(int a, byte v)
         {
             switch (a)
             {
@@ -67,7 +67,7 @@
                 case 0xff4d: _key1 = v; break;
                 case 0xff4f:
                     if (Mmu.Mapper.CGB)
-                        Mmu.VramBank = v & 1;
+                        Mmu.VramBank = (byte)(v & 1);
                     break;
                 case 0xff51: _hdma1 = v; break;
                 case 0xff52: _hdma2 = v; break;
@@ -101,31 +101,30 @@
                 case 0xff70:
                 {
                     if (Mmu.Mapper.CGB)
-                        Mmu.WramBank = v == 0 ? 1 : v & 7;
+                        Mmu.WramBank = (byte)(v == 0 ? 1 : v & 7);
                     break;
                 }
             }
         }
 
-        int Read55()
+        private byte Read55()
         {
-            var v = _hdma5 == 0 ? 0xff : _hdma5;
+            byte v = (byte)(_hdma5 == 0 ? 0xff : _hdma5);
             if (v == 0xff)
                 DMAHBlank = false;
             return v;
         }
 
-        int Read69()
+        byte Read69()
         {
-            _bgpd = CGBBkgPal[_bgpi & 0x3f];
+            _bgpd = _cgbBkgPal[_bgpi & 0x3f];
             _bgpi += (byte)((_bgpi & 0x80) != 0 ? 1 : 0);
             return _bgpd;
         }
 
-        int Read6b()
+        byte Read6b()
         {
-            _obpd = CGBObjPal[_obpi & 0x3f];
-            //if (!editor)
+            _obpd = _cgbObjPal[_obpi & 0x3f];
             _obpi += (byte)((_obpi & 0x80) != 0 ? 1 : 0);
             return _obpd;
         }

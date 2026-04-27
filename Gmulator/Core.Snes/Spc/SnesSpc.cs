@@ -14,18 +14,19 @@ public partial class SnesSpc : ISaveState, ICpu
     private const int FN = 1 << 7;
 
     #region State
-    public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
-    public int SP { get => sp; set => sp = value & 0xff; }
-    public int A { get => a & 0xff; set => a = value & 0xff; }
-    public int X { get => x & 0xff; set => x = value & 0xff; }
-    public int Y { get => y & 0xff; set => y = value & 0xff; }
-    public int PS { get => p & 0xff; set => p = value & 0xff; }
+    public ushort PC { get => _pc; }
+    public ushort SP { get => _sp; }
+    public byte A { get => _a; }
+    public byte X { get => _x; }
+    public byte Y { get => _y; }
+    public byte PS { get => _ps; }
 
     public bool[] Flags { get => flags; set => flags = value; }
-    public int CF { get => p & FC & 0xff; set => p = ((p & 0xfe) | value) & 0xff; }
-    public int HF { get => p & FH & 0xff; }
+    public int CF { get => _ps & FC & 0xff; set => _ps = (byte)((_ps & 0xfe) | value); }
+    public int HF { get => _ps & FH & 0xff; }
 
-    private int pc, sp, a, x, y, p;
+    private ushort _pc, _sp;
+    private byte _a, _x, _y, _ps;
     private bool[] flags;
     #endregion
 
@@ -70,20 +71,20 @@ public partial class SnesSpc : ISaveState, ICpu
 
     private void Idle() => Apu.Idle();
 
-    public int ReadOp(bool debug = false)
+    public byte ReadOpcode(bool debug = false)
     {
         if (!debug)
             Apu.Cycle();
-        return Read(PC++);
+        return Read(_pc++);
     }
 
-    public int Read(int a) => Apu.Read(a);
+    public byte Read(int a) => Apu.Read(a);
 
-    public void Write(int a, int v) => Apu.Write(a, v);
+    public void Write(int a, byte v) => Apu.Write(a, v);
 
-    public int ReadDebug(int a) => Apu.ReadDebug(a);
+    public byte ReadDebug(int a) => Apu.ReadDebug(a);
 
-    private int ReadWord(int a) => (Read(a) | Read(a + 1) << 8) & 0xffff;
+    private ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
 
     public byte[] GetRam() => Apu?.Ram;
 
@@ -99,13 +100,13 @@ public partial class SnesSpc : ISaveState, ICpu
 #endif
 
         int a1, a2;
-        int op = Read(PC++);
+        int op = Read(_pc++);
         switch (op)
         {
             //8-bit Data Transmission (Read)
             case 0xE8: Movia(Imm()); break;
-            case 0xE6: Movda(X); break;
-            case 0xBF: Movda(X++); break;
+            case 0xE6: Movda(_x); break;
+            case 0xBF: Movda(_x++); break;
             case 0xE4: Movda(Dir()); break;
             case 0xF4: Movda(DirIdX()); break;
             case 0xE5: Movda(Abs()); break;
@@ -123,8 +124,8 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0xEC: Movdy(Abs()); break;
 
             //8-bit Data Transmission (Write)
-            case 0xC6: Write(X, A); break;
-            case 0xAF: Write(X++, A); break;
+            case 0xC6: Write(_x, A); break;
+            case 0xAF: Write(_x++, A); break;
             case 0xC4: Write(Dir(), A); break;
             case 0xD4: MovStda(DirIdX(), 0); break;
             case 0xC5: Write(Abs(), A); break;
@@ -140,24 +141,24 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0xCC: Write(Abs(), Y); break;
 
             //8-bit Data Transmission (Reg->Reg, Mem->Mem)
-            case 0x7D: A = X; SetZN(A); break;
-            case 0xDD: A = Y; SetZN(A); break;
-            case 0x5D: X = A; SetZN(X); break;
-            case 0xFD: Y = A; SetZN(Y); break;
-            case 0x9D: X = SP; SetZN(X); break;
-            case 0xBD: SP = X; break;
+            case 0x7D: _a = X; SetZN(_a); break;
+            case 0xDD: _a = Y; SetZN(_a); break;
+            case 0x5D: _x = A; SetZN(_x); break;
+            case 0xFD: _y = A; SetZN(_y); break;
+            case 0x9D: _x = (byte)_sp; SetZN(_x); break;
+            case 0xBD: _sp = X; break;
             case 0xFA:
                 (a1, a2) = DirDir();
-                Write(a2, a1);
+                Write(a2, (byte)a1);
                 break;
             case 0x8F:
                 (a1, a2) = DirImm();
-                Write(a2, a1);
+                Write(a2, (byte)a1);
                 break;
 
             //8-bit Arithmetic
             case 0x88: Adci(Imm()); break;
-            case 0x86: Adca(X); break;
+            case 0x86: Adca(_x); break;
             case 0x84: Adca(Dir()); break;
             case 0x94: Adca(DirIdX()); break;
             case 0x85: Adca(Abs()); break;
@@ -169,7 +170,7 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0x89: Adcxy(DirDir()); break;
             case 0x98: Adcxy(DirImm()); break;
             case 0xA8: Sbci(Imm()); break;
-            case 0xA6: Sbca(X); break;
+            case 0xA6: Sbca(_x); break;
             case 0xA4: Sbca(Dir()); break;
             case 0xB4: Sbca(DirIdX()); break;
             case 0xA5: Sbca(Abs()); break;
@@ -181,7 +182,7 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0xA9: Sbcxy(DirDir()); break;
             case 0xB8: Sbcxy(DirImm()); break;
             case 0x68: Cmp(A, Imm()); break;
-            case 0x66: Cmp(A, Read(X)); break;
+            case 0x66: Cmp(A, Read(_x)); break;
             case 0x64: Cmpi(Dir()); break;
             case 0x74: Cmpi(DirIdX()); break;
             case 0x65: Cmpi(Abs()); break;
@@ -192,16 +193,16 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0x79: Cmpxy(IndXY()); break;
             case 0x69: Cmpxy(DirDir()); break;
             case 0x78: (a1, a2) = DirImm(); Cmp(Read(a2), a1); break;
-            case 0xC8: Cmp(X, Imm()); break;
-            case 0x3E: Cmp(X, Read(Dir())); break;
-            case 0x1E: Cmp(X, Read(Abs())); break;
-            case 0xAD: Cmp(Y, Imm()); break;
-            case 0x7E: Cmp(Y, Read(Dir())); break;
-            case 0x5E: Cmp(Y, Read(Abs())); break;
+            case 0xC8: Cmp(_x, Imm()); break;
+            case 0x3E: Cmp(_x, Read(Dir())); break;
+            case 0x1E: Cmp(_x, Read(Abs())); break;
+            case 0xAD: Cmp(_y, Imm()); break;
+            case 0x7E: Cmp(_y, Read(Dir())); break;
+            case 0x5E: Cmp(_y, Read(Abs())); break;
 
             //8-bit Logical Operations
             case 0x28: AndI(Imm(), A); break;
-            case 0x26: Anda(X); break;
+            case 0x26: Anda(_x); break;
             case 0x24: Andi(Dir()); break;
             case 0x34: Anda(DirIdX()); break;
             case 0x25: Anda(Abs()); break;
@@ -213,7 +214,7 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0x29: Andxy(DirDir()); break;
             case 0x38: Andxy(DirImm()); break;
             case 0x08: Ora(Imm()); break;
-            case 0x06: Ora(X); break;
+            case 0x06: Ora(_x); break;
             case 0x04: Ord(Dir()); break;
             case 0x14: Ora(DirIdX()); break;
             case 0x05: Ord(Abs()); break;
@@ -225,7 +226,7 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0x09: Orxy(DirDir()); break;
             case 0x18: Orxy(DirImm()); break;
             case 0x48: Eora(Imm()); break;
-            case 0x46: Eord(X); break;
+            case 0x46: Eord(_x); break;
             case 0x44: Eord(Dir()); break;
             case 0x54: Eord(DirIdX()); break;
             case 0x45: Eord(Abs()); break;
@@ -273,9 +274,9 @@ public partial class SnesSpc : ISaveState, ICpu
             //16-bit Data Transmission Operations
             case 0xBA:
                 a1 = Dir();
-                A = Read(a1);
-                Y = Read((a1 + 1 & 0xff) | GetPage());
-                SetZN_W(Y << 8 | A);
+                _a = Read(a1);
+                _y = Read((a1 + 1 & 0xff) | GetPage());
+                SetZN_W(_y << 8 | A);
                 break;
             case 0xDA:
                 a1 = Dir();
@@ -314,8 +315,8 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0xDE: Cbne(DirBit(0xde)); break;
             case 0x6E: Dbnzd(DirImm()); break;
             case 0xFE: Dbnzy(Imm()); break;
-            case 0x5F: PC = Abs(); break;
-            case 0x1F: PC = AbsIndX(); break;
+            case 0x5F: _pc = Abs(); break;
+            case 0x1F: _pc = AbsIndX(); break;
 
             //Subroutine Operations
             case 0x3F: Call(Abs()); break;
@@ -331,14 +332,14 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0x7F: Ret1(); break;
 
             //Stack Operations
-            case 0x2D: Push(A); break;
-            case 0x4D: Push(X); break;
-            case 0x6D: Push(Y); break;
+            case 0x2D: Push(_a); break;
+            case 0x4D: Push(_x); break;
+            case 0x6D: Push(_y); break;
             case 0x0D: Push(PS); break;
-            case 0xAE: A = Pop(); break;
-            case 0xCE: X = Pop(); break;
-            case 0xEE: Y = Pop(); break;
-            case 0x8E: PS = Pop(); break;
+            case 0xAE: _a = Pop(); break;
+            case 0xCE: _x = Pop(); break;
+            case 0xEE: _y = Pop(); break;
+            case 0x8E: _ps = Pop(); break;
 
             //Bit Operations
             case 0x02 or 0x22 or 0x42 or 0x62 or
@@ -361,14 +362,14 @@ public partial class SnesSpc : ISaveState, ICpu
             case 0xCA: Mov1(Mbit(), true); break;
 
             //PSW Operations
-            case 0x60: PS &= ~FC; break;
-            case 0x80: PS |= FC; break;
-            case 0xED: PS ^= FC; break;
-            case 0xE0: PS &= ~(FV | FH); break;
-            case 0x20: PS &= ~FP; break;
-            case 0x40: PS |= FP; break;
-            case 0xA0: PS |= FI; break;
-            case 0xC0: PS &= ~FI; break;
+            case 0x60: _ps = (byte)(_ps & ~FC); break;
+            case 0x80: _ps |= FC; break;
+            case 0xED: _ps ^= FC; break;
+            case 0xE0: _ps = (byte)(_ps & ~(FV | FH)); break;
+            case 0x20: _ps = (byte)(_ps & ~FP); break;
+            case 0x40: _ps |= FP; break;
+            case 0xA0: _ps |= FI; break;
+            case 0xC0: _ps = (byte)(_ps & ~FI); break;
 
             //Other Commands
             case 0xEF: break;
@@ -377,29 +378,29 @@ public partial class SnesSpc : ISaveState, ICpu
         Stepped = true;
     }
 
-    public int Imm() => ReadOp();
+    public int Imm() => ReadOpcode();
 
-    public sbyte Rel() => (sbyte)ReadOp();
+    public sbyte Rel() => (sbyte)ReadOpcode();
 
-    public int Dir() => (ReadOp() | GetPage()) & 0xffff;
+    public int Dir() => (ReadOpcode() | GetPage()) & 0xffff;
 
     public int DirIdX()
     {
-        var v = (ReadOp() + X & 0xff) | GetPage();
+        var v = (ReadOpcode() + X & 0xff) | GetPage();
         Idle();
         return v & 0xffff;
     }
 
     public int DirIdY()
     {
-        var v = (ReadOp() + Y & 0xff) | GetPage();
+        var v = (ReadOpcode() + Y & 0xff) | GetPage();
         Idle();
         return v & 0xffff;
     }
 
     public int DirIdXInd()
     {
-        var v = ReadOp() | GetPage();
+        var v = ReadOpcode() | GetPage();
         Idle();
         int a = Read(v + X & 0xff);
         a |= Read(v + X + 1 & 0xff) << 8;
@@ -408,7 +409,7 @@ public partial class SnesSpc : ISaveState, ICpu
 
     public int DirIndY()
     {
-        var v = ReadOp() | GetPage();
+        var v = ReadOpcode() | GetPage();
         v = Read(v) | (Read(v + 1) << 8);
         return (v + Y) & 0xffff;
     }
@@ -416,59 +417,59 @@ public partial class SnesSpc : ISaveState, ICpu
     public (int, int) IndXY()
     {
         Idle();
-        var a1 = Read(Y | GetPage());
+        var a1 = Read(_y | GetPage());
         var a2 = X | GetPage();
         return (a1, a2);
     }
 
-    public (int, int) DirImm()
+    public (byte, ushort) DirImm()
     {
-        int a1 = ReadOp();
-        int a2 = (ReadOp() | GetPage()) & 0xffff;
-        return (a1 & 0xff, a2 & 0xffff);
+        byte a1 = ReadOpcode();
+        int a2 = (ReadOpcode() | GetPage());
+        return (a1, (ushort)a2);
     }
 
-    public (int, int) DirDir()
+    public (byte, ushort) DirDir()
     {
-        var a1 = Read(ReadOp() | GetPage());
-        int a2 = (ReadOp() | GetPage()) & 0xffff;
-        return (a1 & 0xff, a2 & 0xffff);
+        byte a1 = Read(ReadOpcode() | GetPage());
+        int a2 = (ReadOpcode() | GetPage()) & 0xffff;
+        return (a1, (ushort)a2);
     }
 
-    public int Abs()
+    public ushort Abs()
     {
-        int v = ReadOp();
-        v |= ReadOp() << 8;
-        return v & 0xffff;
+        int value = ReadOpcode();
+        value |= ReadOpcode() << 8;
+        return (ushort)value;
     }
 
     public int AbsX()
     {
-        int v = ReadOp();
-        v |= ReadOp() << 8;
+        int v = ReadOpcode();
+        v |= ReadOpcode() << 8;
         return (v + X) & 0xffff;
     }
 
-    public int AbsIndX()
+    public ushort AbsIndX()
     {
-        var (a1, a2) = (ReadOp(), ReadOp());
+        var (a1, a2) = (ReadOpcode(), ReadOpcode());
         var b = a1 | a2 << 8;
         Idle();
-        var v = Read(b + X) | Read(b + X + 1 & 0xffff) << 8;
-        return v & 0xffff;
+        var value = Read(b + X) | Read(b + X + 1 & 0xffff) << 8;
+        return (ushort)(value);
     }
 
     public int AbsY()
     {
-        int v = ReadOp();
-        v |= ReadOp() << 8;
+        int v = ReadOpcode();
+        v |= ReadOpcode() << 8;
         return (v + Y) & 0xffff;
     }
 
     public (int, int) Mbit()
     {
-        int low = ReadOp();
-        int high = ReadOp();
+        int low = ReadOpcode();
+        int high = ReadOpcode();
         int a1 = high << 8 | low;
         int a2 = a1 >> 13;
         return (a1 & 0x1fff, a2);
@@ -476,50 +477,50 @@ public partial class SnesSpc : ISaveState, ICpu
 
     public (int, int) DirBit(int op = -1)
     {
-        int low = ReadOp();
-        int high = ReadOp();
+        int low = ReadOpcode();
+        int high = ReadOpcode();
         int v = (low + (op == -1 ? 0 : X) & 0xff) + GetPage();
         int a1 = Read(v & 0xffff);
         Idle();
         return (a1, high);
     }
 
-    private int Pop() => Read(++SP | 0x100);
+    private byte Pop() => Read(++_sp | 0x100);
 
-    private void Push(int v) => Write(0x100 | SP--, v);
+    private void Push(byte value) => Write(0x100 | _sp--, value);
 
-    private void SetC(bool v)
+    private void SetC(bool value)
     {
-        if (v) PS |= FC;
-        else PS &= ~FC;
+        if (value) _ps |= FC;
+        else _ps = (byte)(_ps & ~FC);
     }
 
     private void SetH(bool flag)
     {
-        if (flag) PS |= FH;
-        else PS &= ~FH;
+        if (flag) _ps |= FH;
+        else _ps = (byte)(_ps & ~FH);
     }
 
     private void SetV(bool flag)
     {
-        if (flag) PS |= FV;
-        else PS &= ~FV;
+        if (flag) _ps |= FV;
+        else _ps = (byte)(_ps & ~FV);
     }
 
     private void SetZN(int v)
     {
-        if ((v & 0xff) == 0) PS |= FZ;
-        else PS &= ~FZ;
-        if ((v & FN) != 0) PS |= FN;
-        else PS &= ~FN;
+        if ((v & 0xff) == 0) _ps |= FZ;
+        else _ps = (byte)(_ps & ~FZ);
+        if ((v & FN) != 0) _ps |= FN;
+        else _ps = (byte)(_ps & ~FN);
     }
 
     private void SetZN_W(int v)
     {
-        if ((v & 0xffff) == 0) PS |= FZ;
-        else PS &= ~FZ;
-        if ((v & 0x8000) == 0x8000) PS |= FN;
-        else PS &= ~FN;
+        if ((v & 0xffff) == 0) _ps |= FZ;
+        else _ps = (byte)(_ps & ~FZ);
+        if ((v & 0x8000) == 0x8000) _ps |= FN;
+        else _ps = (byte)(_ps & ~FN);
     }
 
     public void Reset()
@@ -528,31 +529,31 @@ public partial class SnesSpc : ISaveState, ICpu
         Flags[5] = true;
         Stepped = false;
 
-        SP = 0x00;
-        PS = 0x00;
-        X = 0x00;
-        A = 0x00;
-        Y = 0x00;
+        _sp = 0x00;
+        _ps = 0x00;
+        _a = 0x00;
+        _x = 0x00;
+        _y = 0x00;
         StepOverAddr = -1;
         TestAddr = 0;
 
-        Read(PC); Read(PC);
-        Read(0x100 | SP--); Read(0x100 | SP--); Read(0x100 | SP--);
+        Read(_pc); Read(_pc);
+        Read(0x100 | _sp--); Read(0x100 | _sp--); Read(0x100 | _sp--);
         Idle();
-        PS &= ~FI;
-        PC = ReadWord(0xfffe);
+        _ps = (byte)(_ps & ~FI);
+        _pc = ReadWord(0xfffe);
     }
 
     public List<RegisterInfo> GetFlags() =>
     [
-        new("","C",$"{(PS & 0x01) != 0}"),
-        new("","Z",$"{(PS & 0x02) != 0}"),
-        new("","I",$"{(PS & 0x04) != 0}"),
-        new("","H",$"{(PS & 0x08) != 0}"),
-        new("","B",$"{(PS & 0x10) != 0}"),
-        new("","P",$"{(PS & 0x20) != 0}"),
-        new("","V",$"{(PS & 0x40) != 0}"),
-        new("","N",$"{(PS & 0x80) != 0}"),
+        new("","C",$"{(_ps & 0x01) != 0}"),
+        new("","Z",$"{(_ps & 0x02) != 0}"),
+        new("","I",$"{(_ps & 0x04) != 0}"),
+        new("","H",$"{(_ps & 0x08) != 0}"),
+        new("","B",$"{(_ps & 0x10) != 0}"),
+        new("","P",$"{(_ps & 0x20) != 0}"),
+        new("","V",$"{(_ps & 0x40) != 0}"),
+        new("","N",$"{(_ps & 0x80) != 0}"),
     ];
 
     public List<RegisterInfo> GetRegisters() =>
@@ -560,8 +561,8 @@ public partial class SnesSpc : ISaveState, ICpu
         new("","A",$"{A:X2}"),
         new("","X",$"{X:X2}"),
         new("","Y",$"{Y:X2}"),
-        new("","P",$"{PS:X2}"),
-        new("","S",$"{SP:X2}"),
+        new("","P",$"{_ps:X2}"),
+        new("","S",$"{_sp:X2}"),
     ];
 
     public int GetReg(string reg) => 0;
@@ -571,17 +572,15 @@ public partial class SnesSpc : ISaveState, ICpu
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(PC); bw.Write(SP);
-        bw.Write(A); bw.Write(X);
-        bw.Write(Y); bw.Write(PS);
+        bw.Write(_pc); bw.Write(_sp);
+        bw.Write(_a); bw.Write(_x);
+        bw.Write(_y); bw.Write(_ps);
     }
 
     public void Load(BinaryReader br)
     {
-        PC = br.ReadInt32(); SP = br.ReadInt32();
-        A = br.ReadInt32(); X = br.ReadInt32();
-        Y = br.ReadInt32(); PS = br.ReadInt32();
+        _pc = br.ReadUInt16(); _sp = br.ReadUInt16();
+        _a = br.ReadByte(); _x = br.ReadByte();
+        _y = br.ReadByte(); _ps = br.ReadByte();
     }
-
-
 }

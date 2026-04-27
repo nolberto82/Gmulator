@@ -2,7 +2,7 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesDma(Snes snes) : ISaveState
+public sealed class SnesDma(Snes snes) : ISaveState
 {
     private const int MaxChannels = 8;
     private readonly bool[] Enabled = new bool[MaxChannels];
@@ -50,8 +50,8 @@ public class SnesDma(Snes snes) : ISaveState
         Array.Fill(TransferEnabled, false);
     }
 
-    public Func<int, int> ReadCpu = snes.ReadMemory;
-    public Action<int, int> WriteCpu = snes.WriteMemory;
+    public Func<int, byte> ReadCpu = snes.ReadMemory;
+    public Action<int, byte> WriteCpu = snes.WriteMemory;
     private bool DmaEnabled;
     private int DmaState;
     public readonly byte[] Max = [1, 2, 2, 4, 4, 4, 2, 4];

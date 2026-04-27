@@ -12,9 +12,9 @@
             Reset();
         }
 
-        public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
+        public override byte ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
 
-        public override int ReadChr(int a)
+        public override byte ReadChr(int a)
         {
             if (Header.ChrBanks > 0)
                 return base.ReadChr(0x1000 * Chr[a >> 12] + a % 0x1000);
@@ -22,7 +22,7 @@
                 return Header.Mmu.Vram[a];
         }
 
-        public override void WritePrg(int a, int v)
+        public override void WritePrg(int a, byte v)
         {
             if (a < 0xc000)
                 base.WritePrg(0x4000 * Prg[0] + a % 0x4000, v);
@@ -30,9 +30,9 @@
                 base.WritePrg(0x4000 * Prg[1] + a % 0x4000, v);
         }
 
-        public override void Write(int a, int v)
+        public override void Write(int addr, byte value)
         {
-            if ((v & 0x80) != 0)
+            if ((value & 0x80) != 0)
             {
                 Control |= 0xc;
                 Shift = 0x10;
@@ -40,14 +40,14 @@
             }
             else
             {
-                Shift = Shift >> 1 | (v & 0x01) << 4;
+                Shift = Shift >> 1 | (value & 0x01) << 4;
                 Writes++;
             }
 
             if (Writes == 5)
             {
                 Control = (byte)Shift;
-                if (a <= 0x9fff)
+                if (addr <= 0x9fff)
                 {
                     Header.Mirror = Control & 3;
                     PrgMode = (Control >> 2) & 3;
@@ -55,15 +55,15 @@
 
                     //UpdatePrg((byte)Shift);
                 }
-                else if (a <= 0xbfff)
+                else if (addr <= 0xbfff)
                 {
                     UpdateChr((byte)Shift, 0);
                 }
-                else if (a <= 0xdfff)
+                else if (addr <= 0xdfff)
                 {
                     UpdateChr((byte)Shift, 1);
                 }
-                else if (a <= 0xffff)
+                else if (addr <= 0xffff)
                 {
                     UpdatePrg((byte)Shift);
                     SramEnabled = true;
@@ -71,7 +71,7 @@
                 Writes = 0;
             }
 
-            base.Write(a, v);
+            base.Write(addr, value);
         }
 
         public override void SetLatch(int a, byte v) => base.SetLatch(a, v);

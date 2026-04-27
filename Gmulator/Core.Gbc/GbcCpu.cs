@@ -7,45 +7,46 @@ public partial class GbcCpu : ICpu, ISaveState
     #region State
     public int AF
     {
-        get { return (A << 8 | _f) & 0xffff; }
-        set { A = (value >> 8) & 0xff; _f = value & 0xff; }
+        get { return (_a << 8 | _f) & 0xffff; }
+        set { _a = (byte)((value >> 8) & 0xff); _f = (byte)(value & 0xff); }
     }
 
     public int BC
     {
-        get { return (B << 8 | C) & 0xffff; }
-        set { B = (value >> 8) & 0xff; C = value & 0xff; }
+        get { return (_b << 8 | _c) & 0xffff; }
+        set { _b = (byte)((value >> 8) & 0xff); _c = (byte)(value & 0xff); }
     }
 
     public int DE
     {
-        get { return (D << 8 | E) & 0xffff; }
-        set { D = (value >> 8) & 0xff; E = value & 0xff; }
+        get { return (_d << 8 | _e) & 0xffff; }
+        set { _d = (byte)((value >> 8) & 0xff); _e = (byte)(value & 0xff); }
     }
 
     public int HL
     {
-        get { return (H << 8 | L) & 0xffff; }
-        set { H = (value >> 8) & 0xff; L = value & 0xff; }
+        get { return (_h << 8 | _l) & 0xffff; }
+        set { _h = (byte)(value >> 8); _l = (byte)value; }
     }
-    public int F { get => _f & 0xff; set => _f = value & 0xff; }
-    public int SP { get => sp & 0xffff; set => sp = value & 0xffff; }
-    public int PC { get => pc & 0xffff; set => pc = value & 0xffff; }
+    public int F { get => _f & 0xff; set => _f = (byte)value; }
+    public int SP { get => _sp & 0xffff; set => _sp = value & 0xffff; }
+    public int PC { get => _pc & 0xffff; set => _pc = value & 0xffff; }
     public ulong Cycles { get; set; }
-    public int IE { get => _ie; set => _ie = value; }
-    public int IF { get => _if; set => _if = value; }
-    public int Sb { get => _sb; set => _sb = value; }
-    public int Sc { get => _sc; set => _sc = value; }
+    public byte IE { get => _ie; set => _ie = value; }
+    public byte IF { get => _if; set => _if = value; }
+    public int Sb { get => _sb; set => _sb = (byte)value; }
+    public int Sc { get => _sc; set => _sc = (byte)value; }
     public bool Halt { get => _halt; set => _halt = value; }
     public bool Ime { get => _ime; set => _ime = value; }
     public int Stop { get => _stop; set => _stop = value; }
     public int ImeDelay { get => _imeDelay; set => _imeDelay = value; }
 
-    public int A, _f, B, C, D, E, H, L, pc, sp;
-    private int _ie;
-    private int _if;
-    private int _sb;
-    private int _sc;
+    private int _pc, _sp;
+    private byte _a, _f, _b, _c, _d, _e, _h, _l;
+    private byte _ie;
+    private byte _if;
+    private byte _sb;
+    private byte _sc;
 
     private bool _halt;
     private bool _ime;
@@ -61,10 +62,10 @@ public partial class GbcCpu : ICpu, ISaveState
     public bool FlagH { get => (AF & FH) == FZ; }
     public bool FlagC { get => (AF & FC) == FC; }
 
-    private int Read0F(int a) => IF;
-    private int ReadFF(int a) => IE;
-    private void Write0F(int a, int v) => IF = v & 0xff;
-    private void WriteFF(int a, int v) => IE = v & 0xff;
+    private byte Read0F(int a) => IF;
+    private byte ReadFF(int a) => IE;
+    private void Write0F(int a, byte v) => IF = v;
+    private void WriteFF(int a, byte v) => IE = v;
 
 
     private readonly Gbc Gbc;
@@ -120,19 +121,19 @@ public partial class GbcCpu : ICpu, ISaveState
             F = (byte)(F & ~v);
     }
 
-    public int ReadCycle(int a)
+    public byte ReadCycle(int addr)
     {
         Tick();
-        int v = Mmu.ReadByte(a) & 0xff;
-        Gbc.Debugger.Access(a, v, MemoryHandlers[a >> 12], false);
+        byte v = Mmu.ReadByte(addr);
+        Gbc.Debugger.Watchpoint(addr, v, MemoryHandlers[addr >> 12], false);
         return v;
     }
 
-    public void WriteCycle(int a, int v)
+    public void WriteCycle(int addr, byte value)
     {
         Tick();
-        Mmu.WriteByte(a, v);
-        Gbc.Debugger.Access(a, v, MemoryHandlers[a >> 12], true);
+        Mmu.WriteByte(addr, value);
+        Gbc.Debugger.Watchpoint(addr, value, MemoryHandlers[addr >> 12], true);
     }
 
     public void CheckInterrupts()
@@ -164,11 +165,11 @@ public partial class GbcCpu : ICpu, ISaveState
         }
     }
 
-    public void RequestIE(int v) => IE |= v;
+    public void RequestIE(int v) => IE |= (byte)v;
 
     public void RequestIF(int v)
     {
-        IF |= v;
+        IF |= (byte)v;
         Halt = false;
     }
 
@@ -239,12 +240,16 @@ public partial class GbcCpu : ICpu, ISaveState
 
     public void Save(BinaryWriter bw)
     {
-
+        bw.Write(_pc); bw.Write(_sp); bw.Write(_a); bw.Write(_f); bw.Write(_b); bw.Write(_c); bw.Write(_d); bw.Write(_e); bw.Write(_h); bw.Write(_l); bw.Write(_ie); bw.Write(_if);
+        bw.Write(_sb); bw.Write(_sc); bw.Write(_halt); bw.Write(_ime);
+        bw.Write(_stop); bw.Write(_imeDelay);
     }
 
     public void Load(BinaryReader br)
     {
-
+        _pc = br.ReadInt32(); _sp = br.ReadInt32(); _a = br.ReadByte(); _f = br.ReadByte(); _b = br.ReadByte(); _c = br.ReadByte(); _d = br.ReadByte(); _e = br.ReadByte(); _h = br.ReadByte(); _l = br.ReadByte(); _ie = br.ReadByte(); _if = br.ReadByte();
+        _sb = br.ReadByte(); _sc = br.ReadByte(); _halt = br.ReadBoolean(); _ime = br.ReadBoolean();
+        _stop = br.ReadInt32(); _imeDelay = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetFlags() =>
@@ -291,16 +296,21 @@ public partial class GbcCpu : ICpu, ISaveState
         _ => 0,
     };
 
-    public void SetReg(string reg, int v)
+    public void SetReg(string reg, int value)
     {
         switch (reg.ToLowerInvariant())
         {
-            case "af": AF = v; break;
-            case "bc": BC = v; break;
-            case "de": DE = v; break;
-            case "hl": HL = v; break;
-            case "sp": SP = v; break;
-            case "pc": PC = v; break;
+            case "af": AF = value; break;
+            case "bc": BC = value; break;
+            case "de": DE = value; break;
+            case "hl": HL = value; break;
+            case "sp": SP = value; break;
+            case "pc": PC = value; break;
         }
+    }
+
+    public int[] GetRegValues()
+    {
+        throw new NotImplementedException();
     }
 }

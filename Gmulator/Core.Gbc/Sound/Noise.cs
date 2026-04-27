@@ -5,26 +5,26 @@ namespace Gmulator.Core.Gbc.Sound;
 
 public class Noise : BaseChannel, ISaveState
 {
-    private int _nr41;
-    private int _nr42;
-    private int _nr43;
-    private int _nr44;
+    private byte _nr41;
+    private byte _nr42;
+    private byte _nr43;
+    private byte _nr44;
 
     public Noise(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff20, 0xff23, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a) => a switch
+    public byte Read(int a) => a switch
     {
-        0xff20 => _nr41 | 0xff,
+        0xff20 => (byte)(_nr41 | 0xff),
         0xff21 => _nr42,
         0xff22 => _nr43,
-        0xff23 => _nr44 | 0xbf,
+        0xff23 => (byte)(_nr44 | 0xbf),
         _ => 0xff,
     };
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {
@@ -74,6 +74,7 @@ public class Noise : BaseChannel, ISaveState
         _nr44 = 0xbf;
         Dac = false;
         Enabled = false;
+        Timer = 8192;
     }
 
     public void Save(BinaryWriter bw)
@@ -88,8 +89,8 @@ public class Noise : BaseChannel, ISaveState
     {
         Width = br.ReadInt32(); Divisor = br.ReadInt32(); LFSR = br.ReadInt32(); Frequency = br.ReadInt32();
         LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32();
-        Timer = br.ReadInt32(); _nr41 = br.ReadInt32(); _nr42 = br.ReadInt32(); _nr43 = br.ReadInt32();
-        _nr44 = br.ReadInt32();
+        Timer = br.ReadInt32(); _nr41 = br.ReadByte(); _nr42 = br.ReadByte(); _nr43 = br.ReadByte();
+        _nr44 = br.ReadByte();
     }
 
     public List<RegisterInfo> GetState() =>

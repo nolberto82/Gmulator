@@ -38,7 +38,7 @@ public class SnesSpcLogger()
 
         byte[] b = new byte[size];
         for (int i = 0; i < b.Length; i++)
-            b[i] = (byte)Spc.ReadDebug(pc + i);
+            b[i] = Spc.ReadDebug(pc + i);
 
         pc++;
         string oper = dops.Oper.ToLower();
@@ -104,9 +104,9 @@ public class SnesSpcLogger()
 
         if (getRegisters)
         {
-            var regs = Spc.GetRegisters();
+            var regstr = Spc.GetRegisters();
             var flags = Spc.GetFlags();
-            foreach (var r in regs)
+            foreach (var r in regstr)
             {
                 regtext += $"{r.Name}:{r.Value} ";
             }

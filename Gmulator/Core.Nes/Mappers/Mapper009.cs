@@ -11,32 +11,32 @@ internal class Mapper009 : BaseMapper
         Reset();
     }
 
-    public override int ReadPrg(int a) => base.ReadPrg(0x2000 * Prg[(a >> 13) % 4] + a % 0x2000);
+    public override byte ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
 
-    public override int ReadChr(int a) => base.ReadChr(0x1000 * Chr[a >> 12] + a % 0x1000);
+    public override byte ReadChr(int addr) => base.ReadChr(0x1000 * Chr[addr >> 12] + addr % 0x1000);
 
-    public override void WritePrg(int a, int v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
+    public override void WritePrg(int addr, byte value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
 
-    public override void Write(int a, int v)
+    public override void Write(int addr, byte value)
     {
-        if (a >= 0xa000 && a <= 0xafff)
+        if (addr >= 0xa000 && addr <= 0xafff)
         {
-            Prg[0] = (byte)(v & 0xf);
+            Prg[0] = (byte)(value & 0xf);
             Prg[1] = (byte)((Header.PrgBanks * 2) - 3);
             Prg[2] = (byte)((Header.PrgBanks * 2) - 2);
             Prg[3] = (byte)((Header.PrgBanks * 2) - 1);
         }
-        else if (a <= 0xbfff)
-            LChr[0] = (byte)(v & 0x1f);
-        else if (a <= 0xcfff)
-            LChr[1] = (byte)(v & 0x1f);
-        else if (a <= 0xdfff)
-            LChr[2] = (byte)(v & 0x1f);
-        else if (a <= 0xefff)
-            LChr[3] = (byte)(v & 0x1f);
-        else if (a <= 0xffff)
-            Header.Mirror = (v & 1) + 2;
-        base.Write(a, v);
+        else if (addr <= 0xbfff)
+            LChr[0] = (byte)(value & 0x1f);
+        else if (addr <= 0xcfff)
+            LChr[1] = (byte)(value & 0x1f);
+        else if (addr <= 0xdfff)
+            LChr[2] = (byte)(value & 0x1f);
+        else if (addr <= 0xefff)
+            LChr[3] = (byte)(value & 0x1f);
+        else if (addr <= 0xffff)
+            Header.Mirror = (value & 1) + 2;
+        base.Write(addr, value);
     }
 
     public override byte ReadVram(int a) => base.ReadVram(a);

@@ -5,26 +5,26 @@ namespace Gmulator.Core.Gbc.Sound;
 
 public class Square2 : BaseChannel, ISaveState
 {
-    private int _nr21;
-    private int _nr22;
-    private int _nr23;
-    private int _nr24;
+    private byte _nr21;
+    private byte _nr22;
+    private byte _nr23;
+    private byte _nr24;
 
     public Square2(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff16, 0xff19, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a) => a switch
+    public byte Read(int a) => a switch
     {
-        0xff16 => _nr21 | 0x3f,
+        0xff16 => (byte)(_nr21 | 0x3f),
         0xff17 => _nr22,
-        0xff18 => _nr23 | 0xff,
-        0xff19 => _nr24 | 0xbf,
+        0xff18 => (byte)(_nr23 | 0xff),
+        0xff19 => (byte)(_nr24 | 0xbf),
         _ => 0xff,
     };
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {
@@ -68,6 +68,7 @@ public class Square2 : BaseChannel, ISaveState
         _nr24 = 0xbf;
         Dac = false;
         Enabled = false;
+        Timer = 8192;
     }
 
     public void Save(BinaryWriter bw)
@@ -80,8 +81,8 @@ public class Square2 : BaseChannel, ISaveState
     public void Load(BinaryReader br)
     {
         Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); _nr21 = br.ReadInt32(); _nr22 = br.ReadInt32();
-        _nr23 = br.ReadInt32(); _nr24 = br.ReadInt32();
+        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); _nr21 = br.ReadByte(); _nr22 = br.ReadByte();
+        _nr23 = br.ReadByte(); _nr24 = br.ReadByte();
     }
 
     public List<RegisterInfo> GetState() =>

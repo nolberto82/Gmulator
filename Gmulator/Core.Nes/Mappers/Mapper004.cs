@@ -15,24 +15,23 @@ internal class Mapper004 : BaseMapper
         Reset();
     }
 
-    public override int ReadPrg(int a) => base.ReadPrg(0x2000 * Prg[(a >> 13) % 4] + a % 0x2000);
+    public override byte ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
 
-    public override int ReadChr(int a) => base.ReadChr(0x0400 * Chr[a >> 10] + a % 0x0400);
+    public override byte ReadChr(int addr) => base.ReadChr(0x0400 * Chr[addr >> 10] + addr % 0x0400);
 
-    public override void WritePrg(int a, int v) => base.WritePrg(0x2000 * Prg[(a % 0x8000) >> 13] + a % 0x2000, v);
+    public override void WritePrg(int addr, byte value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
 
-    public override void Write(int a, int v)
+    public override void Write(int addr, byte value)
     {
-        if (a <= 0x9fff)
+        if (addr <= 0x9fff)
         {
-            if ((a % 2) == 0)
+            if ((addr % 2) == 0)
             {
-                ChrMode = (v >> 7) & 1;
-                PrgMode = (v >> 6) & 1;
-                BankReg = v;
+                ChrMode = (value >> 7) & 1;
+                PrgMode = (value >> 6) & 1;
+                BankReg = value;
                 if (PrgMode == 0)
                 {
-
                 }
                 else
                 {
@@ -43,7 +42,6 @@ internal class Mapper004 : BaseMapper
 
                 if (ChrMode == 1)
                 {
-
                 }
             }
             else
@@ -51,16 +49,16 @@ internal class Mapper004 : BaseMapper
                 if (PrgMode == 0)
                 {
                     if ((BankReg & 7) == 7)
-                        Prg[1] = (byte)(v & (Header.PrgBanks * 2 - 1));
+                        Prg[1] = (byte)(value & (Header.PrgBanks * 2 - 1));
                     else if ((BankReg & 7) == 6)
-                        Prg[0] = (byte)(v & (Header.PrgBanks * 2 - 1));
+                        Prg[0] = (byte)(value & (Header.PrgBanks * 2 - 1));
                 }
                 else
                 {
                     if ((BankReg & 7) == 7)
-                        Prg[1] = (byte)(v & (Header.PrgBanks * 2 - 1));
+                        Prg[1] = (byte)(value & (Header.PrgBanks * 2 - 1));
                     else if ((BankReg & 7) == 6)
-                        Prg[2] = (byte)(v & (Header.PrgBanks * 2 - 1));
+                        Prg[2] = (byte)(value & (Header.PrgBanks * 2 - 1));
                 }
 
                 if ((BankReg & 7) < 6)
@@ -70,33 +68,33 @@ internal class Mapper004 : BaseMapper
                         switch (BankReg & 7)
                         {
                             case 0:
-                                Chr[0] = (byte)(v & 0xfe);
+                                Chr[0] = (byte)(value & 0xfe);
                                 Chr[1] = (byte)(Chr[0] + 1);
                                 break;
                             case 1:
-                                Chr[2] = (byte)(v & 0xfe);
+                                Chr[2] = (byte)(value & 0xfe);
                                 Chr[3] = (byte)(Chr[2] + 1);
                                 break;
-                            case 2: Chr[4] = v; break;
-                            case 3: Chr[5] = v; break;
-                            case 4: Chr[6] = v; break;
-                            case 5: Chr[7] = v; break;
+                            case 2: Chr[4] = value; break;
+                            case 3: Chr[5] = value; break;
+                            case 4: Chr[6] = value; break;
+                            case 5: Chr[7] = value; break;
                         }
                     }
                     else
                     {
                         switch (BankReg & 7)
                         {
-                            case 2: Chr[0] = v; break;
-                            case 3: Chr[1] = v; break;
-                            case 4: Chr[2] = v; break;
-                            case 5: Chr[3] = v; break;
+                            case 2: Chr[0] = value; break;
+                            case 3: Chr[1] = value; break;
+                            case 4: Chr[2] = value; break;
+                            case 5: Chr[3] = value; break;
                             case 0:
-                                Chr[4] = (byte)(v & 0xfe);
+                                Chr[4] = (byte)(value & 0xfe);
                                 Chr[5] = (byte)(Chr[4] + 1);
                                 break;
                             case 1:
-                                Chr[6] = (byte)(v & 0xfe);
+                                Chr[6] = (byte)(value & 0xfe);
                                 Chr[7] = (byte)(Chr[6] + 1);
                                 break;
                         }
@@ -104,34 +102,34 @@ internal class Mapper004 : BaseMapper
                 }
             }
         }
-        else if (a <= 0xbfff)
+        else if (addr <= 0xbfff)
         {
-            if ((a % 2) == 0)
-                Header.Mirror = (v & 1) + 2;
+            if ((addr % 2) == 0)
+                Header.Mirror = (value & 1) + 2;
             else
             {
-                WriteProtect = (v & 0x40) != 0;
-                SramEnabled = (v & 0x80) != 0;
+                WriteProtect = (value & 0x40) != 0;
+                SramEnabled = (value & 0x80) != 0;
             }
         }
-        else if (a <= 0xdfff)
+        else if (addr <= 0xdfff)
         {
-            if ((a % 2) == 0)
-                Rvalue = v;
+            if ((addr % 2) == 0)
+                Rvalue = value;
             else
             {
                 Counter = 0;
                 Reload = 1;
             }
         }
-        else if (a <= 0xffff)
+        else if (addr <= 0xffff)
         {
-            if ((a % 2) == 0)
+            if ((addr % 2) == 0)
                 Irq = false;
             else
                 Irq = true;
         }
-        base.Write(a, v);
+        base.Write(addr, value);
     }
 
     public override void Reset()

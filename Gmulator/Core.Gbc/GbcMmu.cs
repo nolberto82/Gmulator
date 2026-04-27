@@ -3,7 +3,7 @@ using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Gbc;
 
-public class GbcMmu : IMmu, ISaveState
+public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
 {
     public string Title { get; private set; } = "";
 
@@ -11,33 +11,23 @@ public class GbcMmu : IMmu, ISaveState
     public int RomSize { get; private set; }
     public bool IsBios { get; private set; }
 
-    private byte[] _ram;
-    private byte[] _vram;
-    public byte[] Wram { get; set; }
+    private byte[] _ram = new byte[0x10000];
+    private byte[] _vram = new byte[0x4000];
+    public byte[] Wram { get; set; } = new byte[0x8000];
     private byte[] _rom;
 
-    public int VramBank { get; set; }
-    public int WramBank { get; set; }
+    public byte VramBank { get; set; }
+    public byte WramBank { get; set; }
 
     public RamType RamType { get; private set; }
     public int RamMask { get; private set; }
 
     public BaseMapper Mapper { get; private set; }
-    public Dictionary<int, Cheat> Cheats { get; }
+    public Dictionary<(int, int), Cheat> Cheats { get; } = cheats;
 
-    private readonly List<MemoryHandler> MemoryHandlers;
+    private readonly List<MemoryHandler> MemoryHandlers = gbc.CpuMap.Handlers;
 
-    private readonly Gbc Gbc;
-
-    public GbcMmu(Gbc gbc, Dictionary<int, Cheat> cheats)
-    {
-        Cheats = cheats;
-        MemoryHandlers = gbc.CpuMap.Handlers;
-        Gbc = gbc;
-        _ram = new byte[0x10000];
-        _vram = new byte[0x4000];
-        Wram = new byte[0x8000];
-    }
+    private readonly Gbc Gbc = gbc;
 
     public int GetOffset(int a)
     {
@@ -45,64 +35,64 @@ public class GbcMmu : IMmu, ISaveState
         return handler.Offset;
     }
 
-    public int ReadByte(int a)
+    public byte ReadByte(int addr)
     {
-        a &= 0xffff;
-        RamType = MemoryHandlers[a].Type;
-        int v = MemoryHandlers[a].Read(a);
+        addr &= 0xffff;
+        RamType = MemoryHandlers[addr].Type;
+        byte v = MemoryHandlers[addr].Read(addr);
         if (RamType == RamType.Rom && Cheats.Count > 0)
-            return ApplyGameGenieCheats(a, (byte)v);
+            return ApplyGameGenieCheats(addr, v);
         return v;
     }
 
-    public void WriteByte(int a, int v)
+    public void WriteByte(int addr, byte value)
     {
-        a &= 0xffff;
-        RamType = MemoryHandlers[a].Type;
-        MemoryHandlers[a].Write(a, v);
+        addr &= 0xffff;
+        RamType = MemoryHandlers[addr].Type;
+        MemoryHandlers[addr].Write(addr, value);
     }
 
-    public int ReadRam(int a) => _ram[a];
-    public void WriteRam(int a, int v) => _ram[a] = (byte)v;
-    public int ReadIo(int a) => MemoryHandlers[0xff00 + (a & 0xff)].Read(0xff00 + (a & 0xff));
-    public void WriteIo(int a, int v) => _ram[0xff00 + a & 0xff] = (byte)v;
-    public int ReadHram(int a) => MemoryHandlers[0xff80 + (a & 0xff)].Read(0xff80 + (a & 0xff));
+    public byte ReadRam(int a) => _ram[a];
+    public void WriteRam(int a, byte v) => _ram[a] = v;
+    public byte ReadIo(int addr) => MemoryHandlers[0xff00 + (addr & 0xff)].Read(0xff00 + (addr & 0xff));
+    public void WriteIo(int addr, byte value) => _ram[0xff00 + addr & 0xff] = (byte)value;
+    public byte ReadHram(int a) => MemoryHandlers[0xff80 + (a & 0xff)].Read(0xff80 + (a & 0xff));
 
-    public void WriteHram(int a, int v) => _ram[0xff80 + a & 0xff] = (byte)v;
+    public void WriteHram(int addr, byte value) => _ram[0xff80 + addr & 0xff] = (byte)value;
 
-    public int ReadVramBank(int a) => _vram[(a & 0x1fff) + (0x2000 * VramBank) & 0x3fff];
+    public byte ReadVramBank(int addr) => _vram[(addr & 0x1fff) + (0x2000 * VramBank) & 0x3fff];
 
-    public int ReadVram(int a) => _vram[a & 0x3fff];
+    public byte ReadVram(int addr) => _vram[addr & 0x3fff];
 
-    public int ReadAttribute(int a) => _vram[(a & 0x1fff) + 0x2000];
+    public byte ReadAttribute(int addr) => _vram[(addr & 0x1fff) + 0x2000];
 
-    public void WriteVramBank(int a, int v) => _vram[(a & 0x1fff) + (0x2000 * VramBank)] = (byte)v;
+    public void WriteVramBank(int addr, byte value) => _vram[(addr & 0x1fff) + (0x2000 * VramBank)] = value;
 
-    public int ReadOam(int a) => _ram[a];
+    public byte ReadOam(int addr) => _ram[addr];
 
-    public int ReadSram(int a)
+    public byte ReadSram(int a)
     {
-        if (Mapper.CartRamOn)
+        if (Mapper.CartRamEnabled)
             return Mapper.Sram[(a - 0xa000 + (0x2000 * Mapper.Rambank)) & 0x1fff];
         return 0xff;
     }
 
-    public void WriteSram(int a, int v)
+    public void WriteSram(int a,byte v)
     {
-        if (Mapper.CartRamOn)
+        if (Mapper.CartRamEnabled)
         {
-            Mapper.Sram[(a - 0xa000 + 0x2000 * Mapper.Rambank) & 0x1fff] = (byte)v;
-            _ram[a] = (byte)v;
+            Mapper.Sram[(a - 0xa000 + 0x2000 * Mapper.Rambank) & 0x1fff] = v;
+            _ram[a] = v;
             Mapper.Write();
         }
     }
 
-    public int ReadWram(int a) => Wram[a < 0xd000 ? a % 0x1000 : a % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))];
+    public byte ReadWram(int a) => Wram[a < 0xd000 ? a % 0x1000 : a % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))];
 
-    public void WriteWram(int a, int v)
+    public void WriteWram(int a, byte v)
     {
-        Wram[a < 0xd000 ? a % 0x1000 : a % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))] = (byte)v;
-        _ram[a] = (byte)v;
+        Wram[a < 0xd000 ? a % 0x1000 : a % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))] = v;
+        _ram[a] = v;
     }
 
     public void WriteBlock(int src, int dst, int size)
@@ -245,9 +235,9 @@ public class GbcMmu : IMmu, ISaveState
 
     private byte ApplyGameGenieCheats(int ba, byte v)
     {
-        var cht = Cheats.ContainsKey(ba) && Cheats[ba].Enabled && Cheats[ba].Compare == v && Cheats[ba].Type == GameGenie;
+        var cht = Cheats.ContainsKey((ba,ba)) && Cheats[(ba, ba)].Enabled && Cheats[(ba, ba)].Compare == v && Cheats[(ba, ba)].Type == GameGenie;
         if (cht)
-            return Cheats[ba].Value;
+            return Cheats[(ba, ba)].Value;
         return v;
     }
 

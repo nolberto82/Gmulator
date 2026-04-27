@@ -2,26 +2,24 @@
 {
     public partial class SnesSa1
     {
-        public int ReadRegister(int a)
+        public byte ReadRegister(int a)
         {
             a &= 0xffff;
             switch (a)
             {
                 case 0x2300:
                 {
-                    int b = (_irqRequest ? 0x80 : 0) |
+                    return (byte)((_irqRequest ? 0x80 : 0) |
                     (_irqVectorSelect ? 0x40 : 0) |
                     (_nmiVectorSelect ? 0x10 : 0) |
                     (_snesCharConvIrqFlag ? 0x20 : 0) |
-                    _sa1Message & 0x0f;
-                    return b;
+                    _sa1Message & 0x0f);
                 }
                 case 0x2301:
                 {
-                    int b = (_sa1IrqRequest ? 0x80 : 0) |
+                    return (byte)((_sa1IrqRequest ? 0x80 : 0) |
                     (_sa1NmiRequest ? 0x20 : 0) |
-                    ((_snesMessage & 0x0f) != 0 ? 0x01 : 0); ;
-                    return b;
+                    ((_snesMessage & 0x0f) != 0 ? 0x01 : 0)); ;
                 }
                 case 0x2302:
                 {
@@ -46,8 +44,7 @@
                 case >= 0x2306 and <= 0x230a:
                 {
                     int shift = (a - 0x2306) * 8;
-                    int b = (_mathResult >> shift) & 0xff;
-                    return b;
+                    return (byte)((_mathResult >> shift) & 0xff);
                 }
                 case 0x230b:
                 {
@@ -73,7 +70,7 @@
             return 0;
         }
 
-        public void WriteSnesRegister(int a, int v)
+        public void WriteSnesRegister(int a, byte v)
         {
             switch (a)
             {
@@ -81,7 +78,7 @@
                     _sa1IrqRequest = (v & 0x80) != 0;
                     _sa1Wait = (v & 0x40) != 0;
                     if ((v & 0x20) == 0 && _sa1Reset)
-                        Cpu.Reset(true);
+                        ResetVector();
                     _sa1Reset = (v & 0x20) != 0;
                     _sa1NmiRequest = (v & 0x10) != 0;
                     _snesMessage = v & 0x0f;
@@ -138,7 +135,7 @@
             }
         }
 
-        public void WriteSa1Register(int a, int v)
+        public void WriteSa1Register(int a, byte v)
         {
             switch (a & 0xffff)
             {
@@ -264,11 +261,5 @@
                     break;
             }
         }
-
-        public int ReadReg(int a) => ReadRegister(a);
-
-        public void WriteCpuReg(int a, int v) => WriteSnesRegister(a, v);
-
-        public void WriteSa1Reg(int a, int v) => WriteSa1Register(a, v);
     }
 }

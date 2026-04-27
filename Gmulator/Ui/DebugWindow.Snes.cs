@@ -1,5 +1,4 @@
 ﻿using Gmulator.Core.Snes;
-using Gmulator.Core.Snes.Mappers;
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
@@ -23,7 +22,7 @@ internal class SnesDebugWindow : DebugWindow
     private readonly Func<int, int> ReadOp;
 
     private readonly int CoProcessor;
-    private readonly BaseMapper Mapper;
+    private readonly SnesMapper Mapper;
     private readonly SnesDma Dma;
 
     public SnesDebugWindow(Snes snes) : base(snes)
@@ -41,7 +40,7 @@ internal class SnesDebugWindow : DebugWindow
         Breakpoints = snes.Breakpoints;
         ReadOp = snes.ReadOp;
         SaveBreakpoints = snes.SaveBreakpoints;
-        CoProcessor = Mapper.CoProcessor;
+        CoProcessor = Mapper.Coprocessor;
 
         GameName = Mapper.Name ?? "";
 
@@ -64,8 +63,8 @@ internal class SnesDebugWindow : DebugWindow
 
         if (Sa1 != null)
         {
-            GetSa1State = Sa1!.Cpu.GetRegisters;
-            GetSa1Flags = Sa1!.Cpu.GetFlags;
+            GetSa1State = Sa1!.GetRegisters;
+            GetSa1Flags = Sa1!.GetFlags;
             GetSa1IORegs = Sa1!.GetIORegisters;
         }
 
@@ -79,24 +78,22 @@ internal class SnesDebugWindow : DebugWindow
 
         MemRegions =
         [
-            new("Work", mmu.ReadWram,mmu.WriteWram, 0x7e0000, 0x20000, 6, 0),
-            new("Save", Mapper.ReadSramDebug, Mapper.WriteSramDebug, 0x0000, Mapper.Sram.Length,$"{Mapper.Sram.Length}".Length,1),
-            new("Video", Ppu.ReadByte, Ppu.WriteByte, 0x0000, 0x10000, 4,2),
-            new("Oam", Ppu.ReadOram,Ppu.WriteOram, 0x0000, 0x220, 3,3),
-            new("Color", Ppu.ReadCram ,Ppu.WriteCram, 0x0000, 0x200, 3,4),
-            new("Spc",Spc.ReadDebug, Spc.Write,0x0000, 0x10000, 4,5),
+            new("Work", mmu.ReadWram, mmu.WriteWram, 0x7e0000, 0x20000, 6, BpType.WramRead | BpType.WramWrite),
+            new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length,$"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead),
+            new("Video", Ppu.ReadByte, Ppu.WriteByte, 0x0000, 0x10000, 4, BpType.VramWrite | BpType.VramRead),
+            new("Oam", Ppu.ReadOram,Ppu.WriteOram, 0x0000, 0x220, 3, BpType.OramWrite | BpType.OramRead),
+            new("Color", Ppu.ReadCram ,Ppu.WriteCram, 0x0000, 0x200, 3, BpType.CramWrite | BpType.CramRead),
+            new("Spc",Spc.ReadDebug, Spc.Write,0x0000, 0x10000, 4, BpType.SpcWrite | BpType.SpcRead),
         ];
 
-        if (Mapper.CoProcessor == BaseMapper.Sa1)
-            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, 6));
-        if (Mapper.CoProcessor == BaseMapper.Gsu)
-            MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, 7));
+        if (Mapper.Coprocessor == SnesMapper.Sa1)
+            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BpType.Sa1Write | BpType.Sa1Read));
+        //if (Mapper.Coprocessor == SnesMapper.Gsu)
+        //    MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BPType.WramWrite | BPType.WramRead));
 
-        MemRegions.Add(new("Prg", mmu.ReadByte, Mapper.WriteSram, 0x0000, Mapper.Rom.Length, 6, 8));
-        MemRegions.Add(new("Register", null, null, -1, -1, -1, 9));
+        MemRegions.Add(new("Prg", mmu.ReadByte, Mapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec));
+        MemRegions.Add(new("Register", null, null, -1, -1, -1, 0));
 
-        for (int i = 0; i < MemRegions.Count; i++)
-            MemRegions[i].Id = i;
     }
 
     public override void Draw(Texture2D texture)
@@ -156,9 +153,19 @@ internal class SnesDebugWindow : DebugWindow
         ImGui.End();
     }
 
-    public override void DrawStackInfo(Span<byte> data, int addr, int start, string name) => base.DrawStackInfo(data, addr, !Cpu.E ? start : 0x1ff, name);
+    public override void DrawStackInfo(Span<byte> data, int addr, int start, string name) => base.DrawStackInfo(data, addr, !Cpu.EmulationMode ? start : 0x1ff, name);
 
-    public override void AddBreakpoint(int a, int type, int condition, bool write, int index = 0) => base.AddBreakpoint(a, type, condition, write, index);
+    public override void AddBreakpoint(int addr, BpType type, int condition, bool write)
+    {
+        if (addr == -1) return;
+        var bp = Breakpoints.Find(b => b.Addr == addr && b.Type == type);
+        if (bp == null)
+        {
+            Breakpoints.Add(new(addr, -1, type, write, true));
+            SaveBreakpoints(GameName);
+        }
+        //base.AddBreakpoint(addr, type, condition, write);
+    }
 
     public override void Continue(DebugState type)
     {
@@ -179,7 +186,7 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void Reset(DebugState type)
     {
-        Snes.Reset("", true, Ppu.ScreenBuffer);
+        Snes.Reset(GameName, true);
         base.Reset(MainCpu);
     }
 
@@ -225,12 +232,12 @@ internal class SnesDebugWindow : DebugWindow
             }
             case Sa1Cpu:
             {
-                var pc = Sa1.Cpu.PBPC;
-                var inst = Sa1.Cpu.Disasm[ReadOp(pc)];
+                var pc = Sa1.PBPC;
+                var inst = Sa1.Disasm[ReadOp(pc)];
                 if (inst.Name == "jsr" || inst.Name == "jsl")
                 {
-                    Sa1.Cpu.StepOverAddr = pc + inst.Size;
-                    Sa1.Cpu.Step();
+                    Sa1.StepOverAddr = pc + inst.Size;
+                    Sa1.Step();
                     base.StepOver(MainCpu);
                 }
                 else

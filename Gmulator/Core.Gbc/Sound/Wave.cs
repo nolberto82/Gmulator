@@ -4,12 +4,12 @@ namespace Gmulator.Core.Gbc.Sound;
 
 public class Wave : BaseChannel, ISaveState
 {
-    private int _wave;
-    private int _nr30;
-    private int _nr31;
-    private int _nr32;
-    private int _nr33;
-    private int _nr34;
+    private byte _wave;
+    private byte _nr30;
+    private byte _nr31;
+    private byte _nr32;
+    private byte _nr33;
+    private byte _nr34;
 
     private readonly Gbc Gbc;
 
@@ -29,17 +29,17 @@ public class Wave : BaseChannel, ISaveState
         gbc.CpuMap.Set(0x00, 0x00, 0xff1a, 0xff1e, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a) => a switch
+    public byte Read(int a) => a switch
     {
-        0xff1a => _nr30 | 0x7f,
-        0xff1b => _nr31 | 0xff,
-        0xff1c => _nr32 | 0x9f,
-        0xff1d => _nr33 | 0xff,
-        0xff1e => _nr34 | 0xbf,
+        0xff1a => (byte)(_nr30 | 0x7f),
+        0xff1b => (byte)(_nr31 | 0xff),
+        0xff1c => (byte)(_nr32 | 0x9f),
+        0xff1d => (byte)(_nr33 | 0xff),
+        0xff1e => (byte)(_nr34 | 0xbf),
         _ => 0xff,
     };
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {
@@ -72,8 +72,8 @@ public class Wave : BaseChannel, ISaveState
         }
     }
 
-    private int ReadWaveRam(int a) => WaveRam[a & 0x0f];
-    private void WriteWaveRam(int a, int v) => WaveRam[a & 0x0f] = (byte)v;//Mmu.WriteByte(0xff00 + a, v);
+    private byte ReadWaveRam(int a) => WaveRam[a & 0x0f];
+    private void WriteWaveRam(int a, byte v) => WaveRam[a & 0x0f] = v;//Mmu.WriteByte(0xff00 + a, v);
 
     public override void Reset()
     {
@@ -94,6 +94,7 @@ public class Wave : BaseChannel, ISaveState
 
         Dac = false;
         Enabled = false;
+        Timer = 8192;
 
         WaveRam = new byte[16];
         if (CGBEnabled())
@@ -118,9 +119,9 @@ public class Wave : BaseChannel, ISaveState
     public void Load(BinaryReader br)
     {
         Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); VolumeShift = br.ReadInt32(); _wave = br.ReadInt32();
-        WaveRam = ReadArray<byte>(br, WaveRam.Length); _nr30 = br.ReadInt32(); _nr31 = br.ReadInt32(); _nr32 = br.ReadInt32();
-        _nr33 = br.ReadInt32(); _nr34 = br.ReadInt32();
+        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); VolumeShift = br.ReadInt32(); _wave = br.ReadByte();
+        WaveRam = ReadArray<byte>(br, WaveRam.Length); _nr30 = br.ReadByte(); _nr31 = br.ReadByte(); _nr32 = br.ReadByte();
+        _nr33 = br.ReadByte(); _nr34 = br.ReadByte();
         Dac = (_nr30 & 0x80) != 0;
     }
 

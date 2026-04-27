@@ -6,11 +6,8 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
 {
     public bool HasStepped { get; private set; }
 
-
-
     private readonly Snes Snes;
     private readonly SnesSa1 Sa1;
-
 
     public SnesSa1Cpu(Snes snes, SnesSa1 sa1)
     {
@@ -26,7 +23,7 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
         return v;
     }
 
-    public override void Step()
+    public void Step()
     {
         ulong syncto = Snes.Ppu.Cycles / 2;
         while (Cycles < syncto)
@@ -91,7 +88,7 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
             Push((byte)(PC & 0xff));
             Push((byte)PS);
         }
-        PC = Sa1.GetIrqVector();
+        PC = Sa1.GetSa1IrqVector();
         PB = 0;
     }
 
@@ -112,17 +109,25 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
             Push((byte)(PC & 0xff));
             Push((byte)PS);
         }
-        PC = Sa1.GetNmiVector();
+        PC = Sa1.GetSa1NmiVector();
         PB = 0;
     }
 
-    public override int Read(int a)
+    public int Read(int a)
     {
         Cycles++;
+        if (a == NMIn)
+            return (byte)Sa1.GetSnesNmiVector();
+        if (a == NMIn + 1)
+            return (byte)(Sa1.GetSnesNmiVector() >> 8);
+        if (a == IRQn)
+            return (byte)Sa1.GetSnesIrqVector();
+        if (a == IRQn + 1) 
+            return (byte)(Sa1.GetSnesIrqVector() >> 8);
         return Sa1.ReadByte(a);
     }
 
-    public override void Write(int a, int v)
+    public void Write(int a, int v)
     {
         Cycles++;
         Sa1.WriteByte(a, v);
@@ -140,36 +145,5 @@ public class SnesSa1Cpu : SnesCpu, ISaveState
         Cycles = 0;
         PC = Sa1.GetResetVector();
     }
-
-    public new List<RegisterInfo> GetFlags()
-    {
-        int ps = PS;
-        return
-        [
-            new("","C",$"{(ps & FC) != 0}"),
-            new("","Z",$"{(ps & FZ) != 0}"),
-            new("","I",$"{(ps & FI) != 0}"),
-            new("","D",$"{(ps & FD) != 0}"),
-            new("","X",$"{(ps & FX) != 0}"),
-            new("","M",$"{(ps & FM) != 0}"),
-            new("","V",$"{(ps & FV) != 0}"),
-            new("","N",$"{(ps & FN) != 0}"),
-            new("","E",$"{E}"),
-        ];
-    }
-
-    public new List<RegisterInfo> GetRegisters() =>
-    [
-        new("","A ",$"{A:X4}"),
-        new("","X ",$"{X:X4}"),
-        new("","Y ",$"{Y:X4}"),
-        new("","SP",$"{SP:X4}"),
-        new("","D ",$"{D:X4}"),
-        new("","P ",$"{PS:X4}"),
-        new("","DB",$"{DB:X2}"),
-        new("","PB",$"{PB:X2}"),
-    ];
-
-
 }
 

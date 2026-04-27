@@ -1,57 +1,56 @@
-﻿namespace Gmulator.Shared;
+﻿using System.Runtime.InteropServices.Marshalling;
+
+namespace Gmulator.Shared;
 
 public class Breakpoint
 {
     public int Addr { get; set; }
     public int Condition { get; set; }
-    public int Type { get; set; }
-    public bool IsDebug { get; set; }
-    public int CpuType { get; set; }
-    public int RamType { get; set; }
+    public BpType Type { get; set; }
     public bool Write { get; set; }
     public bool Enabled { get; set; }
 
     public Breakpoint() { }
-    public Breakpoint(int addr, int condition, int type, bool write, bool enabled, int index = 0)
+    public Breakpoint(int addr, int condition, BpType type, bool write, bool enabled)
     {
         Addr = addr;
         Condition = condition;
         Type = type;
-        RamType = index;
         Write = write;
         Enabled = enabled;
     }
 }
 
-public static class AccessTypes
+public static class Access
 {
-    public const int Reads = BPType.Read | BPType.VideoRead | BPType.RegRead | BPType.SpcRead | BPType.Sa1Read;
-    public const int Writes = BPType.Write | BPType.VideoWrite | BPType.RegWrite | BPType.SpcWrite | BPType.Sa1Write;
-    public const int RamReads = 0xff;
-    public const int RamWrites = RamReads & ~(int)RamType.Rom;
+    public const BpType Write = BpType.WramWrite | BpType.VramWrite | BpType.RegWrite |
+        BpType.SpcWrite | BpType.Sa1Write | BpType.SramWrite | BpType.CramWrite | BpType.OramWrite;
+    public const BpType Read = BpType.WramRead | BpType.VramRead | BpType.RegRead |
+        BpType.SpcRead | BpType.Sa1Read | BpType.SramRead | BpType.CramRead | BpType.OramRead;
+    public const BpType Exec = BpType.CodeExec | BpType.SpcExec | BpType.GsuExec;
 }
 
-public static class CpuType
+public enum BpType : int
 {
-    public const int Main = 1;
-    public const int Spc = 2;
-};
-
-public static class BPType
-{
-    public const int Read = 1;
-    public const int Write = 2;
-    public const int Exec = 4;
-    public const int VideoWrite = 8;
-    public const int VideoRead = 16;
-    public const int RegWrite = 32;
-    public const int RegRead = 64;
-    public const int SpcWrite = 128;
-    public const int SpcRead = 256;
-    public const int SpcExec = 512;
-    public const int Sa1Write = 1024;
-    public const int Sa1Read = 2048;
-    public const int GsuExec = 4096;
+    WramWrite = 1,
+    WramRead = 1 << 1,
+    CodeExec = 1 << 2,
+    VramWrite = 1 << 3,
+    VramRead = 1 << 4,
+    RegWrite = 1 << 5,
+    RegRead = 1 << 6,
+    SpcWrite = 1 << 7,
+    SpcRead = 1 << 8,
+    SpcExec = 1 << 9,
+    Sa1Write = 1 << 10,
+    Sa1Read = 1 << 11,
+    GsuExec = 1 << 12,
+    SramWrite = 1 << 13,
+    SramRead = 1 << 14,
+    CramWrite = 1 << 15,
+    CramRead = 1 << 16,
+    OramWrite = 1 << 15,
+    OramRead = 1 << 16,
 };
 
 public enum RamType : int

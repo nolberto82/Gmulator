@@ -10,26 +10,26 @@ public class GbcTimer : ISaveState
     private bool _overflow;
     private bool _updateTIMA;
 
-    private int _div;
-    private int _tima;
-    private int _tma;
-    private int _tac;
+    private byte _div;
+    private byte _tima;
+    private byte _tma;
+    private byte _tac;
 
     public GbcTimer(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x00, 0xff04, 0xff07, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a) => a switch
+    public byte Read(int a) => a switch
     {
-        0xff04 => _div | 0xad,
+        0xff04 => (byte)(_div | 0xad),
         0xff05 => _tima,
         0xff06 => _tma,
-        0xff07 => _tac | 0xf8,
+        0xff07 => (byte)(_tac | 0xf8),
         _ => 0,
     };
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {
@@ -103,6 +103,6 @@ public class GbcTimer : ISaveState
     public void Load(BinaryReader br)
     {
         _divideRegister = br.ReadInt32(); _timerCounter = br.ReadInt32(); _overflow = br.ReadBoolean(); _updateTIMA = br.ReadBoolean();
-        _div = br.ReadInt32(); _tima = br.ReadInt32(); _tma = br.ReadInt32(); _tac = br.ReadInt32();
+        _div = br.ReadByte(); _tima = br.ReadByte(); _tma = br.ReadByte(); _tac = br.ReadByte();
     }
 }

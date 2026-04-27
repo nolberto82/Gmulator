@@ -2,6 +2,7 @@
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Interfaces;
 using ImGuiNET;
+using rlImGui_cs;
 using static Gmulator.Shared.MemoryEditor;
 
 namespace Gmulator.Ui
@@ -85,6 +86,9 @@ namespace Gmulator.Ui
             {
                 if (ImGui.IsWindowFocused())
                     IsScreenWindow = true;
+                var size = ImGui.GetContentRegionAvail();
+
+                //rlImGui.ImageRect(texture, (int)size.X, (int)size.Y, new(0, 0, (int)size.X, -(int)size.Y));
                 ImGui.Image((nint)texture.Id, ImGui.GetContentRegionAvail());
                 Notifications.RenderDebug();
                 ImGui.End();
@@ -109,12 +113,12 @@ namespace Gmulator.Ui
             }
         }
 
-        private void DrawDisassembly(int PC, int n)
+        private void DrawDisassembly(int Pc, int n)
         {
             ImGui.PushID(n);
             ImGui.BeginChild($"Disassembly{n}");
             {
-                var pc = Scroll(PC, n);
+                var pc = Scroll(Pc, n);
                 //pc = pc & 0xfff000;
                 if (ImGui.BeginPopupContextWindow($"gotomenu{n}"))
                     JumpTo(n);
@@ -134,14 +138,14 @@ namespace Gmulator.Ui
                         {
                             var bp = Breakpoints.Find(b => b.Addr == pc);
                             if (bp == null)
-                                AddBreakpoint(pc, BPType.Exec, -1, false, 6);
+                                AddBreakpoint(pc, BpType.CodeExec, -1, false);
                             else
                                 RemoveBreakpoint(bp);
                         }
 
                     }
 
-                    DrawHighlight(PC, pc);
+                    DrawHighlight(Pc, pc);
 
                     if (ImGui.IsItemHovered())
                     {
@@ -182,8 +186,10 @@ namespace Gmulator.Ui
                             SnesSa1 sa1 = (Console as Snes).Sa1;
                             ImGui.SetColumnWidth(0, 210);
                             SelectedCpu = Sa1Cpu;
-                            cpu = sa1.Cpu;
-                            DrawDisassembly((Console as Snes).Sa1.Cpu.PBPC, Sa1Cpu);
+                            cpu = sa1;
+                            (Console as Snes).Logger.IsSa1 = true;
+                            DrawDisassembly((Console as Snes).Sa1.PBPC, Sa1Cpu);
+                            (Console as Snes).Logger.IsSa1 = false;
                             ImGui.EndTabItem();
                         }
                     }
@@ -193,7 +199,7 @@ namespace Gmulator.Ui
                         SnesSpc spc = (Console as Snes).Spc;
                         SelectedCpu = SpcCpu;
                         cpu = spc;
-                        DrawDisassembly(GetSpcPC(), SpcCpu);
+                        DrawDisassembly(spc.PC, SpcCpu);
                         ImGui.EndTabItem();
                     }
                     //if (CoProcessor == BaseMapper.CoprocessorGsu)
@@ -462,9 +468,9 @@ namespace Gmulator.Ui
                     {
                         Breakpoint bp = Breakpoints[i];
                         cbp = bp;
-                        var types = (bp.Type & BPType.Exec) > 0 ? "X" : ".";
-                        types += (bp.Type & BPType.Write) > 0 ? "W" : ".";
-                        types += (bp.Type & BPType.Read) > 0 ? "R" : ".";
+                        var types = (bp.Type & Access.Exec) > 0 ? "X" : ".";
+                        types += (bp.Type & Access.Write) > 0 ? "W" : ".";
+                        types += (bp.Type & Access.Read) > 0 ? "R" : ".";
                         ImGui.PushID(i);
                         if (ImGui.Button($"{bp.Addr:X6}"))
                             SetJumpAddress(bp.Addr, 0);
@@ -479,7 +485,7 @@ namespace Gmulator.Ui
 
                         var condition = bp.Condition > -1 ? $"{bp.Condition:X4}" : "    ";
                         string name = "";
-                        var memRegion = MemRegions.FirstOrDefault(x => (int)x.Id == (int)bp.RamType);
+                        var memRegion = MemRegions.FirstOrDefault(x => (x.Type & bp.Type) == bp.Type);
                         if (memRegion != null)
                             name = memRegion.Name;
                         var text = $"{types} {name} {condition}";
@@ -490,10 +496,10 @@ namespace Gmulator.Ui
                             {
                                 BpAddr = $"{bp.Addr:X6}";
                                 BPCondition = bp.Condition > -1 ? $"{bp.Condition:X2}" : "";
-                                BreakTypes[0] = (bp.Type & BPType.Exec) > 0;
-                                BreakTypes[1] = (bp.Type & BPType.Write) > 0;
-                                BreakTypes[2] = (bp.Type & BPType.Read) > 0;
-                                itemindex = (int)bp.RamType;
+                                BreakTypes[0] = (bp.Type & Access.Exec) > 0;
+                                BreakTypes[1] = (bp.Type & Access.Write) > 0;
+                                BreakTypes[2] = (bp.Type & Access.Read) > 0;
+                                //itemindex = (int)MemRegions[bp.Type].Type;
                                 ImGui.OpenPopup("Edit Breakpoint");
                             }
                         }
@@ -528,7 +534,7 @@ namespace Gmulator.Ui
 
         public virtual void DrawBpMenu(Breakpoint bp, bool edit = false)
         {
-            var n = MemRegions.FindIndex(x => (int)x.Id == itemindex);
+            var n = MemRegions.FindIndex(x => (int)x.Type == itemindex);
             ImGui.Combo("Type", ref itemindex, [.. MemRegions.Select(x => x.Name)], MemRegions.Count);
             ImGui.PushItemWidth(-1);
             ImGui.Text("Address:"); ImGui.SameLine(86);
@@ -548,12 +554,12 @@ namespace Gmulator.Ui
             ImGui.Separator();
             if (ImGui.Button("Ok", new(99, 0)))
             {
-                var types = BreakTypes[0] ? BPType.Exec : 0;
-                types += BreakTypes[1] ? BPType.Write : 0;
-                types += BreakTypes[2] ? BPType.Read : 0;
+                BpType types = BreakTypes[0] ? MemRegions[itemindex].Type & Access.Exec : 0;
+                types += BreakTypes[1] ? (int)(MemRegions[itemindex].Type & Access.Write) : 0;
+                types += BreakTypes[2] ? (int)(MemRegions[itemindex].Type & Access.Read) : 0;
                 IsSpc = itemindex == 6;
                 if (!edit)
-                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1], MemRegions[itemindex].Id);
+                    AddBreakpoint(BpAddr.ToInt(), types, condition, BreakTypes[1]);
                 else
                     EditBreakpoint(BpAddr.ToInt(), bp.Addr, types, condition, BreakTypes[1], itemindex);
                 ImGui.CloseCurrentPopup();
@@ -630,7 +636,7 @@ namespace Gmulator.Ui
             var bp = Breakpoints.Find(b => b.Addr == line);
             if (bp != null)
             {
-                if (bp.Enabled && (bp.Type & BPType.Exec) != 0)
+                if (bp.Enabled && (bp.Type & BpType.CodeExec) != 0)
                     DrawRect(0x4000ff00, 0xff00ff00);
                 else
                     DrawRect(0x000000ff, 0xff0000ff);
@@ -688,15 +694,13 @@ namespace Gmulator.Ui
             return pc;
         }
 
-        public virtual void AddBreakpoint(int a, int type, int condition, bool write, int index = 0)
+        public virtual void AddBreakpoint(int addr, BpType type, int condition, bool write)
         {
-            if (a == -1) return;
-            //var n = MemRegions.FindIndex(b => b.Type == (RamType)index);
-            var i = MemRegions[index].Id;
-            var bp = Breakpoints.Find(b => b.Addr == a && index == i);
+            if (addr == -1) return;
+            var bp = Breakpoints.Find(b => b.Addr == addr);
             if (bp == null)
             {
-                Breakpoints.Add(new(a, -1, type, write, true, i));
+                Breakpoints.Add(new(addr, -1, type, write, true));
                 SaveBreakpoints(GameName);
             }
         }
@@ -707,20 +711,20 @@ namespace Gmulator.Ui
             SaveBreakpoints(GameName);
         }
 
-        public virtual void EditBreakpoint(int a, int o, int type, int condition, bool write, int index = 0)
+        public virtual void EditBreakpoint(int a, int o, BpType type, int condition, bool write, int index = 0)
         {
             if (a == -1 || o == -1) return;
             var bp = Breakpoints.FirstOrDefault(b => b.Addr == o);
             if (bp != null)
             {
                 Breakpoints.Remove(bp);
-                Breakpoints.Add(new(a, condition, type, write, bp.Enabled, index));
+                Breakpoints.Add(new(a, condition, type, write, bp.Enabled));
                 SaveBreakpoints(GameName);
             }
         }
     }
 
-    public class MemRegion(string name, ReadDel read, WriteDel write, int addr, int size, int addrlength, int id)
+    public class MemRegion(string name, ReadDel read, WriteDel write, int addr, int size, int addrlength, BpType type)
     {
         public string Name { get; } = name;
         public ReadDel Read { get; } = read;
@@ -728,7 +732,7 @@ namespace Gmulator.Ui
         public int StartAddr { get; } = addr;
         public int Size { get; } = size;
         public int AddrLength { get; } = addrlength;
-        public int Id { get; set; } = id;
+        public BpType Type { get; set; } = type;
     }
 
     public class ButtonName(string name, Action<DebugState> action)

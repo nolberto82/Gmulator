@@ -29,9 +29,9 @@ public unsafe class MemoryEditor
     public int OptAddrDigitsCount;                         // = 0      // number of addr digits to display (default calculated based on maximum displayed addr).
     private readonly float OptFooterExtraHeight;                       // = 0      // space to reserve at the bottom of the widget to add custom widgets
     private readonly uint HighlightColor;                             //          // background color of highlighted bytes.
-    public delegate int ReadDel(int off);    // = 0      // optional handler to read bytes.
+    public delegate byte ReadDel(int off);    // = 0      // optional handler to read bytes.
     public ReadDel ReadFn;
-    public delegate void WriteDel(int off, int d); // = 0      // optional handler to write bytes.
+    public delegate void WriteDel(int off, byte d); // = 0      // optional handler to write bytes.
     public WriteDel WriteFn;
     public delegate bool HighlightDel(byte[] data, int off);//= 0      // optional handler to return Highlight property (to support non-contiguous highlighting).
     public HighlightDel HighlightFn;
@@ -63,7 +63,7 @@ public unsafe class MemoryEditor
         public float WindowWidth;
     };
 
-    public MemoryEditor(Action<int, int, int, bool, int> addbp)
+    public MemoryEditor(Action<int, BpType, int, bool> addbp)
     {
         // Settings
         Open = true;
@@ -270,7 +270,7 @@ public unsafe class MemoryEditor
                     }
                     else
                     {
-                        byte b = (byte)(ReadFn != null ? ReadFn(addr | base_display_addr) : mem_data[addr]);
+                        byte b = ReadFn != null ? ReadFn(addr | base_display_addr) : mem_data[addr];
 
                         if (OptShowHexII)
                         {
@@ -355,7 +355,7 @@ public unsafe class MemoryEditor
                             draw_list.AddRectFilled(pos, new(pos.X + s.GlyphWidth, pos.Y + s.LineHeight), ImGui.GetColorU32(ImGuiCol.FrameBg));
                             draw_list.AddRectFilled(pos, new(pos.X + s.GlyphWidth, pos.Y + s.LineHeight), ImGui.GetColorU32(ImGuiCol.TextSelectedBg));
                         }
-                        byte c = (byte)(ReadFn != null ? ReadFn(addr) : mem_data[addr]);
+                        byte c = ReadFn != null ? ReadFn(addr) : mem_data[addr];
                         char display_c = c < 32 || c >= 128 ? '.' : (char)c;
                         draw_list.AddText(pos, display_c == c ? color_text : color_disabled, $"{display_c}");
                         pos.X += s.GlyphWidth;
@@ -441,10 +441,10 @@ public unsafe class MemoryEditor
         }
     }
 
-    private void AddAccessBreakpoint(int access)
+    private void AddAccessBreakpoint(BpType type)
     {
         if (TryHexParse(AddrInputBuf, out var addr))
-            AddBreakpoint(addr & 0xff0000 | addr & 0xffff, access, -1, false, SelectedMemTab);
+            AddBreakpoint(addr & 0xff0000 | addr & 0xffff, type, -1, false);
     }
 
     // FIXME: We should have a way to retrieve the text edit cursor position more easily in the API, this is rather tedious. This is such a ugly mess we may be better off not using InputText() at all here.
@@ -497,7 +497,7 @@ public unsafe class MemoryEditor
     }
 
     private static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
-    private readonly Action<int, int, int, bool, int> AddBreakpoint;
+    private readonly Action<int, BpType, int, bool> AddBreakpoint;
     private readonly Action<int, byte> AddCheat;
 
     private static int DataTypeGetSize(ImGuiDataType data_type)

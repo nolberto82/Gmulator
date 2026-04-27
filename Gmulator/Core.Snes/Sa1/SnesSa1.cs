@@ -1,13 +1,14 @@
-﻿using Gmulator.Interfaces;
+﻿using Gmulator.Core.Nes;
+using Gmulator.Interfaces;
+using System.Runtime.CompilerServices;
 using static Gmulator.Core.Snes.SnesCpu;
 
 namespace Gmulator.Core.Snes.Sa1;
 
-public partial class SnesSa1 : Emulator, IConsole
+public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
 {
-    public Snes Snes { get; }
-    public SnesSa1Cpu Cpu;
-    public SnesSa1Mmu Mmu;
+    public Snes Snes { get; } = snes;
+    public SnesSa1Mmu Mmu = new();
 
     #region State
     private int _resetVector;
@@ -54,8 +55,10 @@ public partial class SnesSa1 : Emulator, IConsole
     #endregion
 
     public int GetResetVector() => _resetVector;
-    public int GetIrqVector() => !_irqVectorSelect ? ReadWord(IRQn) : _irqVector;
-    public int GetNmiVector() => !_nmiVectorSelect ? ReadWord(NMIn) : _nmiVector;
+    public int GetSnesIrqVector() => !_irqVectorSelect ? ReadWord(IRQn) : _irqVector;
+    public int GetSnesNmiVector() => !_nmiVectorSelect ? ReadWord(NMIn) : _nmiVector;
+    public int GetSa1IrqVector() => _irqVector;
+    public int GetSa1NmiVector() => _nmiVector;
 
     ICpu IConsole.Cpu => throw new NotImplementedException();
 
@@ -66,17 +69,11 @@ public partial class SnesSa1 : Emulator, IConsole
     public DebugState EmuState { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
     public Debugger Debugger { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
-    public MemoryMap Sa1Map;
+    public MemoryMap Sa1Map = new(0x1000);
+    private bool HasStepped;
 
     public int BwSa1Bank { get => _bwSa1Bank; }
-
-    public SnesSa1(Snes snes)
-    {
-        Snes = snes;
-        Cpu = new(snes, this);
-        Mmu = new();
-        Sa1Map = new(0x1000);
-    }
+    public List<Breakpoint> Breakpoints { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
     private void SetMemoryMap()
     {
@@ -89,8 +86,8 @@ public partial class SnesSa1 : Emulator, IConsole
         Sa1Map.Iram(0x00, 0x3f, 0x3000, 0x37ff, Mmu.ReadIram, Mmu.WriteIram);
         Sa1Map.Iram(0x80, 0xbf, 0x3000, 0x37ff, Mmu.ReadIram, Mmu.WriteIram);
 
-        Sa1Map.Register(0x00, 0x3f, 0x2000, 0x2fff, ReadReg, WriteSa1Reg);
-        Sa1Map.Register(0x80, 0xbf, 0x2000, 0x2fff, ReadReg, WriteSa1Reg);
+        Sa1Map.Register(0x00, 0x3f, 0x2000, 0x2fff, ReadRegister, WriteSa1Register);
+        Sa1Map.Register(0x80, 0xbf, 0x2000, 0x2fff, ReadRegister, WriteSa1Register);
 
         Sa1Map.Sram(0x40, 0x4f, 0x0000, 0xffff, Mapper.ReadSram, Mapper.WriteSram);
         CpuMap.Sram(0x40, 0x4f, 0x0000, 0xffff, Mapper.ReadSram, Mapper.WriteSram);
@@ -107,14 +104,67 @@ public partial class SnesSa1 : Emulator, IConsole
         UpdateRamBanks();
     }
 
+    public void Step(ulong cycles)
+    {
+        ulong syncto = cycles / 2;
+        while (Cycles < syncto)
+        {
+            if (_sa1Wait || _sa1Reset)
+            {
+                Cycles++;
+                HasStepped = false;
+            }
+            else
+            {
+                if (Snes.Debug && Snes.Breakpoints.Count > 0)
+                {
+                    if (!Snes.Run && Snes.Debugger.Execute(PBPC))
+                    {
+                        Snes.EmuState = DebugState.Break;
+                        return;
+                    }
+
+                    if (Snes.EmuState == DebugState.Break)
+                        return;
+
+                    Snes.Logger.LogSaOne(Snes.Ppu.HPos);
+                }
+
+                int op = ReadOpcode();
+                int addr = GetAddressMode(Disasm[op].Mode);
+                ExecOp(op, addr);
+                HasStepped = true;
+            }
+        }
+    }
+
+    public bool DebugStep()
+    {
+        if (!_sa1Wait && !_sa1Reset)
+        {
+            int op = ReadOpcode();
+            int addr = GetAddressMode(Disasm[op].Mode);
+            ExecOp(op, addr);
+            return true;
+        }
+        return false;
+    }
+
+    public override byte Read(int addr)
+    {
+        Cycles++;
+        return ReadByte(addr);
+    }
+
+    public override void Write(int addr, byte v)
+    {
+        Cycles++;
+        WriteByte(addr, v);
+    }
+
     public int ReadIram(int a) => Mmu.ReadIram(a);
 
-    public void WriteIram(int a, int v) => Mmu.WriteIram(a, v);
-
-    public void Step()
-    {
-        Cpu.Step();
-    }
+    public void WriteIram(int a, byte v) => Mmu.WriteIram(a, v);
 
     private void CheckInterrupts()
     {
@@ -125,69 +175,118 @@ public partial class SnesSa1 : Emulator, IConsole
         }
 
         if (_sa1IrqEnabled && _sa1IrqRequest)
-            Cpu.Irq();
+            Irq();
 
         if (_irqEnabled && _irqRequest || _snesCharConvIrqFlag && _snesCharConvIrqEnabled)
             Snes.Cpu.SetIrq();
     }
 
-    public int ReadByte(int a)
+    private byte ReadOpcode()
     {
-        a &= 0xffffff;
-        int b = a >> 12;
-#if DEBUG || RELEASE
-        Snes.Debugger.Access(a, -1, Sa1Map.Handlers[b], false);
-#endif
-        int v = Sa1Map.Handlers[b].Read(a) & 0xff;
-        if (Snes.Cheats.Count > 0 && Sa1Map.Handlers[a >> 12].Type == RamType.Rom)
-        {
-            lock (Cheats)
-                return Snes.ApplyGameGenieCheats(a, v);
-        }
-        return v;
+        Cycles++;
+        byte value = ReadByte(PBPC);
+        _pc++;
+        return value;
     }
 
-    public void WriteByte(int a, int v)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte ReadByte(int addr)
     {
-        a &= 0xffffff;
-        int b = a >> 12;
-        Sa1Map.Handlers[b].Write(a, v);
-#if DEBUG || RELEASE
-        Snes.Debugger.Access(a, v, Sa1Map.Handlers[b], true);
-#endif
+        addr &= 0xffffff;
+        byte value = (byte)(Sa1Map.Handlers[addr >> 12].Read(addr) & 0xff);
+        if (Snes.Debug)
+            Snes.Debugger.Watchpoint(addr, value, Sa1Map.Handlers[addr >> 12], false);
+        return Snes.ApplyGameGenieCheats(addr, value);
     }
 
-    public int ReadByteDebug(int a)
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void WriteByte(int addr, byte value)
     {
-        a &= 0xffffff;
-        int b = a >> 12;
-        return Sa1Map.Handlers[b].Read(a) & 0xff;
+        addr &= 0xffffff;
+        Sa1Map.Handlers[addr >> 12].Write(addr, value);
+        if (Snes.Debug)
+            Snes.Debugger.Watchpoint(addr, value, Sa1Map.Handlers[addr >> 12], true);
     }
 
-    public int ReadWord(int a) => (ushort)(ReadByteDebug(a) | ReadByteDebug(a + 1) << 8);
-    public int ReadLong(int a) => ReadByteDebug(a) | ReadByteDebug(a + 1) << 8 | ReadByteDebug(a + 2) << 16;
-
-
-    public int ReadBwRam(int a)
+    public byte ReadByteDebug(int addr)
     {
+        addr &= 0xffffff;
+        return Sa1Map.Handlers[addr >> 12].Read(addr);
+    }
+
+    public int ReadWordDebug(int a) => (ushort)(ReadByteDebug(a) | ReadByteDebug(a + 1) << 8);
+    public int ReadLongDebug(int a) => ReadByteDebug(a) | ReadByteDebug(a + 1) << 8 | ReadByteDebug(a + 2) << 16;
+
+
+    public byte ReadBwRam(int a)
+    {
+        Cycles++;
         int addr = GetBwAddr(a);
-        return Snes.Mapper.ReadSram(addr);
+        return Snes.Mapper.ReadBwRam(addr);
     }
 
-    public void WriteBwRam(int a, int v)
+    public void WriteBwRam(int a, byte v)
     {
+        Cycles++;
         int addr = GetBwAddr(a);
         Snes.Mapper.WriteBwRam(addr, v);
     }
 
     private int GetBwAddr(int a) => (BwSa1Bank * 0x2000) | (a & 0x1fff);
 
-    public void Reset2()
+    private void ResetVector()
     {
-        WriteCpuReg(0x2200, 0x20);
-        WriteCpuReg(0x2209, 0x00);
-        WriteCpuReg(0x220a, 0x00);
-        Cpu.ResetCpu();
+        _pc = (ushort)_resetVector;
+    }
+
+    public override void Irq()
+    {
+        if (!_emulationMode)
+        {
+            Push(_pbr);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+            _ps |= FI;
+            Idle();
+        }
+        else
+        {
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+        }
+        _pc = (ushort)GetSa1IrqVector();
+        _pbr = 0;
+    }
+
+    public override void Nmi()
+    {
+        if (!_emulationMode)
+        {
+            Push(_pbr);
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+            _ps |= FI;
+            Idle();
+        }
+        else
+        {
+            Push((byte)(_pc >> 8));
+            Push((byte)(_pc & 0xff));
+            Push(_ps);
+        }
+        _pc = (ushort)GetSa1NmiVector();
+        _pbr = 0;
+    }
+
+    public void Reset()
+    {
+        WriteSnesRegister(0x2200, 0x20);
+        WriteSnesRegister(0x2209, 0x00);
+        WriteSnesRegister(0x220a, 0x00);
+        Reset(true);
         Mmu.Reset();
         SetMemoryMap();
 
@@ -201,6 +300,7 @@ public partial class SnesSa1 : Emulator, IConsole
 
         for (int i = 0; i < _mmcBanks.Length; i++)
             _mmcBanks[i] = i;
+        SetSa1(Snes);
     }
 
     public void UpdateMmcBanks()
@@ -229,8 +329,9 @@ public partial class SnesSa1 : Emulator, IConsole
         cpuMap.Sram(0x80, 0xbf, 0x6000, 0x7fff, Mapper.ReadSram, Mapper.WriteSram, _bwCpuBank);
     }
 
-    public void Save(BinaryWriter bw)
+    public new void Save(BinaryWriter bw)
     {
+
         bw.Write(_resetVector); bw.Write(_nmiVector); bw.Write(_irqVector); bw.Write(_snesMessage);
         bw.Write(_sa1Message); bw.Write(_snesCharConvIrqEnabled); bw.Write(_snesCharConvIrqFlag); WriteArray(bw, _mmcBanks);
         bw.Write(_sa1IrqEnabled); bw.Write(_sa1NmiEnabled); bw.Write(_nmiVectorSelect); bw.Write(_irqVectorSelect);
@@ -240,9 +341,13 @@ public partial class SnesSa1 : Emulator, IConsole
         bw.Write(_mathResult); bw.Write(_dmaControl); bw.Write(_dmaPriority); bw.Write(_dmaMode);
         bw.Write(_dmaConvType); bw.Write(_dmaDstDevice); bw.Write(_dmaSrcDevice); bw.Write(_dmaCharConv);
         bw.Write(_dmaSrcStartAddr); bw.Write(_dmaDstStartAddr); bw.Write(_dmaTerminalCounter);
+        bw.Write(_pc); bw.Write(_sp); bw.Write(_ra); bw.Write(_rx);
+        bw.Write(_ry); bw.Write(_ps); bw.Write(_pbr); bw.Write(_dbr);
+        bw.Write(_emulationMode); bw.Write(dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
+        bw.Write(IrqEnabled); bw.Write(Cycles);
     }
 
-    public void Load(BinaryReader br)
+    public new void Load(BinaryReader br)
     {
         _resetVector = br.ReadInt32(); _nmiVector = br.ReadInt32(); _irqVector = br.ReadInt32(); _snesMessage = br.ReadInt32();
         _sa1Message = br.ReadInt32(); _snesCharConvIrqEnabled = br.ReadBoolean(); _snesCharConvIrqFlag = br.ReadBoolean(); _mmcBanks = ReadArray<int>(br, _mmcBanks.Length);
@@ -253,6 +358,10 @@ public partial class SnesSa1 : Emulator, IConsole
         _mathResult = br.ReadInt32(); _dmaControl = br.ReadBoolean(); _dmaPriority = br.ReadInt32(); _dmaMode = br.ReadBoolean();
         _dmaConvType = br.ReadInt32(); _dmaDstDevice = br.ReadInt32(); _dmaSrcDevice = br.ReadInt32(); _dmaCharConv = br.ReadBoolean();
         _dmaSrcStartAddr = br.ReadInt32(); _dmaDstStartAddr = br.ReadInt32(); _dmaTerminalCounter = br.ReadInt32();
+        _pc = br.ReadUInt16(); _sp = br.ReadUInt16(); _ra = br.ReadUInt16(); _rx = br.ReadUInt16();
+        _ry = br.ReadUInt16(); _ps = br.ReadByte(); _pbr = br.ReadByte(); _dbr = br.ReadByte();
+        _emulationMode = br.ReadBoolean(); dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
+        IrqEnabled = br.ReadBoolean(); Cycles = br.ReadUInt64();
     }
 
     public List<RegisterInfo> GetIORegisters() =>

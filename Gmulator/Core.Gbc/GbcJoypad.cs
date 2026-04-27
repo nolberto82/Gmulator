@@ -22,8 +22,8 @@ public class GbcJoypad
         gbc.CpuMap.Set(0x00, 0x00, 0xff00, 0xff00, Read00, Write00, RamType.Register, 1);
     }
 
-    private int Read00(int a) => Status;
-    private void Write00(int a, int v) => Status = (byte)v;//IF |= IntJoypad;
+    private byte Read00(int a) => Status;
+    private void Write00(int a, byte v) => Status = v;
 
     private byte _status;
     public byte Status

@@ -1,9 +1,11 @@
 ﻿using Gmulator.Interfaces;
+using Gmulator.Shared.LuaScript;
 using System.Collections.Frozen;
+using System.Runtime.CompilerServices;
 
 namespace Gmulator.Core.Snes;
 
-public partial class SnesPpu : ISaveState, IPpu
+public sealed partial class SnesPpu : ISaveState, IPpu
 {
     #region State
     public int VPos { get; private set; }
@@ -121,9 +123,8 @@ public partial class SnesPpu : ISaveState, IPpu
 
     private bool _dramRefresh;
 
-    private GfxColor Tranparent;
-
     private Snes Snes;
+    private LuaManager LuaApi => Snes.Lua;
 
     public int GetScanline() => VPos;
     public void ProcessHdma() => Dma.HandleHdma();
@@ -148,7 +149,6 @@ public partial class SnesPpu : ISaveState, IPpu
     private readonly SpriteData[] _spriteScan;
     private GfxColor[] MBgs = [new(), new(), new(), new(), new()];
     private GfxColor[] SBgs = [new(), new(), new(), new(), new()];
-    private bool[] _windowState = new bool[6];
     private GfxColor Fixed;
 
     public Action SetNmi;
@@ -181,15 +181,14 @@ public partial class SnesPpu : ISaveState, IPpu
         Dma = snes.Dma;
     }
 
-    public void SetJoy1L(int v) => _joy1L = v & 0xff;
-    public void SetJoy1H(int v) => _joy1H = v & 0xff;
+    public void SetJoy1Low(int v) => _joy1L = v & 0xff;
+    public void SetJoy1High(int v) => _joy1H = v & 0xff;
 
-    public void Step(int c)
+    public void Step(int cycles)
     {
-        for (int i = 0; i < c / 2; i++)
+        Snes?.Sa1?.Step(Cycles);
+        for (int i = 0; i < cycles / 2; i++)
         {
-            Snes?.Sa1?.Step();
-
             Cycles += 2;
 
             if (_autoJoyCounter >= 0)
@@ -247,7 +246,7 @@ public partial class SnesPpu : ISaveState, IPpu
 
                     if (!Snes.FastForward || Snes.FastForward && FrameCounter % Snes.Config.FrameSkip == 0)
                     {
-                            Render(VPos);
+                        Render(VPos);
                     }
                 }
             }
@@ -303,28 +302,20 @@ public partial class SnesPpu : ISaveState, IPpu
 
     public void Render(int y)
     {
-        Sub = new(0, 0, 5);
+        Sub = Backdrop;
         Span<int> bpp = new(DictLayers[_bgMode][_bgMode == 1 || _bgMode == 7 ? 4 : 2]);
-        int mapaddr = 0, sx = 0, sy = 0, half = 0;
-        uint rgb = 0;
-        bool main, sub, math = false;
+        int half;
+        uint rgb;
+        bool main, sub, math;
 
         for (int x = 0; x < 256; x++)
         {
             if (!_forcedBlank)
             {
-                _windowState[0] = GetWindow(0, x);
-                _windowState[1] = GetWindow(1, x);
-                _windowState[2] = GetWindow(2, x);
-                _windowState[3] = GetWindow(3, x);
-                _windowState[4] = GetWindow(4, x);
-                _windowState[5] = GetWindow(5, x);
-
                 if (_bgMode < 7)
-                    RenderMode(mapaddr, x, y, bpp);
+                    RenderMode(x, y, bpp);
                 else
-                    RenderMode7(mapaddr, x, y, sx, sy, bpp);
-
+                    RenderMode7(x, y, bpp);
 
                 main = _mainBgs[4] && !GetWindow(4, x);
                 sub = _subBgs[4] && !GetWindow(4, x);
@@ -336,8 +327,8 @@ public partial class SnesPpu : ISaveState, IPpu
 
                 bool clip = _clip switch
                 {
-                    1 => !_windowState[5],
-                    2 or 3 => _windowState[5],
+                    1 => !GetWindow(5, x),
+                    2 or 3 => GetWindow(5, x),
                     _ => false
                 };
 
@@ -398,8 +389,9 @@ public partial class SnesPpu : ISaveState, IPpu
         }
     }
 
-    private void RenderMode(int mapaddr, int x, int y, Span<int> bpp)
+    private void RenderMode(int x, int y, Span<int> bpp)
     {
+        int mapaddr;
         int mx = 0, my = 0;
         for (int i = 0; i < bpp.Length; i++)
         {
@@ -482,11 +474,15 @@ public partial class SnesPpu : ISaveState, IPpu
         }
     }
 
-    private void RenderMode7(int mapaddr, int x, int y, int sx, int sy, Span<int> bpp)
+    private void RenderMode7(int x, int y, Span<int> bpp)
     {
+        int mapaddr;
         for (int i = 0; i < bpp.Length; i++)
         {
+            MBgs[i].Color = 0; MBgs[i].Priority = 0;
 
+            if (!_mainBgs[i])
+                continue;
 
             //int rx = Mode7Settings[1] ? 255 - x : x;
             int ry = _mode7Settings[1] ? 255 - y : y;
@@ -494,12 +490,12 @@ public partial class SnesPpu : ISaveState, IPpu
             var cy = _scrollYMode7 - _m7Y;
             int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
             int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
-            sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (_m7X << 8);
-            sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (_m7Y << 8);
+            int sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (_m7X << 8);
+            int sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (_m7Y << 8);
             var ox = sx + (short)_m7A * x;
             var oy = sy + (short)_m7C * x;
-            ox >>= 8;// & 0x3ff;
-            oy >>= 8;// & 0x3ff;
+            ox >>= 8;
+            oy >>= 8;
 
             if (_mode7Settings[3] && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
             {
@@ -530,7 +526,13 @@ public partial class SnesPpu : ISaveState, IPpu
                 int fx = x - s.X;
                 int fy = y - s.Y;
 
+
+
                 if (fx < 0 || fx >= s.Width) continue;
+                if (s.Tile == 0xa8)
+                {
+                }
+
 
                 if ((s.Attrib & 0x40) != 0)
                     fx = s.Width - fx - 1;
@@ -568,6 +570,40 @@ public partial class SnesPpu : ISaveState, IPpu
                 }
             }
         }
+    }
+
+    private void EvaluateSprites(int y)
+    {
+        int c = _spritesScanline = 0;
+        int n = _objPrioRotation ? (_interOamAddr & 0x1fc) / 4 : 0;
+        for (int i = 0; i < 128; i++)
+        {
+            if (c > 31)
+                break;
+
+            var v = _oam[0x200 + n / 4];
+            var t = v >> ((n & 3) << 1) & 3;
+            var highbit = t & 1;
+            int sy = _oam[n * 4 + 1];
+            int yp = y - sy - 1;
+            int width = _objSizeWidth[((_objSize | t) / 2) << 3 & 0xf];
+            int height = _objSizeHeight[((_objSize | t) / 2) << 3 & 0xf];
+
+            if (yp >= 0 && yp < height || sy + height > 255 && y < ((sy + height) & 0xff))
+            {
+                _spriteScan[c].X = highbit * -256 + _oam[n * 4 + 0];
+                _spriteScan[c].Y = _oam[n * 4 + 1] + 1;
+                _spriteScan[c].Tile = _oam[n * 4 + 2];
+                _spriteScan[c].Attrib = _oam[n * 4 + 3];
+                _spriteScan[c].Priority = (_oam[n * 4 + 3] >> 4) & 3;
+                _spriteScan[c].Width = width;
+                _spriteScan[c].Height = height;
+                _spriteScan[c].Id = n;
+                c++;
+            }
+            n = (n + 1) & 0x7f;
+        }
+        _spritesScanline = c;
     }
 
     public static uint GetRGB555(ushort p, ushort s, int br, bool math, bool add, int half)
@@ -634,9 +670,9 @@ public partial class SnesPpu : ISaveState, IPpu
     {
         bool prev = false;
         if (_prevent == 1)
-            prev = !_windowState[5];
+            prev = !GetWindow(5, x);
         else if (_prevent == 2 || _prevent == 3)
-            prev = _windowState[5];
+            prev = GetWindow(5, x);
 
         if (prev)
             return false;
@@ -656,7 +692,6 @@ public partial class SnesPpu : ISaveState, IPpu
         int[][] layerArr = _layers[mode];
         int[] layer0 = layerArr[0];
         int[] layer1 = layerArr[1];
-
         switch (mode)
         {
             case 0 or 2 or 3 or 4 or 5 or 6:
@@ -752,40 +787,6 @@ public partial class SnesPpu : ISaveState, IPpu
 
     private int GetMode2Tile(int x, int y, int mapaddr) => _vram[(mapaddr + y / 8 * 32 + x / 8) & 0x7fff];
 
-    private void EvaluateSprites(int y)
-    {
-        int c = _spritesScanline = 0;
-        int n = _objPrioRotation ? (_interOamAddr & 0x1fc) / 4 : 0;
-        for (int i = 0; i < 128; i++)
-        {
-            if (c > 31)
-                break;
-
-            var v = _oam[0x200 + n / 4];
-            var t = v >> ((n & 3) << 1) & 3;
-            var highbit = t & 1;
-            int sy = _oam[n * 4 + 1];
-            int yp = y - sy - 1;
-            int width = _objSizeWidth[((_objSize | t) / 2) << 3 & 0xf];
-            int height = _objSizeHeight[((_objSize | t) / 2) << 3 & 0xf];
-
-            if (yp >= 0 && yp < height || sy + height > 255 && y < ((sy + height) & 0xff))
-            {
-                _spriteScan[c].X = highbit * -256 + _oam[n * 4 + 0];
-                _spriteScan[c].Y = _oam[n * 4 + 1] + 1;
-                _spriteScan[c].Tile = _oam[n * 4 + 2];
-                _spriteScan[c].Attrib = _oam[n * 4 + 3];
-                _spriteScan[c].Priority = (_oam[n * 4 + 3] >> 4) & 3;
-                _spriteScan[c].Width = width;
-                _spriteScan[c].Height = height;
-                _spriteScan[c].Id = n;
-                c++;
-            }
-            n = (n + 1) & 0x7f;
-        }
-        _spritesScanline = c;
-    }
-
     private int GetPixel(int ta, int fx, int bpp)
     {
         int idx0 = ta & 0x7fff;
@@ -829,16 +830,16 @@ public partial class SnesPpu : ISaveState, IPpu
         return 0;
     }
 
-    public int ReadByte(int a)
+    public byte ReadByte(int a)
     {
         int addr = a >> 1;
         if ((a & 1) == 0)
-            return _vram[addr & 0x7fff] & 0xff;
+            return (byte)(_vram[addr & 0x7fff]);
         else
-            return _vram[addr & 0x7fff] >> 8 & 0xff;
+            return (byte)(_vram[addr & 0x7fff] >> 8);
     }
 
-    public void WriteByte(int a, int v)
+    public void WriteByte(int a, byte v)
     {
         int addr = a >> 1;
         if ((a & 1) == 0)
@@ -859,12 +860,12 @@ public partial class SnesPpu : ISaveState, IPpu
         };
     }
 
-    public int ReadVram(int a)
+    public byte ReadVram(int a)
     {
         if ((a & 1) == 0)
-            return _vram[a >> 1] & 0x00ff;
+            return (byte)_vram[a >> 1];
         else
-            return _vram[a >> 1] >> 8 & 0xff;
+            return (byte)(_vram[a >> 1] >> 8);
     }
 
     public void WriteVram(int a, int v)
@@ -881,27 +882,21 @@ public partial class SnesPpu : ISaveState, IPpu
         }
     }
 
-    public int ReadOram(int a) => _oam[a];
-    public void WriteOram(int a, int v) => _oam[a] = (byte)v;
+    public byte ReadOram(int a) => _oam[a];
+    public void WriteOram(int a, byte v) => _oam[a] = v;
 
-    public int ReadCram(int a)
+    public byte ReadCram(int a)
     {
         if ((a & 1) == 0)
-        {
-            return _cram[a >> 1] & 0x00ff;
-        }
+            return (byte)(_cram[a >> 1]);
         else
-        {
-            return _cram[a >> 1] >> 8 & 0xff;
-        }
+            return (byte)(_cram[a >> 1] >> 8);
     }
 
-    public void WriteCram(int a, int v)
+    public void WriteCram(int a, byte v)
     {
         if ((a & 1) == 0)
-        {
-            _cram[a & 0xff] = (ushort)v;
-        }
+            _cram[a & 0xff] = v;
         else
         {
             var s = _cram[a >> 1];
@@ -930,7 +925,6 @@ public partial class SnesPpu : ISaveState, IPpu
         Array.Fill(ScreenBuffer, 0xff000000);
         MBgs = [new(), new(), new(), new(), new(), new()];
         SBgs = [new(), new(), new(), new(), new(), new()];
-        Tranparent = new(0, 0, 5);
     }
 
     private readonly Dictionary<int, int[][]> DictLayers = new()
@@ -960,7 +954,6 @@ public partial class SnesPpu : ISaveState, IPpu
                [3, 2, 1, 0, 0], [3, 2, 1, 1, 0, 0, 0],
                [8]],
     };
-    private readonly bool _himeh;
 
     public struct SpriteData
     {
@@ -983,73 +976,6 @@ public partial class SnesPpu : ISaveState, IPpu
         public int Priority = priority;
         public int Layer = layer;
     }
-
-    public List<RegisterInfo> GetState() =>
-    [
-        new("","HClock",$"{HPos}"),
-        new("","Scanline", $"{VPos}"),
-        new("4200.4","HIrq", $"{GetHIrq}"),
-        new("4200.5","VIrq", $"{GetVIrq}"),
-        new("4207/8","HTIME", $"{GetHTime:X4}"),
-        new("4209/A","VTIME", $"{GetVTime:X4}"),
-        new("4212","HVBJOY", $"{_hvbJoy:X2}"),
-        new("2105","BGMode", $"{_bgMode:X2}"),
-        new("2100","Brightness", $"{_brightness:X2}"),
-        new("2132","Fixed Color", $"{Fixed.Color:X4}"),
-        new("4216/7","Remainder", $"{MulDivRemainder:X4}"),
-        new("2101|0-2","Oam Table",$"{_objTable1:X4}"),
-        new("2101|3-5","Oam Table 2",$"{_objTable2:X4}"),
-        new("","ObjAddr", $"{_oamAddr:X4}"),
-        new("2102/3","ObjPrioIndex", $"{_objPrioIndex:X4}"),
-        new("2103.7","ObjPrioRotation", $"{_objPrioRotation}"),
-        new("2115-7","Vram Addr", $"{(_vramAddr * 2)&0xffff:X4}"),
-        new("2126","W1 Left", $"{_w1Left:X2}"),
-        new("2127","W1 Right", $"{_w1Right:X2}"),
-        new("2128","W2 Left", $"{_w2Left:X2}"),
-        new("2129","W2 Right", $"{_w2Right:X2}"),
-        new("211B-20","Mode 7",""),
-        new("211B","M7A", $"{_m7A:X4}"),
-        new("211C","M7B", $"{_m7B:X4}"),
-        new("211D","M7C", $"{_m7C:X4}"),
-        new("211E","M7D", $"{_m7D:X4}"),
-        new("211F","M7X", $"{_m7X:X4}"),
-        new("2120","M7Y", $"{_m7Y:X4}"),
-        new("2107-0A","Tilemaps",""),
-        new("07|0-1","BG1 Size", $"{_bgCharSize[0]:X2}"),
-        new("07|2-6","BG1 Addr", $"{_bgMapbase[0]:X4}"),
-        new("08|0-1","BG2 Size", $"{_bgCharSize[1]:X2}"),
-        new("08|2-6","BG2 Addr", $"{_bgMapbase[1]:X4}"),
-        new("09|0-1","BG3 Size", $"{_bgCharSize[2]:X2}"),
-        new("09|2-6","BG3 Addr", $"{_bgMapbase[2]:X4}"),
-        new("0A|0-1","BG4 Size", $"{_bgCharSize[3]:X2}"),
-        new("0A|2-6","BG4 Addr", $"{_bgMapbase[3]:X4}"),
-        new("210B-0C","Tiles",""),
-        new("0B|0-2","BG1 Tile Addr", $"{_bgTilebase[0]:X4}"),
-        new("0B|4-6","BG2 Tile Addr", $"{_bgTilebase[1]:X4}"),
-        new("0C|0-2","BG3 Tile Addr", $"{_bgTilebase[2]:X4}"),
-        new("0C|4-6","BG3 Tile Addr", $"{_bgTilebase[3]:X4}"),
-        new("210D-2114","Scroll", ""),
-        new("0D","BG1 X", $"{_bgScrollX[0]:X4}"),
-        new("0E","BG1 Y", $"{_bgScrollY[0]:X4}"),
-        new("0F","BG2 X", $"{_bgScrollX[1]:X4}"),
-        new("10","BG2 Y", $"{_bgScrollY[1]:X4}"),
-        new("11","BG3 X", $"{_bgScrollX[2]:X4}"),
-        new("12","BG3 Y", $"{_bgScrollY[2]:X4}"),
-        new("13","BG4 X", $"{_bgScrollX[3]:X4}"),
-        new("14","BG4 Y", $"{_bgScrollY[3]:X4}"),
-        new("212C","Main Layers", ""),
-        new("|0","BG1 Enabled", $"{_mainBgs[0]}"),
-        new("|1","BG2 Enabled", $"{_mainBgs[1]}"),
-        new("|2","BG3 Enabled", $"{_mainBgs[2]}"),
-        new("|3","BG4 Enabled", $"{_mainBgs[3]}"),
-        new("|4","OAM Enabled", $"{_mainBgs[4]}"),
-        new("212D","Sub Layers", ""),
-        new("|0","BG1 Enabled", $"{_subBgs[0]}"),
-        new("|1","BG2 Enabled", $"{_subBgs[1]}"),
-        new("|2","BG3 Enabled", $"{_subBgs[2]}"),
-        new("|3","BG4 Enabled", $"{_subBgs[3]}"),
-        new("|4","OAM Enabled", $"{_subBgs[4]}"),
-    ];
 
     public void Save(BinaryWriter bw)
     {

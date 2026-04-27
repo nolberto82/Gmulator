@@ -1,8 +1,11 @@
-﻿namespace Gmulator.Ui;
+﻿using rlImGui_cs;
+
+namespace Gmulator.Ui;
 
 internal class GuiDeck : Gui
 {
-    private int _dpadCpunter;
+    private const string FontButtons = "Assets/buttons.ttf";
+    private Font _fontButtons;
 
     public override void Run()
     {
@@ -11,9 +14,8 @@ internal class GuiDeck : Gui
             Raylib.BeginDrawing();
             Raylib.ClearBackground(Color.DarkGray);
 
-            if (Emulator.FastForward)
-                Emulator?.RunFrames(Opened);
-            
+            rlImGui.Begin();
+
             Emulator?.RunFrame(Opened);
             Emulator?.Render(MenuHeight);
             Emulator?.Update();
@@ -21,9 +23,10 @@ internal class GuiDeck : Gui
 
             Input.UpdateGuiInput(Emulator, this);
 
+            rlImGui.End();
+
             Update(true);
             Render();
-            LuaApi?.Update(Opened);
 
             Raylib.EndDrawing();
         }
@@ -39,7 +42,8 @@ internal class GuiDeck : Gui
         var scale = Math.Min((float)Raylib.GetRenderWidth() / texwidth, (float)Raylib.GetRenderHeight() / texheight);
         var left = (Raylib.GetRenderWidth() - texwidth * scale) / 2;
         var renderwidth = Raylib.GetRenderWidth();
-        int maxgamesview = Raylib.GetScreenHeight() / FontSize - 5;
+        int maxgamesview = Raylib.GetScreenHeight() / FontSize;
+        int statusBarY = Raylib.GetScreenHeight() - 30;
         int y = 1, posx = 0;// (int)(x * scale + left);
         List<FileDetails> list = [];
 
@@ -49,7 +53,7 @@ internal class GuiDeck : Gui
 
         Rectangle menuRect = new(posx, y + FontSize, renderwidth, Raylib.GetRenderHeight());
         Raylib.DrawRectangle((int)menuRect.X, (int)menuRect.Y, (int)menuRect.Width, (int)menuRect.Height - 5, new(0, 0, 0, 200));
-        Raylib.BeginScissorMode((int)menuRect.X, (int)menuRect.Y, (int)menuRect.Width, (int)menuRect.Height - 5);
+        Raylib.BeginScissorMode((int)menuRect.X, (int)menuRect.Y, (int)menuRect.Width, maxgamesview * FontSize);
 
         y += FontSize;
         y += MenuScroll[TabIndex] * -FontSize;
@@ -93,21 +97,18 @@ internal class GuiDeck : Gui
         Raylib.EndScissorMode();
 
         y = FontSize * maxgamesview + FontSize;
-        Rectangle rectInfo = new(posx + 1, y, renderwidth, Raylib.GetRenderHeight() - y);
+        Rectangle rectInfo = new(posx + 1, Raylib.GetRenderHeight() - 30, renderwidth, 30);
         Raylib.DrawRectangle((int)rectInfo.X, (int)rectInfo.Y, (int)rectInfo.Width, (int)rectInfo.Height, Color.LightGray);
 
         var color = Color.Black;
-        foreach (var t in TabInfo[TabIndex == 1 && CheatDialog ? ScrBrowser : TabIndex][1])
+        Raylib.DrawTextEx(_fontButtons, "X", new(5, statusBarY + 1), FontSize + 10, 1, color);
+        Raylib.DrawTextEx(GuiFont, ":Ok", new(5 + 30, statusBarY + 3), FontSize, 1, color);
+        Raylib.DrawTextEx(_fontButtons, "C", new(5 + 70 + Raylib.MeasureText(":Ok", FontSize), statusBarY + 1), FontSize + 10, 1, color);
+        Raylib.DrawTextEx(GuiFont, ":Cancel", new(5 + 100 + Raylib.MeasureText(":Ok", FontSize), statusBarY + 3), FontSize, 1, color);
+        if (TabIndex == ScrCheats)
         {
-            Raylib.DrawTextEx(GuiFont, t.Button, new(posx, y), FontSize, -1, color);
-            Raylib.DrawTextEx(GuiFont, t.Description, new(posx + 200, y), FontSize, -1, color);
-            y += FontSize;
-        }
-
-        if (TabIndex != ScrMain)
-        {
-            Raylib.DrawTextEx(GuiFont, "Circle", new(posx, y), FontSize, -1, color);
-            Raylib.DrawTextEx(GuiFont, "Back", new(posx + 200, y), FontSize, -1, color);
+            Raylib.DrawTextEx(_fontButtons, "S", new(5 + 170 + Raylib.MeasureText(":Cancel", FontSize), statusBarY + 1), FontSize + 10, 1, color);
+            Raylib.DrawTextEx(GuiFont, ":Load Cheats", new(5 + 200 + Raylib.MeasureText(":Cancel", FontSize), statusBarY + 3), FontSize, 1, color);
         }
 
         base.Render();
@@ -130,20 +131,23 @@ internal class GuiDeck : Gui
 
         bool newDownPressed = Raylib.IsGamepadButtonDown(0, BtnDown);
         bool newUpPressed = Raylib.IsGamepadButtonDown(0, BtnUp);
+        bool newLeftPressed = Raylib.IsGamepadButtonDown(0, BtnLeft);
+        bool newRightPressed = Raylib.IsGamepadButtonDown(0, BtnRight);
         bool oldDownPressed = Raylib.IsGamepadButtonPressed(0, BtnDown);
         bool oldUpPressed = Raylib.IsGamepadButtonPressed(0, BtnUp);
-        if (newDownPressed || newUpPressed)
+
+        if (newDownPressed || newUpPressed || newLeftPressed || newRightPressed)
         {
-            _dpadCpunter--;
-            if (_dpadCpunter < 0)
-                _dpadCpunter = 3;
+            DpadCounter--;
+            if (DpadCounter < 0)
+                DpadCounter = 3;
         }
         else
-            _dpadCpunter = Delay;
+            DpadCounter = Delay;
 
-        if (oldUpPressed || newUpPressed && _dpadCpunter == 0)
+        if (oldUpPressed || newUpPressed && DpadCounter == 0)
             SelOption[TabIndex]--;
-        else if (oldDownPressed || newDownPressed && _dpadCpunter == 0)
+        else if (oldDownPressed || newDownPressed && DpadCounter == 0)
             SelOption[TabIndex]++;
 
         var total = TabIndex switch
@@ -163,7 +167,7 @@ internal class GuiDeck : Gui
         if (SelOption[TabIndex] <= 0)
             SelOption[TabIndex] = 0;
 
-        if (SelOption[TabIndex] > MenuScroll[TabIndex] + maxgamesview - 6)
+        if (SelOption[TabIndex] > MenuScroll[TabIndex] + maxgamesview - 3)
             MenuScroll[TabIndex]++;
 
         if (SelOption[TabIndex] < MenuScroll[TabIndex] && MenuScroll[TabIndex] > 0)
@@ -187,10 +191,20 @@ internal class GuiDeck : Gui
         SelOption = new int[MaxTabs];
         OldTotal = new int[MaxTabs];
         Opened = true;
+
+        if (File.Exists(FontButtons))
+        {
+            _fontButtons = Raylib.LoadFont(FontButtons);
+        }
+
+        var deckres = Raylib.GetMonitorWidth(0) == 1280 && Raylib.GetMonitorHeight(0) == 800;
+        if (deckres && !Raylib.IsWindowMaximized())
+            Raylib.SetWindowState(ConfigFlags.MaximizedWindow);
     }
 
     public override void Unload()
     {
+        Raylib.UnloadFont(_fontButtons);
         Raylib.UnloadRenderTexture(MenuTarget);
         base.Unload();
     }

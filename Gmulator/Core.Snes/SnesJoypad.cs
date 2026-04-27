@@ -1,12 +1,12 @@
 ﻿namespace Gmulator.Core.Snes
 {
-    public class SnesJoypad
+    public sealed class SnesJoypad
     {
         private bool Strobe;
         private int ButtonId;
 
-        public Action<int> SetJoy1L;
-        public Action<int> SetJoy1H;
+        public Action<int> SetJoy1Low;
+        public Action<int> SetJoy1High;
 
         private readonly Dictionary<int, KeyboardKey> Keys = new()
         {
@@ -50,8 +50,8 @@
 
         public void AutoRead()
         {
-            SetJoy1L((byte)Read(0, 8));
-            SetJoy1H((byte)(Read(8, 16) >> 8));
+            SetJoy1Low((byte)Read(0, 8));
+            SetJoy1High((byte)(Read(8, 16) >> 8));
         }
 
         public void Write(byte v)

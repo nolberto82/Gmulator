@@ -2,9 +2,9 @@
 
 namespace Gmulator.Shared;
 
-public abstract class EmuState
+public class EmuState
 {
-    public const string Version = "1.18";
+    public const string Version = "1.19";
 
     public static int SetInt(BinaryReader br, BinaryWriter bw, int v, bool save)
     {

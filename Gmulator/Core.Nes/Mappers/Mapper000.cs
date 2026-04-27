@@ -7,7 +7,7 @@
             Reset();
         }
 
-        public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[(a & 0x4000) >> 14] + a % 0x4000);
+        public override byte ReadPrg(int addr) => base.ReadPrg(0x4000 * Prg[(addr & 0x4000) >> 14] + addr % 0x4000);
 
         public override void Reset()
         {

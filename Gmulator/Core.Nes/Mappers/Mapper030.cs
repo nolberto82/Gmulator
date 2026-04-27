@@ -7,11 +7,11 @@ public class Mapper030 : BaseMapper
         Reset();
     }
 
-    public override int ReadChr(int a) => base.ReadChr(a);
+    public override byte ReadChr(int addr) => base.ReadChr(addr);
 
-    public override int ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
+    public override byte ReadPrg(int addr) => base.ReadPrg(0x4000 * Prg[addr >> 14 & 1] + addr % 0x4000);
 
-    public override byte ReadVram(int a) => base.ReadVram(a);
+    public override byte ReadVram(int addr) => base.ReadVram(addr);
 
     public override void Reset()
     {
@@ -19,14 +19,14 @@ public class Mapper030 : BaseMapper
         Chr = [0];
     }
 
-    public override void Write(int a, int v)
+    public override void Write(int addr, byte value)
     {
-        if (a >= 0xc000)
+        if (addr >= 0xc000)
         {
-            Prg[0] = v & 0x1f;
-            Chr[0] = v & 0x5f;
+            Prg[0] = value & 0x1f;
+            Chr[0] = value & 0x5f;
         }
     }
 
-    public override void WritePrg(int a, int v) => base.WritePrg(a, v);
+    public override void WritePrg(int addr, byte value) => base.WritePrg(addr, value);
 }

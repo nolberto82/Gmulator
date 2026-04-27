@@ -2,21 +2,16 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesMmu : IMmu, ISaveState
+public sealed class SnesMmu(Snes snes) : IMmu, ISaveState
 {
-    public byte[] Wram { get; set; } = new byte[0x20000];
-    public int RamAddr { get; protected set; }
+    private byte[] _wram { get; set; } = new byte[0x20000];
+    public int RamAddr { get; private set; }
     public RamType RamType { get; private set; }
     private MemoryMap CpuMap => Snes.CpuMap;
 
-    private readonly Snes Snes;
+    private readonly Snes Snes = snes;
 
     private byte[] _sram;
-
-    public SnesMmu(Snes snes)
-    {
-        Snes = snes;
-    }
 
     public int GetOffset(int a)
     {
@@ -24,32 +19,28 @@ public class SnesMmu : IMmu, ISaveState
         return handler.Offset + (a & 0xfff);
     }
 
-    public int ReadWram(int a) => Wram[CpuMap.Handlers[a >> 12].Offset + (a & 0xfff) & 0x1ffff];
+    public byte ReadWram(int addr) => _wram[CpuMap.Handlers[addr>>12].Offset + (addr & 0xfff) & 0x1ffff];
 
-    public void WriteWram(int a, int v)
-    {
-        int mask = Wram.Length - 1;
-        Wram[(CpuMap.Handlers[a >> 12].Offset | (a & 0xfff)) & mask] = (byte)v;
-    }
+    public void WriteWram(int addr, byte value) => _wram[CpuMap.Handlers[addr >> 12].Offset + (addr & 0xfff) & 0x1ffff] = value;
 
-    public byte[] GetWram() => Wram;
+    public byte[] GetWram() => _wram;
     public byte[] GetSram() => _sram;
+    public byte ReadVram(int addr) => Snes.Ppu.ReadVram(addr);
 
     public void Reset()
     {
-        Array.Fill<byte>(Wram, 0);
         _sram = Snes.Mapper.Sram;
     }
 
-    public int ReadByte(int a)
+    public byte ReadByte(int a)
     {
         a &= 0xffffff;
         int b = a >> 12;
         RamType = CpuMap.Handlers[b].Type;
-        return CpuMap.Handlers[b].Read(a) & 0xff;
+        return CpuMap.Handlers[b].Read(a);
     }
 
-    public void WriteByte(int a, int v)
+    public void WriteByte(int a, byte v)
     {
         a &= 0xffffff;
         int b = a >> 12;
@@ -59,19 +50,17 @@ public class SnesMmu : IMmu, ISaveState
 
     public void WriteDma(int v)
     {
-        WriteWram(0x7e0000 | RamAddr, v);
+        WriteWram(0x7e0000 | RamAddr, (byte)v);
 #if DEBUG || RELEASE
-        Snes.Debugger.Access(RamAddr, v, CpuMap.Handlers[RamAddr >> 12], true);
+        Snes.Debugger.Watchpoint(RamAddr, v, CpuMap.Handlers[RamAddr >> 12], true);
 #endif
         RamAddr = (RamAddr + 1) & 0xffffff;
     }
 
     public void WriteRamType(int a, int v, RamType type)
     {
-#if DEBUG || RELEASE
         RamType = type;
-        Snes.Debugger.Access(a, v, null, true);
-#endif
+        Snes.Debugger.Watchpoint(a, v, null, true);
     }
 
     public void UpdateWramAddress(int a, int v)
@@ -92,9 +81,9 @@ public class SnesMmu : IMmu, ISaveState
         }
     }
 
-    public void Load(BinaryReader br) => Wram = ReadArray<byte>(br, Wram.Length);
+    public void Load(BinaryReader br) => _wram = ReadArray<byte>(br, _wram.Length);
 
-    public void Save(BinaryWriter bw) => bw.Write(Wram);
+    public void Save(BinaryWriter bw) => bw.Write(_wram);
 
     public RegisterInfo GetRegisters() => new("2181-3", "Wram Address", $"{RamAddr:X6}");
 
@@ -107,8 +96,8 @@ public class SnesMmu : IMmu, ISaveState
 
     public void WriteWord(int a, int v)
     {
-        WriteByte(a, v);
-        WriteByte(a + 1, v);
+        WriteByte(a, (byte)v);
+        WriteByte(a + 1, (byte)(v >> 8));
     }
 
     public int ReadLong(int a)
@@ -121,8 +110,8 @@ public class SnesMmu : IMmu, ISaveState
 
     public void WriteLong(int a, int v)
     {
-        WriteByte(a, v);
-        WriteByte(a + 1, v >> 8);
-        WriteByte(a + 2, v >> 16);
+        WriteByte(a, (byte)v);
+        WriteByte(a + 1, (byte)(v >> 8));
+        WriteByte(a + 2, (byte)(v >> 16));
     }
 }

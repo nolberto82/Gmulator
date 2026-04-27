@@ -10,7 +10,7 @@ public class Mapper5 : BaseMapper
 
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
-    public override int ReadRom(int a)
+    public override byte ReadRom(int a)
     {
         if (Rombank > 1 && a >= 0x4000)
             return base.ReadRom(a % 0x4000 + (0x4000 * Rombank));
@@ -26,20 +26,20 @@ public class Mapper5 : BaseMapper
             return new(Rom, a % 0x4000 + (0x4000 * Rombank), size);
     }
 
-    public override void WriteRom0(int a, int v)
+    public override void WriteRom0(int a, byte v)
     {
         //if (edit)
         //    Rom[a] = v;
         //else
         {
             if (a <= 0x1fff)
-                CartRamOn = v == 0x0a;
+                CartRamEnabled = v == 0x0a;
             else if (a <= 0x3fff)
                 Rombank = v & 0xff;
         }
     }
 
-    public override void WriteRom1(int a, int v)
+    public override void WriteRom1(int a, byte v)
     {
         //if (edit)
         //    Rom[a % 0x4000 + (0x4000 * Rombank)] = v;

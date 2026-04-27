@@ -14,20 +14,15 @@ public abstract class BaseChannel
     public int EnvPeriod { get; set; }
     public bool EnvDirection { get; set; }
     public int Shift { get; set; }
-    public int Duty { get; set; }
+
     public int LengthCounter { get; set; }
     public bool LengthEnabled { get; set; }
-
-    public int Timer { get; set; } = 8192;
 
     public int Position { get; set; }
 
     public int Frequency { get; set; }
 
     public int PeriodTimer { get; set; }
-    public int CurrentVolume { get; set; }
-    public int EnvVolume { get; set; }
-
 
     public int VolumeShift { get; set; }
 
@@ -43,6 +38,11 @@ public abstract class BaseChannel
     public int Width { get; set; }
 
     public byte[] WaveRam { get; set; }
+
+    public int Duty { get; set; }
+    public int EnvVolume { get; set; }
+    public int CurrentVolume { get; set; }
+    public int Timer { get; set; }
 
     public abstract void Reset();
 

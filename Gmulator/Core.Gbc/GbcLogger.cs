@@ -7,7 +7,7 @@ public class GbcLogger(Gbc gbc)
     public StreamWriter Outfile { get; private set; }
     public bool Logging { get; private set; }
 
-    public delegate int ReadDel(int a);
+    public delegate byte ReadDel(int a);
     public event ReadDel ReadByte;
 
     private readonly Gbc Gbc = gbc;
@@ -18,7 +18,7 @@ public class GbcLogger(Gbc gbc)
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
             //bool gamedoctor = false;
-            var (disasm, _, _, _) = Disassemble(Cpu.PC, true);
+            var (disasm, _, _, _) = Disassemble(Cpu.PC,true);
             //if (gamedoctor)
             //    Outfile.WriteLine($"{regtext}");
             //else
@@ -41,7 +41,7 @@ public class GbcLogger(Gbc gbc)
         Outfile?.Close();
     }
 
-    public (string, string, int, int) Disassemble(int pc, bool getRegisters)
+    public (string, string, int, int) Disassemble(int pc,bool getRegisters)
     {
         string data = string.Empty;
         string bytes = string.Empty;

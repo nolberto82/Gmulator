@@ -42,14 +42,13 @@ namespace Gmulator.Core.Gbc
             Logger.ReadByte += Mmu.ReadByte;
         }
 
-        public override void LuaMemoryCallbacks() => LuaApi.InitMemCallbacks(Cpu, Mmu);
+        public override void LuaMemoryCallbacks() => Lua.InitMemCallbacks(this);
 
         public override void RunFrame(bool opened)
         {
             if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)
             {
                 ulong cyclesframe = GbcCycles;
-                LuaApi lua = LuaApi;
                 while (Cpu?.Cycles < cyclesframe)
                 {
                     int pc = Cpu.PC;
@@ -78,19 +77,18 @@ namespace Gmulator.Core.Gbc
                         }
 
                         Run = false;
+
+                        if (EmuState != DebugState.Running)
+                            EmuState = DebugState.Break;
+
+                        if (EmuState == DebugState.Break)
+                            return;
                     }
 
-                    if (EmuState != DebugState.Running)
-                        EmuState = DebugState.Break;
-
-                    if (EmuState == DebugState.Break)
-                        return;
-
-                    lua?.OnExec(pc);
                     Cpu?.Step();
+                    Lua?.OnExec(pc);
                 }
-                Cpu.Cycles -= cyclesframe;
-
+                Cpu?.Cycles -= cyclesframe;
                 Mmu.ApplyParCheats();
             }
         }
@@ -117,11 +115,11 @@ namespace Gmulator.Core.Gbc
             Timer?.Step(Cpu, 4);
         }
 
-        public override void Reset(string name, bool reset, uint[] pixels)
+        public override void Reset(string name, bool reset)
         {
             if (name != "")
             {
-                Mapper = Mmu?.LoadRom(name);
+                Mapper ??= Mmu.LoadRom(name);
 
                 CpuMap.Set(0x00, 0x00, 0x0000, 0x3fff, Mapper.ReadRom, Mapper.WriteRom0, RamType.Rom, 1);
                 CpuMap.Set(0x00, 0x00, 0x4000, 0x7fff, Mapper.ReadRom, Mapper.WriteRom1, RamType.Rom, 1);
@@ -149,7 +147,8 @@ namespace Gmulator.Core.Gbc
                 Logger?.Reset();
                 LoadCheats(name);
                 LoadBreakpoints(Mapper.Name);
-                base.Reset(name, true, Ppu.ScreenBuffer);
+                UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
+                base.Reset(name, true);
             }
         }
 

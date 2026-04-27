@@ -51,7 +51,7 @@ public class Nes : Emulator, IConsole
         CpuMap.Set(0x00, 0x00, 0x4017, 0x4017, Joypad2.Read, Apu.Write, RamType.Register, 1);
     }
 
-    public override void LuaMemoryCallbacks() => LuaApi.InitMemCallbacks(Cpu, Mmu);
+    public override void LuaMemoryCallbacks() => Lua.InitMemCallbacks(this);
 
     public override void RunFrame(bool opened)
     {
@@ -91,6 +91,7 @@ public class Nes : Emulator, IConsole
                     return;
 
                 Cpu.Step();
+                Lua?.OnExec(pc);
             }
             Ppu.Cycles -= cyclesframe;
 
@@ -101,7 +102,6 @@ public class Nes : Emulator, IConsole
         }
     }
 
-    //public override void Update() => Input.Update(this, NesConsole, Ppu.FrameCounter);
     public override void Input()
     {
         if (Raylib.IsGamepadAvailable(0))
@@ -110,7 +110,7 @@ public class Nes : Emulator, IConsole
 
     public override void Render(float MenuHeight) => base.Render(MenuHeight);
 
-    public override void Reset(string name, bool reset, uint[] pixels)
+    public override void Reset(string name, bool reset)
     {
         if (name != "")
             Mapper = Mmu.LoadRom(name);
@@ -129,7 +129,8 @@ public class Nes : Emulator, IConsole
             Logger.Reset();
             LoadCheats(name);
             LoadBreakpoints(Mapper.Name);
-            base.Reset(name, true, Ppu.ScreenBuffer);
+            UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
+            base.Reset(name, true);
 
 #if DEBUG || RELEASE
             DebugWindow ??= new NesDebugWindow(this);

@@ -15,11 +15,11 @@ public class SnesSa1Mmu : ISaveState
 
 
 
-    public int ReadIram(int a) => _ram[a & 0x7ff];
+    public byte ReadIram(int a) => _ram[a & 0x7ff];
 
 
 
-    public void WriteIram(int a, int v) => _ram[a & 0x7ff] = (byte)v;
+    public void WriteIram(int a, byte v) => _ram[a & 0x7ff] = v;
 
     internal void Reset() => Array.Fill<byte>(_ram, 0);
 

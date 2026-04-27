@@ -4,13 +4,12 @@ import re
 
 
 class Opcode:
-    def __init__(self, op, mode, id, imm, size, cycles, opid):
+    def __init__(self, op, id, modeid, imm, size, opid):
         self.op = op
-        self.mode = mode
         self.id = id
+        self.modeid = modeid
         self.imm = imm
         self.size = size
-        self.cycles = cycles
         self.opid = opid
 
 
@@ -74,7 +73,7 @@ with open("opcodes.html", encoding="windows-1252") as rfile:
                 mode = "ImmediateIndex"
 
             opcodes.append(
-                Opcode(s[0][:3], mode, s[0][4:], imm, size[:1], note[:1], int(s[1], 16)))
+                Opcode(s[0][:3], s[0][4:], mode, imm, size[:1], int(s[1], 16)))
             if s[0][:3] not in oplist:
                 oplist.append(s[0][:3])
 
@@ -84,30 +83,28 @@ with open("opcodes.html", encoding="windows-1252") as rfile:
 
 opcodes.sort(key=lambda o: o.opid)
 
-with open("../Core.Snes/SnesOpcodes.cs", "w") as f:
+with open("../SnesOpcodes.cs", "w") as f:
     f.write("using System.Text.Json.Serialization;\n\n")
-    f.write("namespace GSnes.Core.Snes;\n")
+    f.write("namespace Gmulator.Core.Snes;\n")
     f.write("public partial class SnesCpu\n{\n")
-    f.write('''	public struct Opcode(string name, string oper, int mode, int id, bool imm, int size, int cycles)
+    f.write('''	public struct Opcode(string name, string oper, int id, int mode, bool imm, int size)
     {
         public string Name = name;
         public string Oper = oper;
-        public int Mode = mode;
         public int Id = id;
+        public int Mode = mode;     
         public bool Immediate = imm;
         public int Size = size;
-        public int Cycles = cycles;
     };\n''')
 
     f.write("\n")
 
     opid = 0
-    f.write("\t[JsonIgnore]\n")
     f.write("\tpublic List<Opcode> Disasm = new();\n\n")
     f.write("\tpublic void CreateOpcodes() \n\t{\n")
     for l in opcodes:
         f.write(
-            f'\t\tDisasm.Add(new("{l.op[:3].lower()}", "{l.id.lower()}", {l.mode}, {l.op}, {str(l.imm).lower()}, {l.size}, {l.cycles})); //{opid:02X}\n')
+            f'\t\tDisasm.Add(new("{l.op[:3].lower()}", "{l.id.lower()}", {l.op}, {l.modeid}, {str(l.imm).lower()}, {l.size})); //{opid:02X}\n')
         opid += 1
 
     f.write("\t}\n\n\t//Opcodes\n")

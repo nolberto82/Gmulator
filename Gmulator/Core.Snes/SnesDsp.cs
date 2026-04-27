@@ -2,7 +2,7 @@
 
 namespace Gmulator.Core.Snes;
 
-public class SnesDsp : ISaveState
+public sealed class SnesDsp : ISaveState
 {
     public float[] SamplesL { get; private set; }
     public float[] SamplesR { get; private set; }
@@ -122,9 +122,9 @@ public class SnesDsp : ISaveState
 
         SamplesL[SampleOffset] = (float)totalL / 0x8000;
         SamplesR[SampleOffset] = (float)totalR / 0x8000;
-        SampleOffset++;
 
-        if (SampleOffset > 533)
+        SampleOffset++;
+        if (SampleOffset >= 533)
             SampleOffset = 533;
     }
 

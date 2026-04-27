@@ -19,13 +19,13 @@ public class NesJoypad()
         [0x04] = BtnUp, [0x05] = BtnDown, [0x06] = BtnLeft, [0x07] = BtnRight,
     };
 
-    public void Write(int a = 0, int v = 0)
+    public void Write(int a = 0, byte v = 0)
     {
         if ((v & 1) > 0)
             Strobe = true;
     }
 
-    public int Read(int a = 0)
+    public byte Read(int a = 0)
     {
         byte v = 0x40;
         if (ButtonId >= 0 && Strobe)

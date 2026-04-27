@@ -14,7 +14,7 @@ public class Triangle : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x4008, 0x400b, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {

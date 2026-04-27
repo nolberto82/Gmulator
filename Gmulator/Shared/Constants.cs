@@ -5,6 +5,14 @@ namespace Gmulator.Shared;
 
 public static class Constants
 {
+    public const int Ar = 0;
+    public const int Xr = 1;
+    public const int Yr = 2;
+    public const int Dr = 3;
+    public const int PSr = 4;
+    public const int DBr = 5;
+    public const int PCr = 6;
+
     public const int FC = 0x10;
     public const int FH = 0x20;
     public const int FN = 0x40;
@@ -38,7 +46,7 @@ public static class Constants
     public const int ScreenWidth = 1280;
     public const int ScreenHeight = 900;
     public const int DeckWidth = 1280;
-    public const int DeckHeight = 800;
+    public const int DeckHeight = 700;
 
     public const int NesCpuClock = 1789773;
     public const int NesCyclesPerFrame = 29780;

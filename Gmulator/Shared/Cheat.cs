@@ -9,6 +9,7 @@ public class Cheat
     public string Description;
     public string Codes;
     public int Address;
+    public int Address80;
     public byte Compare { get; set; }
     public byte Value { get; set; }
     public int Type { get; set; }
@@ -21,6 +22,7 @@ public class Cheat
     {
         Description = description == "" ? "Cheat" : description;
         Address = address;
+        Address80 = address | 0x800000;
         Value = value;
         Compare = compare;
         Enabled = enabled;
@@ -33,17 +35,18 @@ public class Cheat
     public class RawCode(int address, byte compare, byte value, int type, bool enabled)
     {
         public int Address { get; set; } = address;
+        public int Address80 { get; set; } = address | 0x800000;
         public byte Compare { get; set; } = compare;
         public byte Value { get; set; } = value;
         public int Type { get; set; } = type;
         public bool Enabled { get; set; } = enabled;
     }
 
-    public (int, byte, byte, int, int) DecryptCode(string c, Emulator Emu)
+    public (int, byte, byte, int, int) DecryptCode(string c, int Emu)
     {
         switch (Emu)
         {
-            case Gbc:
+            case GbcConsole:
             {
                 if (c.Length == 9)
                 {
@@ -64,7 +67,7 @@ public class Cheat
                 }
                 return (-1, 0, 0, -1, GbcConsole);
             }
-            case Nes:
+            case NesConsole:
             {
                 if (c.Length == 8)
                 {
@@ -100,7 +103,7 @@ public class Cheat
                 }
                 break;
             }
-            case Snes:
+            case SnesConsole:
             {
                 if (c.Length == 9 && c.ToLowerInvariant().StartsWith("7e") || c.ToLowerInvariant().StartsWith("7f"))
                 {

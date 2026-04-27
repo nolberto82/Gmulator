@@ -76,7 +76,7 @@ namespace Gmulator.Shared
             }
         }
 
-        public void Rom(int bankStart, int bankEnd, int addrStart, int addrEnd, ReadDel r, WriteDel w)
+        public void LoRom(int bankStart, int bankEnd, int addrStart, int addrEnd, ReadDel r, WriteDel w)
         {
             int offset = 0;
             for (int i = bankStart; i <= bankEnd; i++)
@@ -90,6 +90,24 @@ namespace Gmulator.Shared
                     Handlers[a].Write = w;
                     offset += 0x1000;
                 }
+            }
+        }
+
+        public void HiRom(int bankStart, int bankEnd, int addrStart, int addrEnd, ReadDel r, WriteDel w)
+        {
+            int offset = addrStart;
+            for (int i = bankStart; i <= bankEnd; i++)
+            {
+                for (int j = addrStart; j <= addrEnd; j += 0x1000)
+                {
+                    int a = _size == 0x1000 ? i << 4 | (j >> 12) : j;
+                    Handlers[a].Offset = offset;
+                    Handlers[a].Type = RamType.Rom;
+                    Handlers[a].Read = r;
+                    Handlers[a].Write = w;
+                    offset += 0x1000;
+                }
+                offset += addrStart;
             }
         }
 

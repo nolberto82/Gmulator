@@ -39,16 +39,16 @@ public class BaseMapper : ISaveState
 
     public NesMmu Mmu { get; set; }
 
-    public int ReadSram(int a)
+    public byte ReadSram(int a)
     {
         if (!SramEnabled) return 0;
         return Sram[a & 0x1fff];
     }
 
-    public void WriteSram(int a, int v)
+    public void WriteSram(int a, byte v)
     {
         if (!SramEnabled) return;
-        Sram[a & 0x1fff] = (byte)v;
+        Sram[a & 0x1fff] = v;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
@@ -66,17 +66,17 @@ public class BaseMapper : ISaveState
         }
     }
 
-    public virtual int ReadPrg(int a) => PrgRom[a % PrgRom.Length];
+    public virtual byte ReadPrg(int a) => PrgRom[a % PrgRom.Length];
 
-    public virtual int ReadChr(int a)
+    public virtual byte ReadChr(int a)
     {
         if (CharRom.Length == 0) return 0;
         return CharRom[a % CharRom.Length];
     }
 
-    public virtual void WritePrg(int a, int v) => PrgRom[a % PrgRom.Length] = (byte)v;
+    public virtual void WritePrg(int a, byte v) => PrgRom[a % PrgRom.Length] = v;
 
-    public virtual void Write(int a, int v)
+    public virtual void Write(int a, byte v)
     {
 
     }

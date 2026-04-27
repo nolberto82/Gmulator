@@ -21,14 +21,10 @@ public class GuiDesktop : Gui
 
             rlImGui.Begin();
 
-            if (Emulator.FastForward)
-                Emulator?.RunFrames(Opened);
-
             Emulator?.RunFrame(Opened);
-            Emulator?.Render(MenuHeight);
             Emulator?.Update();
+            Emulator?.Render(MenuHeight);
             Emulator?.Input();
-            LuaApi?.Update(Opened);
 
             Input.UpdateGuiInput(Emulator, this);
 
@@ -65,7 +61,7 @@ public class GuiDesktop : Gui
                     }
                 }
                 if (ImGui.MenuItem("Reset"))
-                    Emulator.Reset("", true, null);
+                    Emulator.Reset(Emulator.GameName, true);
 
                 ImGui.EndMenu();
             }
@@ -97,7 +93,6 @@ public class GuiDesktop : Gui
         ImGuiViewportPtr vp = ImGui.GetMainViewport();
         ImGui.SetNextWindowSize(new(vp.Size.X, vp.Size.Y));
         ImGui.SetNextWindowPos(new(0, 0));
-        int bottom = -105;
 
         if (OpenDialog)
         {
@@ -159,7 +154,7 @@ public class GuiDesktop : Gui
                         ImGui.EndChild();
                     }
 
-                    if (ImGui.BeginChild("##gamefiles", new(0, bottom), ImGuiChildFlags.FrameStyle))
+                    if (ImGui.BeginChild("##gamefiles", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
                         var start = GameFiles.Count(d => d.IsDrive) + 1;
                         for (int i = start; i < GameFiles.Count; i++)
@@ -207,7 +202,7 @@ public class GuiDesktop : Gui
                 case ScrCheats:
                     if (CheatDialog)
                     {
-                        if (ImGui.BeginChild("CheatDialog", new(0, bottom), ImGuiChildFlags.FrameStyle))
+                        if (ImGui.BeginChild("CheatDialog", new(0, 0), ImGuiChildFlags.FrameStyle))
                         {
                             CheatFiles.Clear();
                             Enumerate(CheatDirectory);
@@ -233,7 +228,7 @@ public class GuiDesktop : Gui
 
                         CheatWindow(null);
 
-                        if (ImGui.BeginChild("##cheats", new(0, bottom), ImGuiChildFlags.FrameStyle))
+                        if (ImGui.BeginChild("##cheats", new(0, 0), ImGuiChildFlags.FrameStyle))
                         {
                             ImGui.BeginTable("##cheattable", 3);
                             ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthFixed, vp.Size.X - Raylib.MeasureText("OFF ", (int)ImGui.GetFontSize() * 2));
@@ -273,7 +268,7 @@ public class GuiDesktop : Gui
                                     if (ImGui.Button("x"))
                                     {
                                         foreach (var c in cht)
-                                            Cheats.Remove(c.Address);
+                                            Cheats.Remove((c.Address, c.Address80));
                                         Emulator.SaveCheats(CurrentName);
                                     }
 
@@ -294,7 +289,7 @@ public class GuiDesktop : Gui
                 case ScrLua:
                     LuaFiles.Clear();
                     Enumerate(CheatDirectory);
-                    if (ImGui.BeginChild("##luafiles", new(0, bottom), ImGuiChildFlags.FrameStyle))
+                    if (ImGui.BeginChild("##luafiles", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
                         for (int i = 0; i < LuaFiles.Count; i++)
                         {
@@ -306,7 +301,7 @@ public class GuiDesktop : Gui
                                     if (File.Exists(file.Name))
                                     {
                                         Opened = false;
-                                        LuaApi?.Load(file.Name);
+                                        LuaApi?.Load(file.Name, Emulator.Console);
                                         LuaApi?.Save(Emulator.GameName);
                                     }
                                 }
@@ -317,7 +312,7 @@ public class GuiDesktop : Gui
                     break;
 
                 case ScrOptions:
-                    if (ImGui.BeginChild("##emulatoroptions", new(0, bottom), ImGuiChildFlags.FrameStyle))
+                    if (ImGui.BeginChild("##emulatoroptions", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
                         ImGui.BeginTable("##options", 2);
                         {
@@ -327,7 +322,7 @@ public class GuiDesktop : Gui
                             for (int i = 0; i < Options.Count; i++)
                             {
                                 Option o = Options[i];
-                                var v = o.Status == null ? $"{o.Value}" : o.Status[(int)o.Value];
+                                var v = o.Status == null ? $"{o.Value}" : o.Status[o.Value];
                                 if (TableRowSelect(o.Name, v, i == SelOption[ScrOptions]))
                                 {
                                     SelOption[ScrOptions] = i;
@@ -339,23 +334,6 @@ public class GuiDesktop : Gui
                     }
                     break;
             }
-
-            ImGui.PushStyleColor(ImGuiCol.ChildBg, 0xffff0000);
-            ImGui.BeginChild("##info");
-            ImGui.SetCursorPos(new(5, 10));
-            if (ImGui.BeginTable("infobuttons", 2))
-            {
-                ImGui.TableSetupColumn("##info0", ImGuiTableColumnFlags.WidthFixed, 200);
-                ImGui.TableSetupColumn("##info1");
-                foreach (var t in TabInfo[TabIndex == 1 && CheatDialog ? ScrBrowser : TabIndex][1])
-                {
-                    TableRow(t.Button, t.Description);
-                }
-                ImGui.EndTable();
-            }
-            ImGui.EndChild();
-            ImGui.PopStyleColor();
-
             ImGui.EndPopup();
         }
         ImGui.PopStyleColor(3);

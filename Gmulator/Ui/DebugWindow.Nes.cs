@@ -23,12 +23,12 @@ namespace Gmulator.Ui
 
             MemRegions =
             [
-                new("Wram", mmu.ReadByte, mmu.WriteByte, 0x0000, mmu.Wram.Length, 4, 0),
-                new("Vram", ppu.Read, ppu.Write, 0x0000, ppu.Vram.Length, 4, 1),
-                new("Oram", ppu.ReadOam, null, 0x0000,ppu.Oram.Length, 2, 2),
-                new("Sram", mapper.ReadSram, mapper.WriteSram, 0x0000, mapper.Sram == null ? 0 : mapper.Sram.Length,  4, 3),
-                new("Prg", mapper.ReadPrg, mapper.WritePrg, 0x0000, mapper.PrgRom.Length,  6, 4),
-                new("Chr", mapper.ReadChr, mapper.Write, 0x0000, mapper.CharRom.Length,  6, 5),
+                new("Wram", mmu.ReadByte, mmu.WriteByte, 0x0000, mmu.Wram.Length, 4, BpType.WramWrite | BpType.WramRead),
+                new("Vram", ppu.Read, ppu.Write, 0x0000, ppu.Vram.Length, 4, BpType.WramWrite | BpType.WramRead),
+                new("Oram", ppu.ReadOam, null, 0x0000,ppu.Oram.Length, 2, BpType.WramWrite | BpType.WramRead),
+                new("Sram", mapper.ReadSram, mapper.WriteSram, 0x0000, mapper.Sram == null ? 0 : mapper.Sram.Length,  4, BpType.WramWrite | BpType.WramRead),
+                new("Prg", mapper.ReadPrg, mapper.WritePrg, 0x0000, mapper.PrgRom.Length,  6, BpType.WramWrite | BpType.WramRead),
+                new("Chr", mapper.ReadChr, mapper.Write, 0x0000, mapper.CharRom.Length,  6, BpType.WramWrite | BpType.WramRead),
             ];
 
             OnDisassemble =
@@ -65,13 +65,13 @@ namespace Gmulator.Ui
 
         public override void DrawMemory() => base.DrawMemory();
 
-        public override void AddBreakpoint(int a, int type, int condition, bool write, int index = 0) => base.AddBreakpoint(a, type, condition, write, index);
+        public override void AddBreakpoint(int a, BpType type, int condition, bool write) => base.AddBreakpoint(a, type, condition, write);
 
         public override void Continue(DebugState type = 0) => base.Continue(0);
 
         public override void Reset(DebugState type)
         {
-            Nes.Reset("", true, Ppu.ScreenBuffer);
+            Nes.Reset("", true);
             base.Reset(type);
         }
 

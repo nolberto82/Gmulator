@@ -20,13 +20,13 @@ namespace Gmulator.Ui
             var mapper = mmu.Mapper;
             MemRegions =
             [
-                new("Work", mmu.ReadWram, mmu.WriteWram, 0x0000, 0x8000, 4, 0),
-                new("Save", mmu.ReadSram, null,0x0000, mapper.Sram.Length, 4, 1),
-                new("Video", mmu.ReadVram, mmu.WriteVramBank, 0x0000, 0x4000, 4, 2),
-                new("Sprite", mmu.ReadOam, null, 0x0000, 0x100, 2, 3),
-                new("IO", mmu.ReadIo, mmu.WriteIo,0x0000, 0x80, 2, 4),
-                new("Hram", mmu.ReadHram, mmu.WriteHram,0x0000, 0x80, 2, 5),
-                new("Rom", mapper.ReadRom, null, 0x0000, mapper.Rom.Length, 6, 6),
+                new("Work", mmu.ReadWram, mmu.WriteWram, 0x0000, 0x8000, 4, BpType.WramWrite | BpType.WramRead),
+                new("Save", mmu.ReadSram, null,0x0000, mapper.Sram.Length, 4, BpType.WramWrite | BpType.WramRead),
+                new("Video", mmu.ReadVram, mmu.WriteVramBank, 0x0000, 0x4000, 4, BpType.VramWrite | BpType.VramRead),
+                new("Sprite", mmu.ReadOam, null, 0x0000, 0x100, 2, BpType.WramWrite | BpType.WramRead),
+                new("IO", mmu.ReadIo, mmu.WriteIo,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead),
+                new("Hram", mmu.ReadHram, mmu.WriteHram,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead),
+                new("Rom", mapper.ReadRom, null, 0x0000, mapper.Rom.Length, 6, BpType.WramWrite | BpType.WramRead),
             ];
 
             OnDisassemble =
@@ -72,7 +72,7 @@ namespace Gmulator.Ui
 
         public override void DrawMemory() => base.DrawMemory();
 
-        public override void AddBreakpoint(int a, int type, int condition, bool write, int index = 0) => base.AddBreakpoint(a, type, condition, write, index);
+        public override void AddBreakpoint(int a, BpType type, int condition, bool write) => base.AddBreakpoint(a, type, condition, write);
 
         public override void SetJumpAddress(object addr, int i) => base.SetJumpAddress(addr, i);
 
@@ -101,7 +101,7 @@ namespace Gmulator.Ui
 
         public override void Reset(DebugState type = 0)
         {
-            Gbc.Reset("", true, Ppu.ScreenBuffer);
+            Gbc.Reset("", true);
             base.Reset(type);
         }
 

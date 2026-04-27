@@ -208,35 +208,35 @@ public class NesApu : ISaveState
         Noise.Length();
     }
 
-    public int Read(int a)
+    public byte Read(int a)
     {
         switch (a)
         {
             case 0x4015:
             {
-                var res = 0;
+                byte result = 0;
                 if (Square1.LengthCounter > 0)
-                    res |= 0x01;
+                    result |= 0x01;
                 if (Square2.LengthCounter > 0)
-                    res |= 0x02;
+                    result |= 0x02;
                 if (Triangle.LengthCounter > 0)
-                    res |= 0x04;
+                    result |= 0x04;
                 if (Noise.LengthCounter > 0)
-                    res |= 0x08;
+                    result |= 0x08;
                 if (Dmc.LengthValue > 0)
-                    res |= 0x10;
+                    result |= 0x10;
 
                 if (IrqEnabled)
-                    res |= 0x40;
+                    result |= 0x40;
                 IrqEnabled = false;
-                return res & 0xff;
+                return result;
             }
             default:
                 return 0xff;
         }
     }
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {

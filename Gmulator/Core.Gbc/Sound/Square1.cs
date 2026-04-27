@@ -11,28 +11,28 @@ public class Square1 : BaseChannel, ISaveState
     private bool _sweepEnabled;
     private int _shadowFrequency;
 
-    private int _nr10;
-    private int _nr11;
-    private int _nr12;
-    private int _nr13;
-    private int _nr14;
+    private byte _nr10;
+    private byte _nr11;
+    private byte _nr12;
+    private byte _nr13;
+    private byte _nr14;
 
     public Square1(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff10, 0xff14, Read, Write, RamType.Register, 1);
     }
 
-    public int Read(int a) => a switch
+    public byte Read(int a) => a switch
     {
-        0xff10 => _nr10 | 0x80,
-        0xff11 => _nr11 | 0x3f,
+        0xff10 => (byte)(_nr10 | 0x80),
+        0xff11 => (byte)(_nr11 | 0x3f),
         0xff12 => _nr12,
-        0xff13 => _nr13 | 0xff,
-        0xff14 => _nr14 | 0xbf,
+        0xff13 => (byte)(_nr13 | 0xff),
+        0xff14 => (byte)(_nr14 | 0xbf),
         _ => 0xff,
     };
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {
@@ -118,24 +118,23 @@ public class Square1 : BaseChannel, ISaveState
         _nr14 = 0xbf;
         Dac = false;
         Enabled = false;
+        Timer = 8192;
     }
 
     public void Save(BinaryWriter bw)
     {
         bw.Write(_sweepPeriod); bw.Write(_sweepNegate); bw.Write(_sweepShift); bw.Write(_sweepTimer);
-        bw.Write(_sweepEnabled); bw.Write(_shadowFrequency); bw.Write(Frequency); bw.Write(LengthCounter);
-        bw.Write(Duty); bw.Write(EnvVolume); bw.Write(CurrentVolume); bw.Write(Timer);
-        bw.Write(_nr10); bw.Write(_nr11); bw.Write(_nr12); bw.Write(_nr13);
-        bw.Write(_nr14);
+        bw.Write(_sweepEnabled); bw.Write(_shadowFrequency); bw.Write(_nr10); bw.Write(_nr11);
+        bw.Write(_nr12); bw.Write(_nr13); bw.Write(_nr14); bw.Write(Duty);
+        bw.Write(EnvVolume); bw.Write(CurrentVolume); bw.Write(Timer);
     }
 
     public void Load(BinaryReader br)
     {
         _sweepPeriod = br.ReadInt32(); _sweepNegate = br.ReadInt32(); _sweepShift = br.ReadInt32(); _sweepTimer = br.ReadInt32();
-        _sweepEnabled = br.ReadBoolean(); _shadowFrequency = br.ReadInt32(); Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32();
-        Duty = br.ReadInt32(); EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32();
-        _nr10 = br.ReadInt32(); _nr11 = br.ReadInt32(); _nr12 = br.ReadInt32(); _nr13 = br.ReadInt32();
-        _nr14 = br.ReadInt32();
+        _sweepEnabled = br.ReadBoolean(); _shadowFrequency = br.ReadInt32(); _nr10 = br.ReadByte(); _nr11 = br.ReadByte();
+        _nr12 = br.ReadByte(); _nr13 = br.ReadByte(); _nr14 = br.ReadByte(); Duty = br.ReadInt32();
+        EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() => [

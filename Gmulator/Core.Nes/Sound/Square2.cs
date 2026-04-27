@@ -9,7 +9,7 @@ public class Square2 : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x4004, 0x4007, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, int v)
+    public void Write(int a, byte v)
     {
         switch (a)
         {

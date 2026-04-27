@@ -1,693 +1,594 @@
 switch (Disasm[op].Id)
 {
 	case ADC: break;
-	case ADDW: break;
 	case AND: break;
-	case AND1: break;
 	case ASL: break;
-	case BBC: break;
-	case BBS: break;
 	case BCC: break;
 	case BCS: break;
 	case BEQ: break;
+	case BIT: break;
 	case BMI: break;
 	case BNE: break;
 	case BPL: break;
 	case BRA: break;
 	case BRK: break;
+	case BRL: break;
 	case BVC: break;
 	case BVS: break;
-	case CALL: break;
-	case CBNE: break;
-	case CLR1: break;
-	case CLRC: break;
-	case CLRP: break;
-	case CLRV: break;
+	case CLC: break;
+	case CLD: break;
+	case CLI: break;
+	case CLV: break;
 	case CMP: break;
-	case CMPW: break;
-	case DAA: break;
-	case DAS: break;
-	case DBNZ: break;
+	case COP: break;
+	case CPX: break;
+	case CPY: break;
 	case DEC: break;
-	case DECW: break;
-	case DI: break;
-	case DIV: break;
-	case EI: break;
+	case DEX: break;
+	case DEY: break;
 	case EOR: break;
-	case EOR1: break;
 	case INC: break;
-	case INCW: break;
+	case INX: break;
+	case INY: break;
 	case JMP: break;
+	case JML: break;
+	case JSR: break;
+	case JSL: break;
+	case LDA: break;
+	case LDX: break;
+	case LDY: break;
 	case LSR: break;
-	case MOV: break;
-	case MOVR: break;
-	case MOV1: break;
-	case MOVW: break;
-	case MUL: break;
+	case MVN: break;
+	case MVP: break;
 	case NOP: break;
-	case NOT1: break;
-	case NOTC: break;
-	case OR: break;
-	case OR1: break;
-	case PCALL: break;
-	case POP: break;
-	case PUSH: break;
-	case RET: break;
-	case RETI: break;
+	case ORA: break;
+	case PEA: break;
+	case PEI: break;
+	case PER: break;
+	case PHA: break;
+	case PHB: break;
+	case PHD: break;
+	case PHK: break;
+	case PHP: break;
+	case PHX: break;
+	case PHY: break;
+	case PLA: break;
+	case PLB: break;
+	case PLD: break;
+	case PLP: break;
+	case PLX: break;
+	case PLY: break;
+	case REP: break;
 	case ROL: break;
 	case ROR: break;
+	case RTI: break;
+	case RTL: break;
+	case RTS: break;
 	case SBC: break;
-	case SET1: break;
-	case SETC: break;
-	case SETP: break;
-	case SLEEP: break;
-	case STOP: break;
-	case SUBW: break;
-	case TCALL: break;
-	case TCLR1: break;
-	case TSET1: break;
-	case XCN: break;
-}
-
-switch (op)
-{
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x1: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x2: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-	case 0x3: SetState(Debugging); break;
-}
+	case SEC: break;
+	case SED: break;
+	case SEI: break;
+	case SEP: break;
+	case STA: break;
+	case STP: break;
+	case STX: break;
+	case STY: break;
+	case STZ: break;
+	case TAX: break;
+	case TAY: break;
+	case TCD: break;
+	case TCS: break;
+	case TDC: break;
+	case TRB: break;
+	case TSB: break;
+	case TSC: break;
+	case TSX: break;
+	case TXA: break;
+	case TXS: break;
+	case TXY: break;
+	case TYA: break;
+	case TYX: break;
+	case WAI: break;
+	case WDM: break;
+	case XBA: break;
+	case XCE: break;
 
 switch (mode)
 {
 	case Absolute: return 0;
-	case AbsoluteBooleanBit: return 0;
-	case AbsoluteIndexedbyX: return 0;
-	case AbsoluteIndexedbyY: return 0;
+	case AbsoluteIndexedIndirect: return 0;
+	case AbsoluteIndexedX: return 0;
+	case AbsoluteIndexedY: return 0;
+	case AbsoluteIndirect: return 0;
+	case AbsoluteIndirectLong: return 0;
+	case AbsoluteLong: return 0;
+	case AbsoluteLongIndexedX: return 0;
 	case Accumulator: return 0;
+	case BlockMove: return 0;
+	case DPIndexedIndirectX: return 0;
+	case DPIndexedX: return 0;
+	case DPIndexedY: return 0;
+	case DPIndirect: return 0;
+	case DPIndirectIndexedY: return 0;
+	case DPIndirectLong: return 0;
+	case DPIndirectLongIndexedY: return 0;
 	case DirectPage: return 0;
-	case DirectPageBit: return 0;
-	case DirectPageBitRelative: return 0;
-	case DirectPageImmediate: return 0;
-	case DirectPageIndexedIndirectbyX: return 0;
-	case DirectPageIndexedbyX: return 0;
-	case DirectPageIndexedbyXProgramCounterRelative: return 0;
-	case DirectPageIndexedbyY: return 0;
-	case DirectPageIndirectIndexedbyY: return 0;
-	case DirectPageProgramCounterRelative: return 0;
 	case Immediate: return 0;
-	case ImpliedIndirecttype1: return 0;
-	case ImpliedIndirecttype2: return 0;
-	case Impliedtype1: return 0;
-	case Impliedtype1ProgramCounterRelative: return 0;
-	case Impliedtype2: return 0;
-	case Impliedtype3: return 0;
+	case ImmediateIndex: return 0;
+	case ImmediateMemory: return 0;
+	case Implied: return 0;
+	case NoMode: return 0;
 	case ProgramCounterRelative: return 0;
+	case ProgramCounterRelativeLong: return 0;
+	case SRIndirectIndexedY: return 0;
+	case StackAbsolute: return 0;
+	case StackDPIndirect: return 0;
 	case StackInterrupt: return 0;
-	case StackPSW: return 0;
-	case StackR: return 0;
-	case StackX: return 0;
-	case StackY: return 0;
-	case UppermostPage: return 0;
+	case StackPCRelativeLong: return 0;
+	case StackPull: return 0;
+	case StackPush: return 0;
+	case StackRTI: return 0;
+	case StackRTL: return 0;
+	case StackRTS: return 0;
+	case StackRelative: return 0;
 }
 
-	private void Adc()
+	private void ADC()
 	{	
 
 	}
 
-	private void Addw()
+	private void AND()
 	{	
 
 	}
 
-	private void And()
+	private void ASL()
 	{	
 
 	}
 
-	private void And1()
+	private void BCC()
 	{	
 
 	}
 
-	private void Asl()
+	private void BCS()
 	{	
 
 	}
 
-	private void Bbc()
+	private void BEQ()
 	{	
 
 	}
 
-	private void Bbs()
+	private void BIT()
 	{	
 
 	}
 
-	private void Bcc()
+	private void BMI()
 	{	
 
 	}
 
-	private void Bcs()
+	private void BNE()
 	{	
 
 	}
 
-	private void Beq()
+	private void BPL()
 	{	
 
 	}
 
-	private void Bmi()
+	private void BRA()
 	{	
 
 	}
 
-	private void Bne()
+	private void BRK()
 	{	
 
 	}
 
-	private void Bpl()
+	private void BRL()
 	{	
 
 	}
 
-	private void Bra()
+	private void BVC()
 	{	
 
 	}
 
-	private void Brk()
+	private void BVS()
 	{	
 
 	}
 
-	private void Bvc()
+	private void CLC()
 	{	
 
 	}
 
-	private void Bvs()
+	private void CLD()
 	{	
 
 	}
 
-	private void Call()
+	private void CLI()
 	{	
 
 	}
 
-	private void Cbne()
+	private void CLV()
 	{	
 
 	}
 
-	private void Clr1()
+	private void CMP()
 	{	
 
 	}
 
-	private void Clrc()
+	private void COP()
 	{	
 
 	}
 
-	private void Clrp()
+	private void CPX()
 	{	
 
 	}
 
-	private void Clrv()
+	private void CPY()
 	{	
 
 	}
 
-	private void Cmp()
+	private void DEC()
 	{	
 
 	}
 
-	private void Cmpw()
+	private void DEX()
 	{	
 
 	}
 
-	private void Daa()
+	private void DEY()
 	{	
 
 	}
 
-	private void Das()
+	private void EOR()
 	{	
 
 	}
 
-	private void Dbnz()
+	private void INC()
 	{	
 
 	}
 
-	private void Dec()
+	private void INX()
 	{	
 
 	}
 
-	private void Decw()
+	private void INY()
 	{	
 
 	}
 
-	private void Di()
+	private void JMP()
 	{	
 
 	}
 
-	private void Div()
+	private void JML()
 	{	
 
 	}
 
-	private void Ei()
+	private void JSR()
 	{	
 
 	}
 
-	private void Eor()
+	private void JSL()
 	{	
 
 	}
 
-	private void Eor1()
+	private void LDA()
 	{	
 
 	}
 
-	private void Inc()
+	private void LDX()
 	{	
 
 	}
 
-	private void Incw()
+	private void LDY()
 	{	
 
 	}
 
-	private void Jmp()
+	private void LSR()
 	{	
 
 	}
 
-	private void Lsr()
+	private void MVN()
 	{	
 
 	}
 
-	private void Mov()
+	private void MVP()
 	{	
 
 	}
 
-	private void Mov1()
+	private void NOP()
 	{	
 
 	}
 
-	private void Movw()
+	private void ORA()
 	{	
 
 	}
 
-	private void Mul()
+	private void PEA()
 	{	
 
 	}
 
-	private void Nop()
+	private void PEI()
 	{	
 
 	}
 
-	private void Not1()
+	private void PER()
 	{	
 
 	}
 
-	private void Notc()
+	private void PHA()
 	{	
 
 	}
 
-	private void Or()
+	private void PHB()
 	{	
 
 	}
 
-	private void Or1()
+	private void PHD()
 	{	
 
 	}
 
-	private void Pcall()
+	private void PHK()
 	{	
 
 	}
 
-	private void Pop()
+	private void PHP()
 	{	
 
 	}
 
-	private void Push()
+	private void PHX()
 	{	
 
 	}
 
-	private void Ret()
+	private void PHY()
 	{	
 
 	}
 
-	private void Reti()
+	private void PLA()
 	{	
 
 	}
 
-	private void Rol()
+	private void PLB()
 	{	
 
 	}
 
-	private void Ror()
+	private void PLD()
 	{	
 
 	}
 
-	private void Sbc()
+	private void PLP()
 	{	
 
 	}
 
-	private void Set1()
+	private void PLX()
 	{	
 
 	}
 
-	private void Setc()
+	private void PLY()
 	{	
 
 	}
 
-	private void Setp()
+	private void REP()
 	{	
 
 	}
 
-	private void Sleep()
+	private void ROL()
 	{	
 
 	}
 
-	private void Stop()
+	private void ROR()
 	{	
 
 	}
 
-	private void Subw()
+	private void RTI()
 	{	
 
 	}
 
-	private void Tcall()
+	private void RTL()
 	{	
 
 	}
 
-	private void Tclr1()
+	private void RTS()
 	{	
 
 	}
 
-	private void Tset1()
+	private void SBC()
 	{	
 
 	}
 
-	private void Xcn()
+	private void SEC()
+	{	
+
+	}
+
+	private void SED()
+	{	
+
+	}
+
+	private void SEI()
+	{	
+
+	}
+
+	private void SEP()
+	{	
+
+	}
+
+	private void STA()
+	{	
+
+	}
+
+	private void STP()
+	{	
+
+	}
+
+	private void STX()
+	{	
+
+	}
+
+	private void STY()
+	{	
+
+	}
+
+	private void STZ()
+	{	
+
+	}
+
+	private void TAX()
+	{	
+
+	}
+
+	private void TAY()
+	{	
+
+	}
+
+	private void TCD()
+	{	
+
+	}
+
+	private void TCS()
+	{	
+
+	}
+
+	private void TDC()
+	{	
+
+	}
+
+	private void TRB()
+	{	
+
+	}
+
+	private void TSB()
+	{	
+
+	}
+
+	private void TSC()
+	{	
+
+	}
+
+	private void TSX()
+	{	
+
+	}
+
+	private void TXA()
+	{	
+
+	}
+
+	private void TXS()
+	{	
+
+	}
+
+	private void TXY()
+	{	
+
+	}
+
+	private void TYA()
+	{	
+
+	}
+
+	private void TYX()
+	{	
+
+	}
+
+	private void WAI()
+	{	
+
+	}
+
+	private void WDM()
+	{	
+
+	}
+
+	private void XBA()
+	{	
+
+	}
+
+	private void XCE()
 	{	
 
 	}

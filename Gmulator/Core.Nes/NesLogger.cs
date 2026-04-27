@@ -9,7 +9,7 @@ public class NesLogger(Nes nes)
     public bool Logging;
     private readonly NesCpu Cpu = nes.Cpu;
     private readonly NesPpu Ppu = nes.Ppu;
-    public Func<int, int> ReadByte;
+    public Func<int, byte> ReadByte;
 
     public void Toggle(bool log = true)
     {

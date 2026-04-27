@@ -12,7 +12,7 @@ public class Noise : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x400c, 0x400f, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, int v)
+    public void Write(int a,byte v)
     {
         switch (a)
         {

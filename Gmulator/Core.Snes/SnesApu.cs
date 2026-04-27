@@ -3,7 +3,7 @@ using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Snes;
 
-public class SnesApu : ISaveState
+public sealed class SnesApu : ISaveState
 {
     public Timer[] Timers = new Timer[3];
     public ulong Cycles { get; private set; }
@@ -143,14 +143,13 @@ public class SnesApu : ISaveState
         return ram[a];
     }
 
-    public void Write(int addr, int value, bool debug = false)
+    public void Write(int addr, byte value, bool debug = false)
     {
         int a = addr & 0xffff;
-        byte v = (byte)value;
 
 #if DEBUG || RELEASE
         if (Snes.Debug)
-            AccessCheckSpc(a, v, RamType.SpcRam, true);
+            AccessCheckSpc(a, value, RamType.SpcRam, true);
 #endif
 
         switch (a)
@@ -160,7 +159,7 @@ public class SnesApu : ISaveState
             case 0xf1:
                 for (int i = 0; i < Timers.Length; i++)
                 {
-                    bool b = (v & (1 << i)) != 0;
+                    bool b = (value & (1 << i)) != 0;
                     if (!Timers[i].Enabled && b)
                     {
                         Timers[i].Divider = 0;
@@ -169,43 +168,43 @@ public class SnesApu : ISaveState
                     Timers[i].Enabled = b;
                 }
 
-                if ((v & 0x10) != 0)
+                if ((value & 0x10) != 0)
                 {
                     CpuIO[0] = 0;
                     CpuIO[1] = 0;
                 }
 
-                if ((v & 0x20) != 0)
+                if ((value & 0x20) != 0)
                 {
                     CpuIO[2] = 0;
                     CpuIO[3] = 0;
                 }
-                IplEnabled = (v & 0x80) != 0;
+                IplEnabled = (value & 0x80) != 0;
                 return;
             case 0xf2:
-                DspAddr = v;
+                DspAddr = value;
                 return;
             case 0xf3:
                 if (DspAddr < 0x80)
-                    Dsp.Write(DspAddr, v);
+                    Dsp.Write(DspAddr, value);
                 return;
             case >= 0xf4 and <= 0xf7:
-                SpcIO[a - 0xf4] = v;
+                SpcIO[a - 0xf4] = value;
                 return;
             case 0xf8 or 0xf9:
-                Timers[0].Target = v;
+                Timers[0].Target = value;
                 return;
             case >= 0xfa and <= 0xfc:
-                Timers[(a - 0xfa) & 3].Target = v;
+                Timers[(a - 0xfa) & 3].Target = value;
                 return;
             case >= 0xfd and <= 0xff:
                 return;
         }
 
-        ram[a] = v;
+        ram[a] = value;
     }
 
-    public int ReadDebug(int a)
+    public byte ReadDebug(int a)
     {
         if (a >= 0xffc0)
             return IplBootrom[a & 0x3f];

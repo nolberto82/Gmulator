@@ -7,21 +7,21 @@ internal class Mapper007 : BaseMapper
         Reset();
     }
 
-    public override int ReadPrg(int a) => base.ReadPrg(0x8000 * Prg[0] + a % 0x8000);
+    public override byte ReadPrg(int addr) => base.ReadPrg(0x8000 * Prg[0] + addr % 0x8000);
 
-    public override int ReadChr(int a) => base.ReadChr(0x2000 * Chr[0] + a % 0x2000);
+    public override byte ReadChr(int addr) => base.ReadChr(0x2000 * Chr[0] + addr % 0x2000);
 
-    public override void WritePrg(int a, int v) => base.WritePrg(0x8000 * Prg[0] + a % 0x8000, v);
+    public override void WritePrg(int addr, byte value) => base.WritePrg(0x8000 * Prg[0] + addr % 0x8000, value);
 
-    public override void Write(int a, int v)
+    public override void Write(int addr, byte value)
     {
-        Prg[0] = (byte)(v & 7);
-        Chr[0] = (byte)(v >> 4);
-        Header.Mirror = (v >> 4) & 1;
-        base.Write(a, v);
+        Prg[0] = (byte)(value & 7);
+        Chr[0] = (byte)(value >> 4);
+        Header.Mirror = (value >> 4) & 1;
+        base.Write(addr, value);
     }
 
-    public override byte ReadVram(int a) => base.ReadVram(a);
+    public override byte ReadVram(int addr) => base.ReadVram(addr);
 
     public override void Reset()
     {

@@ -1,6 +1,7 @@
 ﻿using Gmulator.Core.Gbc;
 using Gmulator.Core.Nes;
 using Gmulator.Core.Snes;
+using Gmulator.Shared.LuaScript;
 using ImGuiNET;
 using rlImGui_cs;
 using System.Data;
@@ -21,10 +22,10 @@ public abstract class Gui
     public const int ScrBrowser = 4;
     public const int ScrMain = 5;
 
-    public LuaApi LuaApi { get; private set; }
+    public LuaManager LuaApi { get; private set; }
     private Audio Audio { get; set; }
     private Cheat Cheat { get; set; }
-    public Dictionary<int, Cheat> Cheats => Emulator?.Cheats;
+    public Dictionary<(int, int), Cheat> Cheats => Emulator?.Cheats;
     public float MenuHeight { get; set; }
     public RenderTexture2D Screen { get; private set; }
     public RenderTexture2D MenuTarget { get; set; }
@@ -34,6 +35,7 @@ public abstract class Gui
     public const int FontSize = 28;
 
     public ulong FrameCounter { get; set; }
+    public int DpadCounter { get; set; }
     public int TabIndex { get; set; }
     public int[] SelOption { get; set; } = new int[MaxTabs];
     public int[] OldTotal { get; set; } = new int[MaxTabs];
@@ -201,13 +203,9 @@ public abstract class Gui
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #endif
 
-        var deckres = Raylib.GetMonitorWidth(0) == 1280 && Raylib.GetMonitorHeight(0) == 800;
-        if (deckres && !Raylib.IsWindowMaximized())
-            Raylib.SetWindowState(ConfigFlags.MaximizedWindow);
-
         if (isdeck)
         {
-            MenuTarget = Raylib.LoadRenderTexture(1280, 800);
+            MenuTarget = Raylib.LoadRenderTexture(DeckWidth, DeckHeight);
 
             if (File.Exists(FontName))
             {
@@ -215,21 +213,19 @@ public abstract class Gui
                 Notifications.SetFont(null, GuiFont);
             }
         }
-        else
-        {
-            rlImGui.Setup(true);
-            GraphicsWindow.Init();
-            var io = ImGui.GetIO();
 
-            if (File.Exists(FontName))
-            {
-                DebugFont = [null, null];
-                DebugFont[0] = io.Fonts.AddFontFromFileTTF(FontName, 23f);
-                DebugFont[1] = io.Fonts.AddFontFromFileTTF(FontName, 15f);
-                GuiFont = Raylib.LoadFont(FontName);
-                rlImGui.ReloadFonts();
-                Notifications.SetFont(DebugFont[0], GuiFont);
-            }
+        rlImGui.Setup(true);
+        GraphicsWindow.Init();
+        var io = ImGui.GetIO();
+
+        if (File.Exists(FontName))
+        {
+            DebugFont = [null, null];
+            DebugFont[0] = io.Fonts.AddFontFromFileTTF(FontName, 23f);
+            DebugFont[1] = io.Fonts.AddFontFromFileTTF(FontName, 15f);
+            GuiFont = Raylib.LoadFont(FontName);
+            rlImGui.ReloadFonts();
+            Notifications.SetFont(DebugFont[0], GuiFont);
         }
 
         Emulator?.Config = new();
@@ -271,13 +267,15 @@ public abstract class Gui
     private int ChangeOption(Option o)
     {
         var mousewheel = Raylib.GetMouseWheelMove();
-        if (Raylib.IsGamepadButtonPressed(0, BtnLeft) || mousewheel < 0)
+        var olddpadLeft = Raylib.IsGamepadButtonPressed(0, BtnLeft);
+        var olddpadRight = Raylib.IsGamepadButtonPressed(0, BtnRight);
+        if (Raylib.IsGamepadButtonDown(0, BtnLeft) && DpadCounter == 0 || olddpadLeft || mousewheel < 0)
         {
             o.Value -= o.Add;
             if (o.Value <= o.Min)
                 o.Value = o.Min;
         }
-        else if (Raylib.IsGamepadButtonPressed(0, BtnRight) || mousewheel > 0)
+        else if (Raylib.IsGamepadButtonDown(0, BtnRight) && DpadCounter == 0 || olddpadRight || mousewheel > 0)
         {
             o.Value += o.Add;
             if (o.Value > o.Max)
@@ -296,21 +294,21 @@ public abstract class Gui
                 case ".gb" or ".gbc":
                 {
                     Emulator = new Gbc();
-                    Emulator.Init(GbWidth, GbHeight, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(GbWidth, GbHeight, MenuHeight, DebugFont, GuiFont, GbcConsole);
                     Audio.Init(GbcAudioFreq, 4096, 4096, 32);
                     break;
                 }
                 case ".nes":
                 {
                     Emulator = new Nes();
-                    Emulator.Init(NesWidth, NesHeight, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(NesWidth, NesHeight, MenuHeight, DebugFont, GuiFont, NesConsole);
                     Audio.Init(NesAudioFreq, 4096, 4096, 32);
                     break;
                 }
                 case ".sfc" or ".smc":
                 {
                     Emulator = new Snes();
-                    Emulator.Init(SnesWidth, SnesHeight, MenuHeight, DebugFont, GuiFont);
+                    Emulator.Init(SnesWidth, SnesHeight, MenuHeight, DebugFont, GuiFont, SnesConsole);
                     Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
                     break;
                 }
@@ -326,9 +324,9 @@ public abstract class Gui
             }
 
             Emulator?.LuaMemoryCallbacks();
-            LuaApi = Emulator?.LuaApi;
+            LuaApi = Emulator?.Lua;
             LuaApi.Init();
-            Emulator.Reset(name, false, null);
+            Emulator.Reset(name, false);
             Emulator.Config = new();
             Emulator?.Config.Load();
             LuaApi?.Reset();
@@ -338,7 +336,7 @@ public abstract class Gui
 
         _gameName = Emulator?.GameName;
 
-        LuaApi?.Load(name);
+        LuaApi?.Load(name, Emulator.Console);
     }
 
     public void DisplayFiles(List<FileDetails> list, int x, int y, int width, Font font)
@@ -497,39 +495,11 @@ public abstract class Gui
 
     public void LoadLua(string filename)
     {
-        LuaApi?.Load(filename);
+        LuaApi?.Load(filename, Emulator.Console);
         Opened = false;
     }
 
     public readonly string[] MainEntries = ["Games", "Cheats", "Lua", "Options", "Copy Hacks"];
-
-    public readonly Dictionary<int, Info[][]> TabInfo = new()
-    {
-        [ScrMain] = [
-            [new("Cross", "Select File")],
-            [new("", "")]
-        ],
-        [ScrGames] = [
-            [new("Cross", "Select File"), new("Triangle", "Delete Mode")],
-            [new("Cross", "Select File"), new("Triangle", "Delete Mode")]
-        ],
-        [ScrCheats] = [
-            [new("Cross", "Select File"),new("Triangle", "Enable All Cheats"), new("Square", "Open Browser")],
-            [new("Cross", "Select File"), new("Triangle", "Enable All Cheats"), new("Square", "Open Browser")],
-        ],
-        [ScrLua] = [
-            [new("Cross", "Select File")],
-            [new("Cross", "Select File")],
-        ],
-        [ScrOptions] = [
-            [new("Mouse Wheel", "Change Options")],
-            [new("Left/Right", "Change Options")]
-        ],
-        [ScrBrowser] = [
-            [new("Cross", "Select File")],
-            [new("Cross", "Select File")]
-        ],
-    };
 
     public record Info(string Button, string Description);
 

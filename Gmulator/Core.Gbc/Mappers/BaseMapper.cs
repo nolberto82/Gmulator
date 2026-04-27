@@ -7,7 +7,7 @@ public abstract class BaseMapper : ISaveState
     public GbcMmu Mmu { get; }
     public int Rombank { get; set; }
     public int Rambank { get; set; }
-    public bool CartRamOn { get; set; }
+    public bool CartRamEnabled { get; set; }
     public bool CGB { get; set; }
     public int Ramsize { get; set; }
     public string Name { get; set; }
@@ -40,10 +40,10 @@ public abstract class BaseMapper : ISaveState
             MapperType = "Unknown";
     }
 
-    public virtual int ReadRom(int a) => Rom[a % Rom.Length];
+    public virtual byte ReadRom(int a) => Rom[a % Rom.Length];
     public abstract Span<byte> ReadRomBlock(int a, int size);
-    public abstract void WriteRom0(int a, int v);
-    public abstract void WriteRom1(int a, int v);
+    public abstract void WriteRom0(int a, byte v);
+    public abstract void WriteRom1(int a, byte v);
 
     public virtual void Write() =>
         //Sram[a % Sram.Length] = v;
@@ -74,8 +74,8 @@ public abstract class BaseMapper : ISaveState
         }
     }
 
-    public Dictionary<string, string> GetInfo() => new Dictionary<string, string>
-        {
+    public Dictionary<string, string> GetInfo() => new()
+    {
             { "Game",Path.GetFileName(Name) },
             { "Mapper", MapperType },
             { "ROM Size", $"{Rom.Length / 1024}KB" },
@@ -83,7 +83,7 @@ public abstract class BaseMapper : ISaveState
             { "ROM Bank", $"{Rombank}" },
             { "RAM Bank", $"{Rambank}" },
             { "CGB Mode", $"{(CGB ? "Yes" : "No")}" },
-            { "Cart RAM", $"{(CartRamOn ? "On" : "Off")}" }
+            { "Cart RAM", $"{(CartRamEnabled ? "On" : "Off")}" }
         };
 
     private readonly Dictionary<int, string> MapperTypes = new()
@@ -124,7 +124,7 @@ public abstract class BaseMapper : ISaveState
         bw.Write(Ramsize);
         bw.Write(Rombank);
         bw.Write(Rambank);
-        bw.Write(CartRamOn);
+        bw.Write(CartRamEnabled);
         bw.Write(CGB);
     }
 
@@ -134,7 +134,7 @@ public abstract class BaseMapper : ISaveState
         Ramsize = br.ReadInt32();
         Rombank = br.ReadInt32();
         Rambank = br.ReadInt32();
-        CartRamOn = br.ReadBoolean();
+        CartRamEnabled = br.ReadBoolean();
         CGB = br.ReadBoolean();
     }
 }

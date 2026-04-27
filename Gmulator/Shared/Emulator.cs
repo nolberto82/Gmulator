@@ -1,5 +1,7 @@
 ﻿using Gmulator.Interfaces;
+using Gmulator.Shared.LuaScript;
 using ImGuiNET;
+using rlImGui_cs;
 using System.Numerics;
 using System.Text.Json;
 using static Gmulator.Interfaces.IMmu;
@@ -17,11 +19,12 @@ public class Emulator
     public int Offset { get; set; }
     public Config Config { get; set; }
     public RenderTexture2D Screen { get; set; }
-    public Dictionary<int, Cheat> Cheats { get; set; } = [];
+    public Dictionary<(int, int), Cheat> Cheats { get; set; } = [];
     public Cheat Cheat { get; set; } = new();
-    public LuaApi LuaApi { get; set; }
+    public LuaManager Lua { get; set; }
     public DebugWindow DebugWindow { get; set; }
     public CheatConverter CheatConverter { get; set; }
+    public IConsole Console { get; set; }
     public bool Run { get; set; }
     public bool FastForward { get; set; }
     public bool Debug { get; set; }
@@ -31,25 +34,29 @@ public class Emulator
     public Vector2 Dimensions { get; set; } = new(GbWidth, GbHeight);
     public object StateLock { get; set; } = new object();
     public List<Breakpoint> Breakpoints { get; set; } = [];
-    public IConsole Console { get; set; }
+    public int SystemType { get; set; }
 
     public enum StateResult
     {
         Success, Failed, Mismatch
     }
 
-    public Emulator() { }
+    public Emulator()
+    {
+    }
 
-    public void Init(int width, int height, float menuheight, ImFontPtr[] imguifont, Font raylibfont)
+
+    public void Init(int width, int height, float menuheight, ImFontPtr[] imguifont, Font raylibfont, int system)
     {
         Screen = Raylib.LoadRenderTexture(width, height);
         Dimensions = new(width, height);
-        LuaApi = new(Screen.Texture, imguifont, raylibfont, menuheight, Debug);
+        SystemType = system;
+        Lua = new(Screen, imguifont, raylibfont, menuheight, Debug);
     }
 
     public virtual void LuaMemoryCallbacks() { }
 
-    public virtual void Reset(string name, bool reset, uint[] pixels)
+    public virtual void Reset(string name, bool reset)
     {
 #if DEBUG
         Debug = true;
@@ -58,21 +65,9 @@ public class Emulator
             Console.EmuState = DebugState.Running;
         else
             Console.EmuState = DebugState.Break;
-        LuaApi?.SetDebug(Debug);
+        Lua?.SetDebug(Debug);
         if (name != "")
             GameName = name;
-
-        UpdateTexture(Screen.Texture, pixels);
-    }
-
-    public void RunFrames(bool opened)
-    {
-        RunFrame(opened);
-        RunFrame(opened);
-        RunFrame(opened);
-        RunFrame(opened);
-        RunFrame(opened);
-        RunFrame(opened);
     }
 
     public virtual void RunFrame(bool opened) { }
@@ -81,12 +76,6 @@ public class Emulator
     {
         var width = Raylib.GetScreenWidth();
         var height = Raylib.GetScreenHeight();
-        var texwidth = Dimensions.X;
-        var texheight = Dimensions.Y;
-        var scale = Math.Min(width / texwidth, height / texheight);
-        var posx = (int)((width - texwidth * scale) / 2);
-        var posy = (int)(((height - texheight * scale) / 2) + MenuHeight);
-
         IsScreenWindow = false;
         if (Debug)
         {
@@ -96,17 +85,26 @@ public class Emulator
         }
         else
         {
+            var texwidth = Dimensions.X;
+            var texheight = Dimensions.Y;
+            var scale = Math.Min(width / texwidth, height / texheight);
+            var posx = (int)((width - texwidth * scale) / 2);
+            var posy = (int)(((height - texheight * scale) / 2) + MenuHeight);
+
             if (Raylib.IsWindowFocused())
                 IsScreenWindow = true;
 
+            Raylib.BeginTextureMode(Screen);
+            Lua?.Update(false);
+            Raylib.EndTextureMode();
+
             Raylib.DrawTexturePro(
                 Screen.Texture,
-                new Rectangle(0, 0, texwidth, texheight),
+                new Rectangle(0, 0, texwidth, -texheight),
                 new Rectangle(posx, posy,
                 texwidth * scale,
                 texheight * scale + MenuHeight),
                 Vector2.Zero, 0, Color.White);
-
             Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), Debug);
         }
         Raylib.DrawFPS(width - 80, (int)(5 + MenuHeight));
@@ -114,8 +112,27 @@ public class Emulator
 
     public virtual unsafe void UpdateTexture(Texture2D texture, uint[] buffer)
     {
-        fixed (uint* pixels = &buffer[0])
-            Raylib.UpdateTexture(texture, pixels);
+        if (buffer == null) return;
+        if (!Debug)
+        {
+            //Array.Reverse(buffer);
+            uint[] flippedBuffer = new uint[texture.Width * texture.Height];
+            for (int x = 0; x < texture.Width; x++)
+            {
+                for (int y = 0; y < texture.Height; y++)
+                {
+                    flippedBuffer[y * texture.Width + x] = buffer[(texture.Height - 1 - y) * texture.Width + x];
+                }
+            }
+
+            fixed (uint* pixels = &flippedBuffer[0])
+                Raylib.UpdateTexture(texture, pixels);
+        }
+        else
+        {
+            fixed (uint* pixels = &buffer[0])
+                Raylib.UpdateTexture(texture, pixels);
+        }
     }
 
     public void UpdateScreen(uint[] buffer) => UpdateTexture(Screen.Texture, buffer);
@@ -128,7 +145,7 @@ public class Emulator
 
     public string ConvertCodes(string description, string cheats, bool add)
     {
-        if (cheats == "" || cheats == "\r\n") return string.Empty;
+        if (cheats == "" || cheats == "\r\n" || cheats == null) return string.Empty;
         List<string> codes = [];
         List<RawCode> rawcodes = [];
         cheats = cheats.Replace(" ", "");
@@ -144,7 +161,7 @@ public class Emulator
             c = c.Replace("-", "").ReplaceLineEndings("");
             if (!add)
             {
-                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, this);
+                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
                 if (addr == -1)
                     continue;
                 if (type == GameGenie)
@@ -160,7 +177,7 @@ public class Emulator
             }
             else
             {
-                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, this);
+                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
                 if (addr > -1)
                 {
                     codes.Add($"{input[i]}\r\n");
@@ -177,7 +194,7 @@ public class Emulator
         {
             var rc = rawcodes[0];
             var n = Cheats.Values.ToList().FindIndex(v => v.Address == rc.Address);
-            var res = Cheats.TryGetValue(rc.Address, out var ch);
+            var res = Cheats.TryGetValue((rc.Address, rc.Address80), out var ch);
             if (res)
             {
                 ch.Description = description;
@@ -189,8 +206,8 @@ public class Emulator
             {
                 foreach (var r in rawcodes)
                 {
-                    if (!Cheats.ContainsKey(r.Address))
-                        Cheats.Add(r.Address, new(description, r.Address, r.Value, r.Compare, r.Type, true, string.Join("", codes.ToArray())));
+                    if (!Cheats.ContainsKey((r.Address, r.Address80)))
+                        Cheats.Add((r.Address, r.Address80), new(description, r.Address, r.Value, r.Compare, r.Type, true, string.Join("", codes.ToArray())));
                 }
             }
         }
@@ -242,14 +259,14 @@ public class Emulator
                     var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "").Trim();
                     if (c == "")
                         continue;
-                    (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, this);
+                    (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
                     rawcodes.Add(new(addr, cmp, val, type, cht.Enabled));
                 }
 
                 foreach (var r in rawcodes)
                 {
-                    if (!Cheats.ContainsKey(r.Address))
-                        Cheats.Add(r.Address, new(cht.Description, r.Address, r.Value, r.Compare, r.Type, r.Enabled, cht.Codes));
+                    if (!Cheats.ContainsKey((r.Address, r.Address80)))
+                        Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, r.Enabled, cht.Codes));
                 }
             }
         }
@@ -270,7 +287,7 @@ public class Emulator
         {
             Cheat cht = cheats[i];
             string codes = cht.Codes.Replace("\r\n", "+");
-            if (codes.Length > 0 && codes[codes.Length - 1] == '+')
+            if (codes.Length > 0 && codes[^1] == '+')
                 codes = codes.TrimEnd('+');
             sw.Write($"cheat{i}_desc = \"{cht.Description}\"\n");
             sw.Write($"cheat{i}_code = \"{codes}\"\n");
@@ -333,21 +350,13 @@ public class Emulator
     }
 }
 
-public class MemoryHandler
+public class MemoryHandler(int mask, IMmu.ReadDel read, IMmu.WriteDel write, RamType type)
 {
     public int Offset { get; set; }
-    public int Mask { get; set; }
+    public int Mask { get; set; } = mask;
     public byte[] Ram { get; set; }
-    public ReadDel Read { get; set; }
-    public WriteDel Write { get; set; }
-    public RamType Type { get; set; }
+    public ReadDel Read { get; set; } = read;
+    public WriteDel Write { get; set; } = write;
+    public RamType Type { get; set; } = type;
     public Func<int, int> ReadByte { get; set; }
-
-    public MemoryHandler() { }
-    public MemoryHandler(int mask, ReadDel read, WriteDel write, RamType type)
-    {
-        Read = read;
-        Write = write;
-        Type = type;
-    }
 }

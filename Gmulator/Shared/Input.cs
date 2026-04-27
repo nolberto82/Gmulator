@@ -11,7 +11,7 @@ internal class Input
 
     public static void UpdateGuiInput(Emulator emu, Gui menu)
     {
-        if (emu == null) return;
+        if (emu == null || !Raylib.IsGamepadAvailable(0)) return;
         if (!Raylib.IsWindowFocused()) return;
 
         var newrightstickY = Raylib.GetGamepadAxisMovement(0, GamepadAxis.RightY);

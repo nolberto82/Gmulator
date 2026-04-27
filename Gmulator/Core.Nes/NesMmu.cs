@@ -3,7 +3,7 @@ using Gmulator.Interfaces;
 
 namespace Gmulator.Core.Nes;
 
-public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
+public class NesMmu(Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
 {
     private NesJoypad Joypad1;
     private NesJoypad Joypad2;
@@ -19,7 +19,7 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
 
     public bool RomLoaded { get; private set; }
     public string RomName { get; internal set; }
-    public Dictionary<int, Cheat> Cheats { get; private set; } = cheats;
+    public Dictionary<(int, int), Cheat> Cheats { get; private set; } = cheats;
     public RamType RamType { get; private set; }
 
     public int GetOffset(int a)
@@ -44,13 +44,14 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
         Mapper.Reset();
     }
 
-    private byte ApplyGameGenieCheats(int a, byte v)
+    private byte ApplyGameGenieCheats(int addr, byte v)
     {
         if (Cheats.Count == 0) return v;
-        if (Cheats.TryGetValue(a, out Cheat value) && value.Enabled && value.Type == GameGenie)
+        var addr80 = addr | 0x800000;
+        if (Cheats.TryGetValue((addr, addr80), out Cheat value) && value.Enabled && value.Type == GameGenie)
         {
-            if (v == Cheats[a].Compare)
-                return Cheats[a].Value;
+            if (v == Cheats[(addr, addr80)].Compare)
+                return Cheats[(addr, addr80)].Value;
         }
         return v;
     }
@@ -65,23 +66,25 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
         }
     }
 
-    public int ReadWram(int a) => Wram[a & 0x7ff];
-    public void WriteWram(int a, int v) => Wram[a & 0x7ff] = (byte)v;
-    public int ReadSram(int a) => Mapper.Sram[a & 0x1fff];
-    public void WriteSram(int a, int v) => Wram[a & 0xffff] = (byte)v;
-    public static int ReadNone(int a) => 0;
+    public byte ReadWram(int a) => Wram[a & 0x7ff];
+    public void WriteWram(int a, byte v) => Wram[a & 0x7ff] = v;
+    public byte ReadSram(int a) => Mapper.Sram[a & 0x1fff];
+    public void WriteSram(int a, byte v) => Wram[a & 0xffff] = v;
+    public byte ReadVram(int a) => Vram[a & 0x3fff];
+    public static byte ReadNone(int a) => 0;
     public static void WriteNone(int a, int v) { }
 
-    public int ReadByte(int a)
+    public byte ReadByte(int addr)
     {
-        RamType = MemoryHandlers[a].Type;
-        int v = MemoryHandlers[a].Read(a);
+        addr &= 0xffff;
+        RamType = MemoryHandlers[addr].Type;
+        byte v = MemoryHandlers[addr].Read(addr);
         if (Cheats.Count > 0 && RamType == RamType.Rom)
-            return ApplyGameGenieCheats(a, (byte)v);
+            return ApplyGameGenieCheats(addr, v);
         return v;
     }
 
-    public void WriteByte(int a, int v)
+    public void WriteByte(int a, byte v)
     {
         RamType = MemoryHandlers[a].Type;
         MemoryHandlers[a].Write(a, v);
@@ -103,8 +106,6 @@ public class NesMmu(Dictionary<int, Cheat> cheats) : IMmu, ISaveState
 
         if (nes != "NES\u001a")
             return null;
-
-        bool mapper20 = (data[7] & 0x0c) == 8;
 
         header.Name = filename;
         header.PrgBanks = data[4];

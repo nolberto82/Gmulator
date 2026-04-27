@@ -1,4 +1,5 @@
 ﻿using Gmulator.Interfaces;
+using Gmulator.Shared.LuaScript;
 
 namespace Gmulator.Core.Gbc;
 
@@ -12,42 +13,28 @@ public partial class GbcPpu : IPpu, ISaveState
     private const int OamDots = 80;
     private const int LcdDots = 172;
 
-    public GbcMmu Mmu { get; private set; }
+    private readonly GbcMmu Mmu;
+    private  LuaManager LuaApi => Gbc.Lua;
     private readonly Action<uint[]> UpdateScreen;
     private readonly Gbc Gbc;
     private readonly List<Sprite> _sprites;
-    public byte[] LineBGColors { get; private set; }
+    private readonly byte[] _lineBGColors;
     public uint FrameCounter { get; private set; }
     private int PrevMode { get; set; }
 
-    private int _wly;
     private int _dots;
     private bool _cgb;
-    private int _ly;
-    private int _lyc;
-    private int _lcdc;
-    private int _scy;
-    private int _scx;
-    private int _wy;
-    private int _wx;
-    private int _stat;
-    private int _bgp;
-    private int _obp0;
-    private int _obp1;
-    private int _oamDma;
-    private int _key1;
-    private int _bgpi;
-    private int _bgpd;
-    private int _obpi;
-    private int _obpd;
-    private int _hdma1;
-    private int _hdma2;
-    private int _hdma3;
-    private int _hdma4;
-    private int _hdma5;
+    private byte _oamDma;
+    private byte _key1;
+    private byte _ly, _lyc, _lcdc, _stat;
+    private byte _scy, _scx;
+    private byte _wy, _wx, _wly;
+    private byte _bgp, _obp0, _obp1;
+    private byte _bgpi, _bgpd;
+    private byte _obpi, _obpd;
+    private byte _hdma1, _hdma2, _hdma3, _hdma4, _hdma5;
+    private byte[] _cgbBkgPal, _cgbObjPal;
     public uint[] ScreenBuffer { get; set; }
-    public byte[] CGBBkgPal { get; private set; }
-    public byte[] CGBObjPal { get; private set; }
 
     public int SpeedMode { get => (_key1 & 0x80) != 0 ? 2 : 1; }
     public bool DMAactive { get => (_hdma5 & 0x80) != 0; }
@@ -56,11 +43,11 @@ public partial class GbcPpu : IPpu, ISaveState
     public uint[] ClearBuffer(uint[] buffer) => [.. Enumerable.Repeat(GbColors[1][3], buffer.Length)];
     public int GetScanline() => _ly;
     private bool BackgroundOn => (_lcdc & 0x01) != 0;
-    private bool SpriteOn => (_lcdc & 0x02) != 0;
-    private bool WindowOn => (_lcdc & 0x20) != 0;
-    public int WindowAddr { get => (_lcdc & 0x40) != 0 ? 0x9c00 : 0x9800; }
-    public int TileAddr { get => (_lcdc & 0x10) != 0 ? 0x8000 : 0x8800; }
-    public int MapAddr { get => (_lcdc & 0x08) != 0 ? 0x9c00 : 0x9800; }
+    private bool SpriteEnabled => (_lcdc & 0x02) != 0;
+    private bool WindowEnabled => (_lcdc & 0x20) != 0;
+    public int WindowAddr => (_lcdc & 0x40) != 0 ? 0x9c00 : 0x9800;
+    public int TileAddr => (_lcdc & 0x10) != 0 ? 0x8000 : 0x8800;
+    public int MapAddr => (_lcdc & 0x08) != 0 ? 0x9c00 : 0x9800;
 
     public readonly uint[][] GbColors =
     [
@@ -75,15 +62,15 @@ public partial class GbcPpu : IPpu, ISaveState
         UpdateScreen = gbc.UpdateScreen;
 
         ScreenBuffer = new uint[GbWidth * GbHeight * 4];
-        LineBGColors = new byte[GbWidth * 4];
+        _lineBGColors = new byte[GbWidth * 4];
         _sprites = [];
-        CGBBkgPal = new byte[64];
-        CGBObjPal = new byte[64];
+        _cgbBkgPal = new byte[64];
+        _cgbObjPal = new byte[64];
 
         gbc.CpuMap.Set(0x00, 0x01, 0xff40, 0xff70, Read, Write, RamType.Register, 1);
     }
 
-    public void Step(int cyc)
+    public void Step(int cycles)
     {
         if ((_lcdc & 0x80) == 0)
         {
@@ -94,7 +81,7 @@ public partial class GbcPpu : IPpu, ISaveState
             return;
         }
 
-        _dots += cyc;
+        _dots += cycles;
         switch (_stat & 3)
         {
             case HBLANK:
@@ -175,11 +162,11 @@ public partial class GbcPpu : IPpu, ISaveState
     {
         if (!Gbc.FastForward || Gbc.FastForward && FrameCounter % Gbc.Config.FrameSkip == 0)
         {
-            Array.Fill<byte>(LineBGColors, 0);
+            Array.Fill<byte>(_lineBGColors, 0);
             DrawBackground();
-            if (WindowOn)
+            if (WindowEnabled)
                 DrawWindow();
-            if (SpriteOn)
+            if (SpriteEnabled)
                 DrawSprites();
         }
     }
@@ -212,13 +199,13 @@ public partial class GbcPpu : IPpu, ISaveState
                     int bgaddr = GetBgAddr(TileAddr, MapAddr, sx, sy, (attribute & 0x40) != 0) + bank;
                     color = GetColor(bgaddr, sx, (attribute & 0x20) != 0);
                     var n = (((attribute & 7) << 2) + color) << 1;
-                    var pal = (ushort)(CGBBkgPal[n] | CGBBkgPal[n + 1] << 8);
+                    var pal = (ushort)(_cgbBkgPal[n] | _cgbBkgPal[n + 1] << 8);
                     rgb = GetRGB555(pal);
                 }
             }
 
             ScreenBuffer[_ly * GbWidth + x] = rgb;
-            LineBGColors[x] = (byte)(color | (attribute & 0x80));
+            _lineBGColors[x] = (byte)(color | (attribute & 0x80));
         }
     }
 
@@ -255,7 +242,7 @@ public partial class GbcPpu : IPpu, ISaveState
                 int bgaddr = GetBgAddr(TileAddr, WindowAddr, x, row, (att & 0x40) != 0) + bank;
                 color = GetColor(bgaddr, x, (att & 0x20) != 0);
                 var n = (((att & 7) << 2) + color) << 1;
-                var pal = (ushort)(CGBBkgPal[n] | CGBBkgPal[n + 1] << 8);
+                var pal = (ushort)(_cgbBkgPal[n] | _cgbBkgPal[n + 1] << 8);
                 rgb = GetRGB555(pal);
             }
             ScreenBuffer[_ly * GbWidth + wx + x] = rgb;
@@ -321,11 +308,11 @@ public partial class GbcPpu : IPpu, ISaveState
                     color = (Mmu.ReadVram((ushort)bgaddr + bank) >> (fx & 7) & 1) |
                         (Mmu.ReadVram((ushort)bgaddr + 1 + bank) >> (fx & 7) & 1) * 2;
                     var n = ((at & 7) << 2) + color << 1;
-                    var pal = CGBObjPal[n] | CGBObjPal[n + 1] << 8;
+                    var pal = _cgbObjPal[n] | _cgbObjPal[n + 1] << 8;
                     rgb = GetRGB555((ushort)pal);
                 }
 
-                var bgcolor = LineBGColors[sx + xx] & 3;
+                var bgcolor = _lineBGColors[sx + xx] & 3;
                 if (color != 0)
                 {
                     if (!_cgb)
@@ -335,7 +322,7 @@ public partial class GbcPpu : IPpu, ISaveState
                     }
                     else
                     {
-                        var bgpriority = (LineBGColors[sx + xx] & 0x80) != 0;
+                        var bgpriority = (_lineBGColors[sx + xx] & 0x80) != 0;
                         if (bgcolor == 0)
                             ScreenBuffer[pos] = rgb;
                         else if (!BackgroundOn)
@@ -395,8 +382,8 @@ public partial class GbcPpu : IPpu, ISaveState
         }
     }
 
-    public void SetBkgPalette(int o, int v) => CGBBkgPal[o & 0x3f] = (byte)v;
-    public void SetObjPalette(int o, int v) => CGBObjPal[o & 0x3f] = (byte)v;
+    public void SetBkgPalette(int o, int v) => _cgbBkgPal[o & 0x3f] = (byte)v;
+    public void SetObjPalette(int o, int v) => _cgbObjPal[o & 0x3f] = (byte)v;
 
     public void Reset(bool cgb)
     {
@@ -407,32 +394,32 @@ public partial class GbcPpu : IPpu, ISaveState
         _key1 = 0;
         _bgpd = 0xff;
 
-        Array.Fill<byte>(CGBBkgPal, 0x00);
-        Array.Fill<byte>(CGBObjPal, 0x00);
+        Array.Fill<byte>(_cgbBkgPal, 0x00);
+        Array.Fill<byte>(_cgbObjPal, 0x00);
 
         ScreenBuffer = ClearBuffer(ScreenBuffer);
     }
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(_wly); bw.Write(_dots); bw.Write(_cgb); bw.Write(_ly);
-        bw.Write(_lyc); bw.Write(_lcdc); bw.Write(_scy); bw.Write(_scx);
-        bw.Write(_wy); bw.Write(_wx); bw.Write(_stat); bw.Write(_bgp);
-        bw.Write(_obp0); bw.Write(_obp1); bw.Write(_oamDma); bw.Write(_key1);
+        bw.Write(_dots); bw.Write(_cgb); bw.Write(_oamDma); bw.Write(_key1);
+        bw.Write(_ly); bw.Write(_lyc); bw.Write(_lcdc); bw.Write(_stat);
+        bw.Write(_scy); bw.Write(_scx); bw.Write(_wy); bw.Write(_wx);
+        bw.Write(_wly); bw.Write(_bgp); bw.Write(_obp0); bw.Write(_obp1);
         bw.Write(_bgpi); bw.Write(_bgpd); bw.Write(_obpi); bw.Write(_obpd);
         bw.Write(_hdma1); bw.Write(_hdma2); bw.Write(_hdma3); bw.Write(_hdma4);
-        bw.Write(_hdma5); WriteArray(bw, ScreenBuffer); WriteArray(bw, CGBBkgPal); WriteArray(bw, CGBObjPal);
+        bw.Write(_hdma5); WriteArray(bw, _cgbBkgPal); WriteArray(bw, _cgbObjPal); WriteArray(bw, ScreenBuffer);
     }
 
     public void Load(BinaryReader br)
     {
-        _wly = br.ReadInt32(); _dots = br.ReadInt32(); _cgb = br.ReadBoolean(); _ly = br.ReadInt32();
-        _lyc = br.ReadInt32(); _lcdc = br.ReadInt32(); _scy = br.ReadInt32(); _scx = br.ReadInt32();
-        _wy = br.ReadInt32(); _wx = br.ReadInt32(); _stat = br.ReadInt32(); _bgp = br.ReadInt32();
-        _obp0 = br.ReadInt32(); _obp1 = br.ReadInt32(); _oamDma = br.ReadInt32(); _key1 = br.ReadInt32();
-        _bgpi = br.ReadInt32(); _bgpd = br.ReadInt32(); _obpi = br.ReadInt32(); _obpd = br.ReadInt32();
-        _hdma1 = br.ReadInt32(); _hdma2 = br.ReadInt32(); _hdma3 = br.ReadInt32(); _hdma4 = br.ReadInt32();
-        _hdma5 = br.ReadInt32(); ScreenBuffer = ReadArray<uint>(br, ScreenBuffer.Length); CGBBkgPal = ReadArray<byte>(br, CGBBkgPal.Length); CGBObjPal = ReadArray<byte>(br, CGBObjPal.Length);
+        _dots = br.ReadInt32(); _cgb = br.ReadBoolean(); _oamDma = br.ReadByte(); _key1 = br.ReadByte();
+        _ly = br.ReadByte(); _lyc = br.ReadByte(); _lcdc = br.ReadByte(); _stat = br.ReadByte();
+        _scy = br.ReadByte(); _scx = br.ReadByte(); _wy = br.ReadByte(); _wx = br.ReadByte();
+        _wly = br.ReadByte(); _bgp = br.ReadByte(); _obp0 = br.ReadByte(); _obp1 = br.ReadByte();
+        _bgpi = br.ReadByte(); _bgpd = br.ReadByte(); _obpi = br.ReadByte(); _obpd = br.ReadByte();
+        _hdma1 = br.ReadByte(); _hdma2 = br.ReadByte(); _hdma3 = br.ReadByte(); _hdma4 = br.ReadByte();
+        _hdma5 = br.ReadByte(); _cgbBkgPal = ReadArray<byte>(br, _cgbBkgPal.Length); _cgbObjPal = ReadArray<byte>(br, _cgbObjPal.Length); ScreenBuffer = ReadArray<uint>(br, ScreenBuffer.Length);
     }
 
     public List<RegisterInfo> GetState() =>

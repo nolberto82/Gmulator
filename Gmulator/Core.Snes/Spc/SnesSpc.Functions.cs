@@ -2,21 +2,21 @@
 
 public partial class SnesSpc
 {
-    private void Asla() => A = Asl(A);
+    private void Asla() => _a = Asl(_a);
 
-    private void Asld(int c) => Write(c, Asl(Read(c)));
+    private void Asld(int c) => Write(c, (byte)Asl(Read(c)));
 
-    private int Asl(int c)
+    private byte Asl(int c)
     {
         int r = (c << 1) & 0xfe;
         SetC((c & 0x80) > 0);
         SetZN(r);
-        return r & 0xff;
+        return (byte)r;
     }
 
-    private void Lsra() => A = Lsr(A);
+    private void Lsra() => _a= (byte)Lsr(_a);
 
-    private void Lsrd(int c) => Write(c, Lsr(Read(c)));
+    private void Lsrd(int c) => Write(c, (byte)Lsr(Read(c)));
 
     private int Lsr(int c)
     {
@@ -26,9 +26,9 @@ public partial class SnesSpc
         return r & 0xff;
     }
 
-    private void Rola() => A = Rol(A);
+    private void Rola() => _a= (byte)Rol(_a);
 
-    private void Rold(int c) => Write(c, Rol(Read(c)));
+    private void Rold(int c) => Write(c, (byte)Rol(Read(c)));
 
     private int Rol(int c)
     {
@@ -38,35 +38,35 @@ public partial class SnesSpc
         return r & 0xff;
     }
 
-    private void Rora() => A = Ror(A);
+    private void Rora() => _a= Ror(_a);
 
-    private void Rord(int c) => Write(c, Ror(Read(c)));
+    private void Rord(int c) => Write(c, (byte)Ror(Read(c)));
 
-    private int Ror(int c)
+    private byte Ror(int c)
     {
         int bit0 = c & 1;
         int r = (c >> 1) | (CF == 1 ? 0x80 : 0x00);
         SetC(bit0 == 1);
         SetZN(r);
-        return r & 0xff;
+        return (byte)r;
     }
 
     private void Bbc((int a, int b) t, int bit)
     {
         if ((t.a & bit) == 0)
-            PC += (sbyte)t.b;
+            _pc += (ushort)(sbyte)t.b;
     }
 
     private void Bbs((int a, int b) t, int bit)
     {
         if ((t.a & bit) == bit)
-            PC += (sbyte)t.b;
+            _pc += (ushort)(sbyte)t.b;
     }
 
     private void Dbnzy(int b)
     {
-        Y--;
-        Dbnz(Y, b);
+        _y--;
+        Dbnz(_y, b);
     }
 
     private void Dbnzd((int a, int b) t)
@@ -74,38 +74,38 @@ public partial class SnesSpc
         int da = t.a | GetPage();
         int v = (Read(da) - 1) & 0xff;
         Dbnz(v, t.b);
-        Write(da, v);
+        Write(da, (byte)v);
     }
     private void Dbnz(int r, int b)
     {
         if (r > 0)
-            PC += (sbyte)b;
+            _pc += (ushort)(sbyte)b;
     }
 
     private void Brk()
     {
-        Push(PC >> 8);
-        Push(PC);
-        Push(PS);
-        PS |= FB;
-        PS = PS & ~FI;
-        PC = Read(0xffde) | Read(0xffdf) << 8;
+        Push((byte)(PC >> 8));
+        Push((byte)PC);
+        Push(_ps);
+        _ps |= FB;
+        _ps = (byte)(_ps & ~FI);
+        _pc = (ushort)(Read(0xffde) | Read(0xffdf) << 8);
         Idle(); Idle();
     }
 
-    private void Inca() => A = Inc(A);
+    private void Inca() => _a = Inc(_a);
 
-    private void Incx() => X = Inc(X);
+    private void Incx() => _x = Inc(_x);
 
-    private void Incy() => Y = Inc(Y);
+    private void Incy() => _y = Inc(_y);
 
-    private void Incd(int b) => Write(b, Inc(Read(b)));
+    private void Incd(int b) => Write(b, (byte)Inc(Read(b)));
 
-    private int Inc(int c)
+    private byte Inc(int c)
     {
         int r = c + 1;
         SetZN(r);
-        return r & 0xff;
+        return (byte)r;
     }
 
     private void IncW(int c)
@@ -114,14 +114,14 @@ public partial class SnesSpc
         int r = (v + 1) & 0xffff;
         SetZN_W(r);
         Write(c, (byte)r);
-        Write((c + 1 & 0xff) + GetPage(), r >> 8);
+        Write((c + 1 & 0xff) + GetPage(), (byte)(r >> 8));
     }
 
-    private void Deca() => A = Dec(A);
+    private void Deca() => _a = Dec(_a);
 
-    private void Decx() => X = Dec(X);
+    private void Decx() => _x = Dec(_x);
 
-    private void Decy() => Y = Dec(Y);
+    private void Decy() => _y = Dec(_y);
 
     private void Decd(int b) => Write(b, Dec(Read(b)));
 
@@ -137,58 +137,58 @@ public partial class SnesSpc
         int v = Read(c) | Read((c + 1 & 0xff) + GetPage()) << 8;
         int r = (v - 1) & 0xffff;
         SetZN_W(r);
-        Write(c, r);
+        Write(c, (byte)r);
         Write((c + 1 & 0xff) + GetPage(), (byte)(r >> 8));
     }
 
-    private void Call(int v)
+    private void Call(int value)
     {
-        Push(PC >> 8);
-        Push(PC);
+        Push((byte)(_pc >> 8));
+        Push((byte)_pc);
         Idle();
-        PC = v;
+        _pc = (ushort)value;
         Idle(); Idle();
     }
 
     private void Ret()
     {
-        PC = Pop();
-        PC |= Pop() << 8;
+        _pc = Pop();
+        _pc |= (ushort)(Pop() << 8);
         Idle(); Idle();
     }
 
     private void Ret1()
     {
-        PS = Pop();
-        PC = Pop();
-        PC |= Pop() << 8;
+        _ps = Pop();
+        _pc = Pop();
+        _pc |= (ushort)(Pop() << 8);
         Idle(); Idle();
     }
 
     private void PCall(int op)
     {
-        Push((byte)(PC >> 8));
-        Push((byte)(PC + 1));
+        Push((byte)(_pc >> 8));
+        Push((byte)(_pc + 1));
         Idle();
-        PC = 0xff00 | ReadOp();
+        _pc = (ushort)(0xff00 | ReadOpcode());
         Idle(); Idle();
     }
 
     private void TCall(int n)
     {
-        Push((byte)(PC >> 8));
-        Push((byte)PC);
+        Push((byte)(_pc >> 8));
+        Push((byte)_pc);
         Idle();
         int a1 = 0xff00 | (0xde - n * 2);
-        int v = Read(a1 & 0xffff);
-        v |= Read((a1 + 1) & 0xffff) << 8;
-        PC = v;
+        int value = Read(a1 & 0xffff);
+        value |= Read((a1 + 1) & 0xffff) << 8;
+        _pc = (ushort)value;
         Idle(); Idle();
     }
 
-    private void Adci(int c) => A = Adc(A, c);
+    private void Adci(int c) => _a = Adc(_a, c);
 
-    private void Adca(int c) => A = Adc(A, Read(c));
+    private void Adca(int c) => _a = Adc(_a, Read(c));
 
     private void Adcxy((int a, int b) t) => Write(t.b, Adc(Read(t.b), t.a));
 
@@ -212,15 +212,15 @@ public partial class SnesSpc
         SetH((v & 0xfff) + (ya & 0xfff) > 0xfff);
         SetC(r > 0xffff);
         SetV((~(ya ^ v) & (ya ^ r) & 0x8000) > 0);
-        PS = (r & 0x8000) > 0 ? PS |= FN : PS &= ~FN;
-        PS = (r & 0xffff) == 0 ? PS |= FZ : PS &= ~FZ;
-        A = (byte)r;
-        Y = (byte)(r >> 8);
+        _ps = (byte)((r & 0x8000) > 0 ? _ps |= FN : _ps & ~FN);
+        _ps = (byte)((r & 0xffff) == 0 ? _ps |= FZ : _ps & ~FZ);
+        _a = (byte)r;
+        _y = (byte)(r >> 8);
     } //YA,d
 
-    private void Sbci(int c) => A = Sbc(A, c);
+    private void Sbci(int c) => _a = Sbc(_a, c);
 
-    private void Sbca(int c) => A = Sbc(A, Read(c));
+    private void Sbca(int c) => _a = Sbc(_a, Read(c));
 
     private void Sbcxy((int a, int b) t) => Write(t.b, Sbc(Read(t.b), t.a));
 
@@ -245,17 +245,17 @@ public partial class SnesSpc
         SetH(((v & 0xfff) + (ya & 0xfff) + 1) > 0xfff);
         SetC(r > 0xffff);
         SetV((~(ya ^ v) & (ya ^ r) & 0x8000) > 0);
-        PS = (r & 0x8000) > 0 ? PS |= FN : PS &= ~FN;
-        PS = (r & 0xffff) == 0 ? PS |= FZ : PS &= ~FZ;
-        A = r;
-        Y = r >> 8;
+        _ps = (byte)((r & 0x8000) > 0 ? _ps |= FN : _ps & ~FN);
+        _ps = (byte)((r & 0xffff) == 0 ? _ps |= FZ : _ps & ~FZ);
+        _a = (byte)r;
+        _y = (byte)(r >> 8);
     } //YA,d
 
     private void Anda(int c) => AndI(A, Read(c));
 
     private void Andi(int c) => AndI(A, Read(c));
 
-    private void Andxy((int a, int b) t) => Write(t.b, And(t.b, t.a));
+    private void Andxy((int a, int b) t) => Write(t.b, (byte)And(t.b, t.a));
 
     private int And(int a1, int c)
     {
@@ -267,53 +267,53 @@ public partial class SnesSpc
     private void AndI(int a1, int c)
     {
         int r = c & a1;
-        SetZN(A = r & 0xff);
+        SetZN(_a = (byte)r);
     }
 
     private void And1((int a, int b) t, bool reverse = false)
     {
-        int c = PS & FC;
+        int c = _ps & FC;
         if (!reverse)
             c &= (Read(t.a) >> t.b) & 1;
         else
             c &= ~(Read(t.a) >> t.b) & 1;
-        PS = (PS & 0xfe) | c;
+        _ps = (byte)((_ps & 0xfe) | c);
     }
 
-    private void Ora(int c) => A = Or(A, c);
+    private void Ora(int c) => _a = Or(_a, c);
 
-    private void Ord(int c) => A = Or(A, Read(c));
+    private void Ord(int c) => _a = Or(_a, Read(c));
 
-    private void Orxy((int a, int b) t) => Write(t.b, Or(Read(t.b), t.a));
+    private void Orxy((int a, int b) t) => Write(t.b, (byte)Or(Read(t.b), t.a));
 
-    private int Or(int a1, int c)
+    private byte Or(int a1, int c)
     {
         int r = c | a1;
         SetZN(r);
-        return r & 0xff;
+        return (byte)r;
     }
 
-    private void Eora(int c) => A = Eor(A, c);
+    private void Eora(int c) => _a = Eor(_a, c);
 
-    private void Eord(int c) => A = Eor(A, Read(c));
+    private void Eord(int c) => _a = Eor(_a, Read(c));
 
-    private void Eorxy((int a, int b) t) => Write(t.b, Eor(Read(t.b), t.a));
+    private void Eorxy((int a, int b) t) => Write(t.b, (byte)Eor(Read(t.b), t.a));
 
-    private int Eor(int a1, int c)
+    private byte Eor(int a1, int c)
     {
         int r = c ^ a1;
         SetZN(r);
-        return r & 0xff;
+        return (byte)r;
     }
 
     private void Eor1((int a, int b) t, bool reverse = false)
     {
-        int c = PS & FC;
+        int c = _ps & FC;
         if (!reverse)
             c ^= (Read(t.a) >> t.b) & 1;
         else
             c ^= ~(Read(t.a) >> t.b) & 1;
-        PS = (PS & 0xfe) | c;
+        _ps = (byte)((_ps & 0xfe) | c);
     }
 
     private void Cmpi(int b) => Cmp(A, Read(b));
@@ -336,41 +336,41 @@ public partial class SnesSpc
         SetZN_W(r);
     }
 
-    private void Movia(int c) => A = Mov(c);
+    private void Movia(int c) => _a = Mov(c);
 
-    private void Movix(int c) => X = Mov(c);
+    private void Movix(int c) => _x = Mov(c);
 
-    private void Moviy(int c) => Y = Mov(c);
+    private void Moviy(int c) => _y = Mov(c);
 
-    private void Movda(int c) => A = Mov(Read(c));
+    private void Movda(int c) => _a = Mov(Read(c));
 
-    private void Movdx(int c) => X = Mov(Read(c));
+    private void Movdx(int c) => _x = Mov(Read(c));
 
-    private void Movdy(int c) => Y = Mov(Read(c));
+    private void Movdy(int c) => _y = Mov(Read(c));
 
-    private int Mov(int c)
+    private byte Mov(int value)
     {
-        SetZN(c);
-        return c & 0xff;
+        SetZN(value);
+        return (byte)value;
     }
 
     private void MovStda(int c, int r) => Movst(c, A);
-    private void Movst(int a, int v) => Write(a, v);
+    private void Movst(int a, int v) => Write(a, (byte)v);
 
-    private void Bra(int a) => PC += (sbyte)a;
+    private void Bra(int a) => _pc += (ushort)(sbyte)a;
 
     private void Brc(int a, int op)
     {
         bool flag = op switch
         {
-            0x10 => (PS & FN) == 0,
-            0x30 => (PS & FN) != 0,
-            0x50 => (PS & FV) == 0,
-            0x70 => (PS & FV) != 0,
-            0x90 => (PS & FC) == 0,
-            0xb0 => (PS & FC) != 0,
-            0xd0 => (PS & FZ) == 0,
-            0xf0 => (PS & FZ) != 0,
+            0x10 => (_ps & FN) == 0,
+            0x30 => (_ps & FN) != 0,
+            0x50 => (_ps & FV) == 0,
+            0x70 => (_ps & FV) != 0,
+            0x90 => (_ps & FC) == 0,
+            0xb0 => (_ps & FC) != 0,
+            0xd0 => (_ps & FZ) == 0,
+            0xf0 => (_ps & FZ) != 0,
             _ => false,
         };
 
@@ -384,24 +384,24 @@ public partial class SnesSpc
             Bra(t.c);
     }
 
-    private void Clr1(int v, int bit) => Write(v, Read(v) & ~bit);
+    private void Clr1(int v, int bit) => Write(v, (byte)(Read(v) & ~bit));
 
-    private void Set1(int v, int bit) => Write(v, Read(v) | bit);
+    private void Set1(int v, int bit) => Write(v, (byte)(Read(v) | bit));
 
     private void Mov1((int a, int b) t, bool reverse = false)
     {
-        int c = PS & FC;
+        int c = _ps & FC;
         if (!reverse)
         {
             int v = Read(t.a);
             c = v >> t.b & 1;
-            PS = (PS & 0xfe) | c;
+            _ps = (byte)((_ps & 0xfe) | c);
         }
         else
         {
             int v = Read(t.a);
             int b = c != 0 ? v | 1 << t.b : v & ~(1 << t.b);
-            Write(t.a, b);
+            Write(t.a, (byte)b);
         }
     }
 
@@ -412,16 +412,16 @@ public partial class SnesSpc
         int m = X != 0 ? ya % X : Y;
         SetH((Y & 0xf) >= (X & 0xf));
         SetV(r > 0xff);
-        A = r;
-        Y = m;
-        SetZN(A);
+        _a = (byte)r;
+        _y = (byte)m;
+        SetZN(_a);
     }
 
     private void Mul()
     {
         int v = Y * A;
-        A = v;
-        Y = v >> 8;
+        _a = (byte)v;
+        _y = (byte)(v >> 8);
         SetZN(Y);
     }
 
@@ -429,23 +429,23 @@ public partial class SnesSpc
     {
         int c = Read(t.a);
         c ^= (1 << t.b) & 0xff;
-        Write(t.a, c);
+        Write(t.a, (byte)c);
     }
 
     private void Or1((int a, int b) t, bool reverse = false)
     {
-        int c = PS & FC;
+        int c = _ps & FC;
         if (!reverse)
         {
             int v = Read(t.a);
             c |= v >> t.b & 1;
-            PS = (PS & 0xfe) | c;
+            _ps = (byte)((_ps & 0xfe) | c);
         }
         else
         {
             int v = Read(t.a);
             c |= ~(v >> t.b) & 1;
-            PS = (PS & 0xfe) | c;
+            _ps = (byte)((_ps & 0xfe) | c);
         }
     }
 
@@ -454,7 +454,7 @@ public partial class SnesSpc
         int v = Read(b);
         int r = v & (byte)~A;
         SetZN(A - v);
-        Write(b, r);
+        Write(b, (byte)r);
     }
 
     private void TSet1(int b)
@@ -462,13 +462,13 @@ public partial class SnesSpc
         int v = Read(b);
         int r = v | A;
         SetZN(A - v);
-        Write(b, r);
+        Write(b, (byte)r);
     }
 
     private void Xcn()
     {
-        A = (A & 0x0f) << 4 | (A & 0xf0) >> 4;
-        SetZN(A);
+        _a = (byte)((_a & 0x0f) << 4 | (_a & 0xf0) >> 4);
+        SetZN(_a);
     }
 
     private void Daa()
@@ -484,22 +484,22 @@ public partial class SnesSpc
         }
 
         SetZN(v);
-        A = v;
+        _a = (byte)v;
     }
 
     private void Das()
     {
-        int v = A;
+        int value = A;
         int cf = HF;
         if (HF == 0 || (A & 0xf) > 9)
-            v -= 6;
+            value -= 6;
         if (cf == 0 || A > 0x99)
         {
-            v -= 0x60;
+            value -= 0x60;
             CF = 0;
         }
 
-        SetZN(v);
-        A = v;
+        SetZN(value);
+        _a = (byte)value;
     }
 }

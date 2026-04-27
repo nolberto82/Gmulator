@@ -37,10 +37,11 @@ internal static class Notifications
             var list = ImGui.GetForegroundDrawList();
             var pos = ImGui.GetWindowPos();
             var size = ImGui.GetWindowSize();
+            var fontsize = 32;
             ImGui.SetCursorPos(pos);
-            list.AddRectFilled(pos, new(pos.X + size.X, 5 + 15 * Text.Length), 0xc0000000);
+            list.AddRectFilled(pos + size, new(pos.X + size.X, 5 + 15 * Text.Length), 0xc0000000);
             foreach (var text in Text)
-                list.AddText(ImGuiFont, 16, new(pos.X + 5, size.Y + 5), 0xff00ffff, text);
+                list.AddText(ImGuiFont, fontsize, new(pos.X + 5, size.Y - fontsize), 0xff00ffff, text);
         }
     }
 

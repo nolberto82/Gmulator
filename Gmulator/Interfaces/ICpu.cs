@@ -9,7 +9,7 @@ public interface ICpu
     List<RegisterInfo> GetRegisters();
     List<RegisterInfo> GetFlags();
     int GetReg(string reg);
-    void SetReg(string reg, int v);
+    void SetReg(string reg, int value);
     void Step();
     void Save(BinaryWriter bw);
     void Load(BinaryReader br);
