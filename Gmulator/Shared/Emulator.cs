@@ -2,6 +2,7 @@
 using Gmulator.Shared.LuaScript;
 using ImGuiNET;
 using rlImGui_cs;
+using System.Data;
 using System.Numerics;
 using System.Text.Json;
 using static Gmulator.Interfaces.IMmu;
@@ -54,8 +55,6 @@ public class Emulator
         Lua = new(Screen, imguifont, raylibfont, menuheight, Debug);
     }
 
-    public virtual void LuaMemoryCallbacks() { }
-
     public virtual void Reset(string name, bool reset)
     {
 #if DEBUG
@@ -80,8 +79,7 @@ public class Emulator
         if (Debug)
         {
             DebugWindow?.Draw(Screen.Texture);
-            if (DebugWindow != null)
-                IsScreenWindow = DebugWindow.IsScreenWindow;
+            IsScreenWindow = true;
         }
         else
         {
@@ -105,18 +103,18 @@ public class Emulator
                 texwidth * scale,
                 texheight * scale + MenuHeight),
                 Vector2.Zero, 0, Color.White);
+
             Notifications.Render(posx, (int)MenuHeight, (int)(texwidth * scale), Debug);
         }
         Raylib.DrawFPS(width - 80, (int)(5 + MenuHeight));
     }
 
-    public virtual unsafe void UpdateTexture(Texture2D texture, uint[] buffer)
+    public virtual unsafe void UpdateTexture(Texture2D texture, ReadOnlySpan<uint> buffer)
     {
-        if (buffer == null) return;
         if (!Debug)
         {
             //Array.Reverse(buffer);
-            uint[] flippedBuffer = new uint[texture.Width * texture.Height];
+            uint[] flippedBuffer = new uint[buffer.Length];
             for (int x = 0; x < texture.Width; x++)
             {
                 for (int y = 0; y < texture.Height; y++)
@@ -323,6 +321,7 @@ public class Emulator
                 Notifications.Init($"Save State {slot} Version Mismatch");
                 break;
         }
+        Lua?.Load(GameName, Console);
     }
 
     public virtual void LoadBreakpoints(string name)
@@ -350,7 +349,7 @@ public class Emulator
     }
 }
 
-public class MemoryHandler(int mask, IMmu.ReadDel read, IMmu.WriteDel write, RamType type)
+public class MemoryHandler(int mask, ReadDel read, WriteDel write, RamType type)
 {
     public int Offset { get; set; }
     public int Mask { get; set; } = mask;

@@ -86,7 +86,6 @@ namespace Gmulator.Ui
             {
                 if (ImGui.IsWindowFocused())
                     IsScreenWindow = true;
-                var size = ImGui.GetContentRegionAvail();
 
                 //rlImGui.ImageRect(texture, (int)size.X, (int)size.Y, new(0, 0, (int)size.X, -(int)size.Y));
                 ImGui.Image((nint)texture.Id, ImGui.GetContentRegionAvail());

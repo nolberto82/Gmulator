@@ -10,7 +10,7 @@ public class Audio
         Raylib.InitAudioDevice();
     }
 
-    public static void Init(uint freq, int maxsamples, int buffersize, uint samplesize)
+    public static void Init(uint freq, int maxsamples, uint samplesize)
     {
         MaxSamples = maxsamples;
         Raylib.SetAudioStreamBufferSizeDefault(MaxSamples);

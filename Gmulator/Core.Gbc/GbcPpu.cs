@@ -34,8 +34,8 @@ public partial class GbcPpu : IPpu, ISaveState
     private byte _obpi, _obpd;
     private byte _hdma1, _hdma2, _hdma3, _hdma4, _hdma5;
     private byte[] _cgbBkgPal, _cgbObjPal;
-    public uint[] ScreenBuffer { get; set; }
-
+    private uint[] _screenBuffer;
+    public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
     public int SpeedMode { get => (_key1 & 0x80) != 0 ? 2 : 1; }
     public bool DMAactive { get => (_hdma5 & 0x80) != 0; }
     public bool DMAHBlank { get; set; }
@@ -61,7 +61,7 @@ public partial class GbcPpu : IPpu, ISaveState
         Mmu = gbc.Mmu;
         UpdateScreen = gbc.UpdateScreen;
 
-        ScreenBuffer = new uint[GbWidth * GbHeight * 4];
+        _screenBuffer = new uint[GbWidth * GbHeight * 4];
         _lineBGColors = new byte[GbWidth * 4];
         _sprites = [];
         _cgbBkgPal = new byte[64];
@@ -121,7 +121,7 @@ public partial class GbcPpu : IPpu, ISaveState
                         _ly = 0;
                         _wly = 0;
                         FrameCounter++;
-                        UpdateScreen(ScreenBuffer);
+                        UpdateScreen(_screenBuffer);
                     }
                 }
                 break;
@@ -204,7 +204,7 @@ public partial class GbcPpu : IPpu, ISaveState
                 }
             }
 
-            ScreenBuffer[_ly * GbWidth + x] = rgb;
+            _screenBuffer[_ly * GbWidth + x] = rgb;
             _lineBGColors[x] = (byte)(color | (attribute & 0x80));
         }
     }
@@ -245,7 +245,7 @@ public partial class GbcPpu : IPpu, ISaveState
                 var pal = (ushort)(_cgbBkgPal[n] | _cgbBkgPal[n + 1] << 8);
                 rgb = GetRGB555(pal);
             }
-            ScreenBuffer[_ly * GbWidth + wx + x] = rgb;
+            _screenBuffer[_ly * GbWidth + wx + x] = rgb;
         }
         _wly++;
     }
@@ -318,17 +318,17 @@ public partial class GbcPpu : IPpu, ISaveState
                     if (!_cgb)
                     {
                         if (priority || bgcolor == 0)
-                            ScreenBuffer[pos] = rgb;
+                            _screenBuffer[pos] = rgb;
                     }
                     else
                     {
                         var bgpriority = (_lineBGColors[sx + xx] & 0x80) != 0;
                         if (bgcolor == 0)
-                            ScreenBuffer[pos] = rgb;
+                            _screenBuffer[pos] = rgb;
                         else if (!BackgroundOn)
-                            ScreenBuffer[pos] = rgb;
+                            _screenBuffer[pos] = rgb;
                         else if (!bgpriority && priority)
-                            ScreenBuffer[pos] = rgb;
+                            _screenBuffer[pos] = rgb;
                     }
                 }
             }
@@ -397,7 +397,7 @@ public partial class GbcPpu : IPpu, ISaveState
         Array.Fill<byte>(_cgbBkgPal, 0x00);
         Array.Fill<byte>(_cgbObjPal, 0x00);
 
-        ScreenBuffer = ClearBuffer(ScreenBuffer);
+        _screenBuffer = ClearBuffer(_screenBuffer);
     }
 
     public void Save(BinaryWriter bw)
@@ -408,7 +408,7 @@ public partial class GbcPpu : IPpu, ISaveState
         bw.Write(_wly); bw.Write(_bgp); bw.Write(_obp0); bw.Write(_obp1);
         bw.Write(_bgpi); bw.Write(_bgpd); bw.Write(_obpi); bw.Write(_obpd);
         bw.Write(_hdma1); bw.Write(_hdma2); bw.Write(_hdma3); bw.Write(_hdma4);
-        bw.Write(_hdma5); WriteArray(bw, _cgbBkgPal); WriteArray(bw, _cgbObjPal); WriteArray(bw, ScreenBuffer);
+        bw.Write(_hdma5); WriteArray(bw, _cgbBkgPal); WriteArray(bw, _cgbObjPal); WriteArray(bw, _screenBuffer);
     }
 
     public void Load(BinaryReader br)
@@ -419,7 +419,7 @@ public partial class GbcPpu : IPpu, ISaveState
         _wly = br.ReadByte(); _bgp = br.ReadByte(); _obp0 = br.ReadByte(); _obp1 = br.ReadByte();
         _bgpi = br.ReadByte(); _bgpd = br.ReadByte(); _obpi = br.ReadByte(); _obpd = br.ReadByte();
         _hdma1 = br.ReadByte(); _hdma2 = br.ReadByte(); _hdma3 = br.ReadByte(); _hdma4 = br.ReadByte();
-        _hdma5 = br.ReadByte(); _cgbBkgPal = ReadArray<byte>(br, _cgbBkgPal.Length); _cgbObjPal = ReadArray<byte>(br, _cgbObjPal.Length); ScreenBuffer = ReadArray<uint>(br, ScreenBuffer.Length);
+        _hdma5 = br.ReadByte(); _cgbBkgPal = ReadArray<byte>(br, _cgbBkgPal.Length); _cgbObjPal = ReadArray<byte>(br, _cgbObjPal.Length); _screenBuffer = ReadArray<uint>(br, _screenBuffer.Length);
     }
 
     public List<RegisterInfo> GetState() =>

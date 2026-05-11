@@ -93,7 +93,7 @@ namespace Gmulator.Shared
             }
         }
 
-        public void HiRom(int bankStart, int bankEnd, int addrStart, int addrEnd, ReadDel r, WriteDel w)
+        public void HiRom(int bankStart, int bankEnd, int addrStart, int addrEnd, ReadDel r, WriteDel w, int add = 0)
         {
             int offset = addrStart;
             for (int i = bankStart; i <= bankEnd; i++)
@@ -101,7 +101,7 @@ namespace Gmulator.Shared
                 for (int j = addrStart; j <= addrEnd; j += 0x1000)
                 {
                     int a = _size == 0x1000 ? i << 4 | (j >> 12) : j;
-                    Handlers[a].Offset = offset;
+                    Handlers[a].Offset = add == 0x400 ? 0x400000 + offset : offset;
                     Handlers[a].Type = RamType.Rom;
                     Handlers[a].Read = r;
                     Handlers[a].Write = w;

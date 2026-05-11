@@ -302,7 +302,6 @@ public class GuiDesktop : Gui
                                     {
                                         Opened = false;
                                         LuaApi?.Load(file.Name, Emulator.Console);
-                                        LuaApi?.Save(Emulator.GameName);
                                     }
                                 }
                             }
@@ -364,7 +363,6 @@ public class GuiDesktop : Gui
         ImGui.SetNextWindowSize(new(0, 0));
         if (ImGui.BeginPopupModal("Add/Edit Cheat"))
         {
-            var str = cht == null ? "" : cht.Description;
             string cheatstr = cht == null ? "" : string.Join("\n", cht.Codes.Split("+"));
             ImGui.PushItemWidth(308);
             ImGui.InputText($"##cheatname", ref _cheatName, 256);

@@ -8,4 +8,5 @@ public interface IConsole
     DebugState EmuState { get; set; }
     Debugger Debugger { get; set; }
     List<Breakpoint> Breakpoints { get; set; }
+    string GameName { get; }
 }

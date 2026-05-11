@@ -72,6 +72,7 @@ public sealed class SnesLogger(Snes snes)
                 else
                 {
                     data += $"${a:x4}";
+                    if (a < 0x2000 && a > 0x5fff)
                     access += $"${db:x2}{a:x4} = #${Read(a):x2}";
                 }
                 break;

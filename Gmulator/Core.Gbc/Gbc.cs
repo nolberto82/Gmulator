@@ -42,8 +42,6 @@ namespace Gmulator.Core.Gbc
             Logger.ReadByte += Mmu.ReadByte;
         }
 
-        public override void LuaMemoryCallbacks() => Lua.InitMemCallbacks(this);
-
         public override void RunFrame(bool opened)
         {
             if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)

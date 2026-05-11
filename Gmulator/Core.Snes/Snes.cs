@@ -55,8 +55,6 @@ public sealed class Snes : Emulator, IConsole
 #endif
     }
 
-    public override void LuaMemoryCallbacks() => Lua.InitMemCallbacks(this);
-
     public override void RunFrame(bool opened)
     {
         if (!opened && (EmuState == DebugState.Running || EmuState == DebugState.StepMain || EmuState == DebugState.StepSa1 || EmuState == DebugState.StepSpc))
@@ -96,6 +94,8 @@ public sealed class Snes : Emulator, IConsole
 
                 Cpu.Step();
                 Lua?.OnExec(pc);
+                if (Sa1 != null)
+                    Lua?.OnExec(Sa1.PBPC);
                 Run = false;
             }
 
@@ -103,7 +103,7 @@ public sealed class Snes : Emulator, IConsole
 
             if (Cheats.Count != 0)
                 ApplyRawCheats();
-    
+
             UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
 
             float[] dspSamples = Dsp.GetSamples();
@@ -270,15 +270,11 @@ public sealed class Snes : Emulator, IConsole
                 }
                 else
                     base.LoadState(slot, StateResult.Mismatch);
+                Lua?.Load(GameName, this);
             }
             else
                 base.LoadState(slot, StateResult.Failed);
         }
-    }
-
-    public override void Update()
-    {
-
     }
 
     public override void Input()

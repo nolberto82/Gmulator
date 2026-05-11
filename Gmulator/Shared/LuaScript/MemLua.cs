@@ -1,17 +1,18 @@
 ﻿using Gmulator.Interfaces;
+using NLua;
 
-namespace Gmulator.Shared.Lua;
+namespace Gmulator.Shared.LuaScript;
 
 public partial class MemLua
 {
-    private NLua.Lua _state;
-    private Func<int, byte> Read;
-    private Action<int, byte> Write;
-    private Func<int, byte> ReadVramByte;
-    private Func<string, int> GetRegister;
-    private Action<string, int> SetRegister;
+    private readonly Lua _state;
+    private readonly Func<int, byte> Read;
+    private readonly Action<int, byte> Write;
+    private readonly Func<int, byte> ReadVramByte;
+    private readonly Func<string, int> GetRegister;
+    private readonly Action<string, int> SetRegister;
 
-    public MemLua(NLua.Lua state, IConsole console)
+    public MemLua(Lua state, IConsole console)
     {
         _state = state;
         Read = console.Mmu.ReadByte;
@@ -44,10 +45,10 @@ public partial class MemLua
         Write(addr + 1, (byte)(value >> 8));
     }
 
-    public int GetReg(string reg)
+    public int GetReg(string register)
     {
-        if (reg == null) return 0;
-        return GetRegister(reg);
+        if (register == null) return 0;
+        return GetRegister(register);
     }
 
     public void SetReg(string register, int value) => SetRegister(register, (byte)value);

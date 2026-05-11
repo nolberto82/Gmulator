@@ -13,12 +13,12 @@ namespace Gmulator.Shared.LuaScript;
 internal partial class GuiLua
 {
     private RenderTexture2D _screen;
-    private ImFontPtr[] _consolas;
+    private readonly ImFontPtr[] _consolas;
     private Font _guiFont;
-    private float _menuHeight;
-    private bool _debug;
+    private readonly float _menuHeight;
+    private readonly bool _debug;
 
-    public GuiLua(NLua.Lua state, LuaManager luaManager)
+    public GuiLua(Lua state, LuaManager luaManager)
     {
         _screen = luaManager.Screen;
         _consolas = luaManager.Consolas;
@@ -38,7 +38,7 @@ internal partial class GuiLua
         if (args.Length < 4)
             return;
 
-        var fontsize = 10;// args.Length > 3 && args[3] != null ? Convert.ToInt32(args[3]) : 32;
+        var fontsize = 10;
         bool iscaled = false;
         if (args.Length == 5)
         {
@@ -53,16 +53,14 @@ internal partial class GuiLua
             textcolor = Convert.ToUInt32(args[3]);
 
         var text = $"{args[2]}";
-        //(var x, var y, _) = GetScaledPosition(args[0], args[1], _screen, true);
         var x = Convert.ToInt32(args[0]);
         var y = Convert.ToInt32(args[1]);
         var scale = GetScale();
         var textureHeight = _screen.Texture.Height - 1;
         var textureSize = Raylib.MeasureTextEx(_guiFont, text, fontsize, 1);
         var textRect = new Rectangle(x, y, textureSize.X, textureSize.Y);
-        //Raylib.BeginTextureMode(_screen);
-        //if (args.Length == 5)
-        //    Raylib.DrawRectangleRec(textRect, GetColor(args[4] == null ? 0x00000000 : Convert.ToUInt32(args[4])));
+        if (args.Length == 5)
+            Raylib.DrawRectangleRec(textRect, GetColor(args[4] == null ? 0x00000000 : Convert.ToUInt32(args[4])));
 
         Raylib.DrawTextEx(_guiFont, text, new(x + textRect.Width / 2 - textureSize.X / 2, y), textureSize.Y, 0f, GetColor(textcolor));
 

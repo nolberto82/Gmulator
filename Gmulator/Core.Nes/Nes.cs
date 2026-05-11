@@ -51,8 +51,6 @@ public class Nes : Emulator, IConsole
         CpuMap.Set(0x00, 0x00, 0x4017, 0x4017, Joypad2.Read, Apu.Write, RamType.Register, 1);
     }
 
-    public override void LuaMemoryCallbacks() => Lua.InitMemCallbacks(this);
-
     public override void RunFrame(bool opened)
     {
         if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)

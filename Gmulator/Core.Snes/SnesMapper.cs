@@ -47,11 +47,23 @@ public sealed class SnesMapper : ISaveState
         }
         else
         {
-            CpuMap.HiRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write);
-            CpuMap.HiRom(0x80, 0xbf, 0x8000, 0xffff, Read, Write);
-            CpuMap.HiRom(0x40, 0x7d, 0x0000, 0xffff, Read, Write);
-            CpuMap.HiRom(0xc0, 0xff, 0x0000, 0xffff, Read, Write);
+            if (Map == 0x25)
+            {
+                CpuMap.HiRom(0xc0, 0xff, 0x0000, 0xffff, Read, Write);
+                CpuMap.HiRom(0x40, 0x7d, 0x0000, 0xffff, Read, Write, 0x400);
+                CpuMap.HiRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write, 0x400);
+                CpuMap.HiRom(0x80, 0xbf, 0x8000, 0xffff, Read, Write);
+            }
+            else
+            {
+                CpuMap.HiRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write);
+                CpuMap.HiRom(0x80, 0xbf, 0x8000, 0xffff, Read, Write);
+                CpuMap.HiRom(0x40, 0x7d, 0x0000, 0xffff, Read, Write);
+                CpuMap.HiRom(0xc0, 0xff, 0x0000, 0xffff, Read, Write);
+            }
+
             CpuMap.Sram(0x20, 0x3f, 0x6000, 0x7fff, ReadSram, WriteSram);
+            CpuMap.Sram(0x70, 0x7d, 0x6000, 0x7fff, ReadSram, WriteSram);
             CpuMap.Sram(0xa0, 0xbf, 0x6000, 0x7fff, ReadSram, WriteSram);
         }
 
@@ -135,6 +147,7 @@ public sealed class SnesMapper : ISaveState
     public bool GetMapper(Snes snes, byte[] rom)
     {
         int highscore = -1;
+        Mmu = snes.Mmu;
         for (int i = 0; i < offsets.Length; i++)
         {
             int score = -1;
@@ -149,7 +162,6 @@ public sealed class SnesMapper : ISaveState
             Coprocessor = (rom[o + 0x7fd6] & 0xf0) >> 4;
             Romsize = 0x400 << rom[o + 0x7fd7];
             Ramsize = 0x400 << rom[o + 0x7fd8];
-            Mmu = snes.Mmu;
 
             var map = Map & 0x37;
 

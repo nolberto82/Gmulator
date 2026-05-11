@@ -138,8 +138,8 @@ public partial class SnesCpu : ISaveState, ICpu
 
     private void PpuCycle()
     {
-        var c = GetClockSpeed(PBPC);
-        Ppu.Step(c);
+        int speed = GetClockSpeed(PBPC);
+        Ppu.Step(speed);
         cycles++;
     }
 
@@ -156,42 +156,39 @@ public partial class SnesCpu : ISaveState, ICpu
         cycles++;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual byte Read(int a)
+    public virtual byte Read(int addr)
     {
-        var c = GetClockSpeed(a);
-        Ppu?.Step(c);
+        int speed = GetClockSpeed(addr);
+        Ppu?.Step(speed);
         Snes?.HandleDma();
         cycles++;
-        return (byte)(OpenBus = Snes?.ReadMemory(a) & 0xff ?? 0);
+        return (byte)(OpenBus = Snes?.ReadMemory(addr) & 0xff ?? 0);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public virtual void Write(int a, byte v)
+    public virtual void Write(int addr, byte v)
     {
-        var c = GetClockSpeed(a);
-        Ppu?.Step(c);
+        int speed = GetClockSpeed(addr);
+        Ppu?.Step(speed);
         Snes?.HandleDma();
         cycles++;
-        Snes?.WriteMemory(a, v);
+        Snes?.WriteMemory(addr, v);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public int GetClockSpeed(int a)
+    public int GetClockSpeed(int addr)
     {
-        var bank = a >> 16;
-        a &= 0xffff;
+        var bank = addr >> 16;
+        addr &= 0xffff;
         if (bank < 0x40)
         {
-            if (a < 0x2000)
+            if (addr < 0x2000)
                 return 8;
-            if (a < 0x4000)
+            if (addr < 0x4000)
                 return 6;
-            if (a < 0x4200)
+            if (addr < 0x4200)
                 return 12;
-            if (a < 0x6000)
+            if (addr < 0x6000)
                 return 6;
-            if (a < 0x8000)
+            if (addr < 0x8000)
                 return 8;
         }
         else if (bank < 0x80)
@@ -199,35 +196,35 @@ public partial class SnesCpu : ISaveState, ICpu
         return FastMem && bank >= 0x80 ? 6 : 8;
     }
 
-    public ushort ReadWord(int a)
+    public ushort ReadWord(int addr)
     {
-        int low = Read(a);
-        int high = Read(a + 1);
+        int low = Read(addr);
+        int high = Read(addr + 1);
         return (ushort)(((high << 8) | low) & 0xffff);
     }
 
-    private int ReadLong(int a)
+    private int ReadLong(int addr)
     {
-        int low = Read(a);
-        int mid = Read(a + 1);
-        int high = Read(a + 2);
+        int low = Read(addr);
+        int mid = Read(addr + 1);
+        int high = Read(addr + 2);
         return (high << 16 | mid << 8 | low) & 0xffffff;
     }
 
-    private void WriteWord(int a, int v)
+    private void WriteWord(int addr, int value)
     {
-        Write(a, (byte)v);
-        Write(a + 1, (byte)(v >> 8));
+        Write(addr, (byte)value);
+        Write(addr + 1, (byte)(value >> 8));
     }
 
-    private byte GetGet8bitImm(int a, int op)
+    private byte GetGet8bitImm(int addr, int op)
     {
-        return (byte)(Disasm[op].Immediate ? a & 0xff : Read(a));
+        return (byte)(Disasm[op].Immediate ? addr & 0xff : Read(addr));
     }
 
-    private ushort GetGet16bitImm(int a, int op)
+    private ushort GetGet16bitImm(int addr, int op)
     {
-        return (ushort)(Disasm[op].Immediate ? a & 0xffff : ReadWord(a));
+        return (ushort)(Disasm[op].Immediate ? addr & 0xffff : ReadWord(addr));
     }
 
     private void WrapStackPointer()
@@ -236,12 +233,12 @@ public partial class SnesCpu : ISaveState, ICpu
             _sp = (ushort)(0x100 | (_sp & 0xff));
     }
 
-    private void SetSp(int s, bool e)
+    private void SetSp(int addr, bool isEmulation)
     {
-        if (e && _emulationMode)
-            _sp = (ushort)(0x100 | (s & 0xff));
+        if (isEmulation && _emulationMode)
+            _sp = (ushort)(0x100 | (addr & 0xff));
         else
-            _sp = (ushort)s;
+            _sp = (ushort)addr;
     }
 
     public void SetNmi() => NmiEnabled = true;

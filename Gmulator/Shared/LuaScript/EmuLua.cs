@@ -10,7 +10,7 @@ namespace Gmulator.Shared.LuaScript;
 
 public partial class EmuLua
 {
-    private NLua.Lua _state;
+    private readonly Lua _state;
 
     public static List<LuaMemCallback> MemCallbacks { get; private set; }
     public static List<LuaEventCallback> EventCallbacks { get; private set; }
@@ -20,7 +20,17 @@ public partial class EmuLua
         Read, Write, Exec, Frame
     }
 
-    public EmuLua(NLua.Lua state)
+    public enum CpuType
+    {
+        None, Gb, Nes, Snes, Sa1
+    }
+
+    public enum MemType
+    {
+        None, GbDebug, NesDebug, SnesDebug, Sa1Debug
+    }
+
+    public EmuLua(Lua state)
     {
         _state = state;
         MemCallbacks = [];
@@ -30,31 +40,49 @@ public partial class EmuLua
         //    RemoveCallbacks();
 
         _state.NewTable("emu");
-        _state.RegisterFunction("emu.memcallback",this,typeof(EmuLua).GetMethod("AddMemCallback"));
+        _state.RegisterFunction("emu.memcallback", this, typeof(EmuLua).GetMethod("AddMemCallback"));
         _state.RegisterFunction("emu.eventcallback", this, typeof(EmuLua).GetMethod("AddEventCallback"));
-        _state.RegisterFunction("emu.log", this, typeof(EmuLua).GetMethod("AddMemCallback"));
+        _state.RegisterFunction("emu.log", this, typeof(EmuLua).GetMethod("Log"));
 
         LuaRegistrationHelper.Enumeration<Type>(_state);
+        LuaRegistrationHelper.Enumeration<CpuType>(_state);
+        LuaRegistrationHelper.Enumeration<MemType>(_state);
     }
 
-    public void AddMemCallback(Action<int> func, Type type, int start, int end = -1)
+    public static void AddMemCallback(Action<int> func, Type type, int start, int end = -1, CpuType cpuType = CpuType.None, MemType memType = MemType.None)
     {
         if (type == Type.Exec)
-            MemCallbacks.Add(new(func, type, start, end));
+            MemCallbacks.Add(new(func, type, start, end, cpuType, memType));
     }
 
-    public void AddEventCallback(Action func, Type type)
+    public static void AddEventCallback(Action func, Type type)
     {
         if (type == Type.Frame)
             EventCallbacks.Add(new(func, type));
     }
 
-    public class LuaMemCallback(Action<int> Action, Type Type, int StartAddr, int EndAddr = -1)
+    public static void Log(object msg)
+    {
+        if (msg != null)
+        {
+            ImGui.SetWindowPos(new(0, 0), ImGuiCond.Once);
+            ImGui.SetNextWindowSize(new(200, 0), ImGuiCond.Once);
+            if (ImGui.Begin("log"))
+            {
+                ImGui.Text($"{msg}");
+            }
+            ImGui.End();
+        }
+    }
+
+    public class LuaMemCallback(Action<int> Action, Type Type, int StartAddr, int EndAddr = -1, CpuType cpuType = default, MemType memType = default)
     {
         public Action<int> Action { get; } = Action;
         public Type Type { get; } = Type;
         public int StartAddr { get; } = StartAddr;
         public int EndAddr { get; } = EndAddr;
+        public CpuType CpuType { get; } = cpuType;
+        public MemType MemType { get; } = memType;
     }
 
     public class LuaEventCallback(Action Action, Type Type)

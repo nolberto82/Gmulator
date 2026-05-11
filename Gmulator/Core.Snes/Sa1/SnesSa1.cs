@@ -75,6 +75,8 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
     public int BwSa1Bank { get => _bwSa1Bank; }
     public List<Breakpoint> Breakpoints { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
 
+    public string GameName => Snes.GameName;
+
     private void SetMemoryMap()
     {
         var Mapper = Snes.Mapper;
@@ -106,7 +108,7 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
 
     public void Step(ulong cycles)
     {
-        ulong syncto = cycles / 2;
+        ulong syncto = cycles / 4;
         while (Cycles < syncto)
         {
             if (_sa1Wait || _sa1Reset)

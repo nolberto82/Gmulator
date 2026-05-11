@@ -1,18 +1,15 @@
 ﻿using Gmulator.Interfaces;
-using Gmulator.Shared.Lua;
 using ImGuiNET;
-using NLua;
 using NLua.Exceptions;
 using System.Data;
-using System.Numerics;
 using Color = Raylib_cs.Color;
-using Lua = NLua.Lua;
+using NLua;
 
 namespace Gmulator.Shared.LuaScript;
 
 public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font, float menuheight, bool debug)
 {
-    private NLua.Lua _state;
+    private Lua _state;
     public RenderTexture2D Screen => screen;
     private readonly List<Texture2D> Textures = [];
     public ImFontPtr[] Consolas => consolas;
@@ -25,8 +22,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
     private string Error = "";
     private string LuaFile = "";
     private bool _fileChanged;
-
-
 
     public void Init()
     {
@@ -47,10 +42,9 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
         LuaFile = filename;
 
         _state = new();
-
-        var emu = new EmuLua(_state);
-        var mem = new MemLua(_state, console);
-        var gui = new GuiLua(_state, this);
+        _ = new EmuLua(_state);
+        _ = new MemLua(_state, console);
+        _ = new GuiLua(_state, this);
 
         //Lua.Globals["mem.onexec"] = () => OnExec;
 
@@ -84,10 +78,10 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
         }
 
         Error = "";
+        Save(console?.GameName);
     }
 
     public void SetDebug(bool value) => Debug = value;
-
 
     public static string GetVersion() => EmulatorName;
 
@@ -96,8 +90,9 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
         if (_state == null) return;
         try
         {
-            foreach (var call in EmuLua.MemCallbacks)
+            for (int i = 0; i < EmuLua.MemCallbacks.Count; i++)
             {
+                EmuLua.LuaMemCallback call = EmuLua.MemCallbacks[i];
                 if (call.Action != null)
                 {
                     if (call.EndAddr > -1 && call.StartAddr <= addr && addr <= call.EndAddr || call.StartAddr == addr)
@@ -117,25 +112,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
             Error += $"{e.Source}\n";
             _state?.Close();
         }
-    }
-
-    public static void Log(object msg)
-    {
-        if (msg != null)
-        {
-            ImGui.SetWindowPos(new(0, 0), ImGuiCond.Once);
-            ImGui.SetNextWindowSize(new(200, 0), ImGuiCond.Once);
-            if (ImGui.Begin("log"))
-            {
-                ImGui.Text($"{msg}");
-            }
-            ImGui.End();
-        }
-    }
-
-    public void InitMemCallbacks(IConsole console)
-    {
-
     }
 
     private void OnChanged(object sender, FileSystemEventArgs e)
@@ -177,14 +153,10 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
 
         if (Error != "")
         {
-            if (Debug)
-            {
-                ImGui.Begin("LuaError");
-                ImGui.TextWrapped($"{Error}");
-                ImGui.End();
-            }
-            else
-                Raylib.DrawTextEx(GuiFont, $"{Error}", new(0, 50), 24, 1, Color.Red);
+            ImGui.SetNextWindowSize(new(500, 0));
+            ImGui.Begin("LuaError");
+            ImGui.TextWrapped($"{Error}");
+            ImGui.End();
         }
     }
 

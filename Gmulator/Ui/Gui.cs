@@ -190,7 +190,7 @@ public abstract class Gui
 
 #if DEBUG || RELEASE
         Raylib.SetWindowSize(1280, 980);
-        Raylib.SetWindowPosition(10, 30);
+        Raylib.SetWindowPosition(500, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
         Emulator.Debug = false;
@@ -202,7 +202,6 @@ public abstract class Gui
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #endif
-
         if (isdeck)
         {
             MenuTarget = Raylib.LoadRenderTexture(DeckWidth, DeckHeight);
@@ -295,21 +294,21 @@ public abstract class Gui
                 {
                     Emulator = new Gbc();
                     Emulator.Init(GbWidth, GbHeight, MenuHeight, DebugFont, GuiFont, GbcConsole);
-                    Audio.Init(GbcAudioFreq, 4096, 4096, 32);
+                    Audio.Init(GbcAudioFreq, 4096, 32);
                     break;
                 }
                 case ".nes":
                 {
                     Emulator = new Nes();
                     Emulator.Init(NesWidth, NesHeight, MenuHeight, DebugFont, GuiFont, NesConsole);
-                    Audio.Init(NesAudioFreq, 4096, 4096, 32);
+                    Audio.Init(NesAudioFreq, 4096, 32);
                     break;
                 }
                 case ".sfc" or ".smc":
                 {
                     Emulator = new Snes();
                     Emulator.Init(SnesWidth, SnesHeight, MenuHeight, DebugFont, GuiFont, SnesConsole);
-                    Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, SnesMaxSamples, 32);
+                    Audio.Init(SnesAudioFreq, SnesMaxSamples / 2, 32);
                     break;
                 }
                 //case ".sms":
@@ -323,7 +322,6 @@ public abstract class Gui
                 default: return;
             }
 
-            Emulator?.LuaMemoryCallbacks();
             LuaApi = Emulator?.Lua;
             LuaApi.Init();
             Emulator.Reset(name, false);
@@ -496,7 +494,8 @@ public abstract class Gui
     public void LoadLua(string filename)
     {
         LuaApi?.Load(filename, Emulator.Console);
-        Opened = false;
+        Notifications.Init("Lua File Loaded Successfully");
+        //Opened = false;
     }
 
     public readonly string[] MainEntries = ["Games", "Cheats", "Lua", "Options", "Copy Hacks"];

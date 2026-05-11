@@ -197,9 +197,9 @@ internal class GuiDeck : Gui
             _fontButtons = Raylib.LoadFont(FontButtons);
         }
 
-        var deckres = Raylib.GetMonitorWidth(0) == 1280 && Raylib.GetMonitorHeight(0) == 800;
-        if (deckres && !Raylib.IsWindowMaximized())
-            Raylib.SetWindowState(ConfigFlags.MaximizedWindow);
+        //var deckres = Raylib.GetMonitorWidth(0) == 1280 && Raylib.GetMonitorHeight(0) == 800;
+        //if (deckres && !Raylib.IsWindowMaximized())
+        //    Raylib.SetWindowState(ConfigFlags.MaximizedWindow);
     }
 
     public override void Unload()

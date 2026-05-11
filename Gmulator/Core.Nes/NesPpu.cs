@@ -91,7 +91,8 @@ namespace Gmulator.Core.Nes
         private NesMmu Mmu;
         private NesApu Apu;
         public uint[] NametableBuffer { get; private set; } = new uint[NesWidth * NesWidth * 4];
-        public uint[] ScreenBuffer { get; set; }
+        private uint[] _screenBuffer;
+        public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
 
         private Nes Nes;
 
@@ -117,7 +118,7 @@ namespace Gmulator.Core.Nes
             Nes = nes;
             Mmu = nes.Mmu;
             Apu = nes.Apu;
-            ScreenBuffer = new uint[NesWidth * NesHeight * 4];
+            _screenBuffer = new uint[NesWidth * NesHeight * 4];
 
             MemoryHandlers = [];
             for (int i = 0; i < 0x4000; i++)
@@ -148,7 +149,7 @@ namespace Gmulator.Core.Nes
             for (int i = 0; i < palBuffer.Length; i += 3)
                 pixPalettes[i / 3] = (uint)(palBuffer[i] | palBuffer[i + 1] << 8 | palBuffer[i + 2] << 16 | 0xff000000);
 
-            Array.Fill(ScreenBuffer, 0xff000000);
+            Array.Fill(_screenBuffer, 0xff000000);
             SpriteScan = [];
         }
 
@@ -468,7 +469,7 @@ namespace Gmulator.Core.Nes
             if ((uint)paletteIndex >= (uint)pixPalettes.Length)
                 paletteIndex %= pixPalettes.Length;
 
-            ScreenBuffer[y * 256 + x] = pixPalettes[paletteIndex];
+            _screenBuffer[y * 256 + x] = pixPalettes[paletteIndex];
 
             UpdateRegisters();
         }

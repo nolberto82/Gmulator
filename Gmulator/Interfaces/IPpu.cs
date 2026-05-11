@@ -3,6 +3,6 @@
 public interface IPpu
 {
     int GetScanline();
-    uint[] ScreenBuffer { get; set; }
+    ReadOnlySpan<uint> ScreenBuffer { get; }
     List<RegisterInfo> GetState();
 }

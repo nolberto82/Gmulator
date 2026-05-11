@@ -1,6 +1,7 @@
 ﻿using Gmulator.Interfaces;
 using Gmulator.Shared.LuaScript;
 using System.Collections.Frozen;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 
 namespace Gmulator.Core.Snes;
@@ -30,7 +31,6 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private bool _dirColor;
     private int _prevent;
     private int _clip;
-    private int _spritesScanline;
     private readonly int[] _objSizeWidth = [8, 8, 8, 16, 16, 32, 16, 16, 16, 32, 64, 32, 64, 64, 32, 32];
     private readonly int[] _objSizeHeight = [8, 8, 8, 16, 16, 32, 32, 32, 16, 32, 64, 32, 64, 64, 64, 32];
     private int _objTable1;
@@ -104,18 +104,25 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private ushort[] _vram;
     private ushort[] _cram;
     private byte[] _oam;
-    public uint[] ScreenBuffer { get; set; }
+    private uint[] _screenBuffer;
+    public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
     #endregion
 
     private int _cgBuffer;
+    private readonly int[] _mainColors = new int[5];
+    private readonly int[] _mainPriorities = new int[5];
+    private readonly int[] _mainPalette = new int[6];
+    private int _mainLayer;
+    private readonly int[] _subColors = new int[5];
+    private readonly int[] _subPriorities = new int[5];
+    private readonly int[] _subPalette = new int[5];
+    private int _subLayer;
 
-    private GfxColor Main = new();
-    private GfxColor Sub = new();
-    private GfxColor Backdrop = new();
+    private int _spritesPerScanline;
 
     public int MulDivResult { get => field & 0xffff; private set => field = value & 0xffff; }
     public int MulDivRemainder { get => field & 0xffff; private set => field = value & 0xffff; }
-    private int Overscan { get => _overscanMode ? 240 : 225; }
+    private int Overscan { get => _overscanMode ? 239 : 224; }
     private bool GetHIrq { get => (_nmiTimEn & 0x10) != 0; }
     private bool GetVIrq { get => (_nmiTimEn & 0x20) != 0; }
     private int GetHTime { get => (_hTimeLow | _hTimeHigh << 8) & 0xffff; }
@@ -143,12 +150,13 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             MulDivRemainder = (ushort)_dividend;
         }
     }
-
+    private readonly int[] _xCoordsMode7;
+    private readonly int[] _yCoordsMode7;
+    private readonly uint[] _bgPixels;
     private byte _oamLatch;
     private byte _mode7Latch;
+
     private readonly SpriteData[] _spriteScan;
-    private GfxColor[] MBgs = [new(), new(), new(), new(), new()];
-    private GfxColor[] SBgs = [new(), new(), new(), new(), new()];
     private GfxColor Fixed;
 
     public Action SetNmi;
@@ -159,10 +167,11 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private SnesCpu Cpu;
     private SnesApu Apu;
     private SnesDma Dma;
+
     private readonly FrozenDictionary<int, int[][]> _layers;
     public SnesPpu()
     {
-        ScreenBuffer = new uint[SnesWidth * SnesHeight];
+        _screenBuffer = new uint[SnesWidth * SnesHeight];
         _spriteScan = new SpriteData[32];
         for (int i = 0; i < _spriteScan.Length; i++)
             _spriteScan[i] = new();
@@ -170,6 +179,9 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         _vram = new ushort[0x8000];
         _cram = new ushort[0x100];
         _oam = new byte[0x220];
+        _bgPixels = new uint[256];
+        _xCoordsMode7 = new int[256];
+        _yCoordsMode7 = new int[256];
         _layers = DictLayers.ToFrozenDictionary();
     }
 
@@ -239,7 +251,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     _oamAddr = _interOamAddr;
                 }
 
-                if (VPos != 0 && VPos < Overscan && HPos == 512)
+                if (VPos != 0 && HPos == 512)
                 {
                     if (!_forcedBlank)
                         EvaluateSprites(VPos);
@@ -302,11 +314,28 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     public void Render(int y)
     {
-        Sub = Backdrop;
         Span<int> bpp = new(DictLayers[_bgMode][_bgMode == 1 || _bgMode == 7 ? 4 : 2]);
         int half;
         uint rgb;
-        bool main, sub, math;
+        bool math;
+        int mainColor, subColor, mainLayer, subLayer;
+
+        if (_bgMode == 7)
+        {
+            //int rx = Mode7Settings[1] ? 255 - x : x;
+            int ry = _mode7Settings[1] ? 255 - y : y;
+            var cx = _scrollXMode7 - _m7X;
+            var cy = _scrollYMode7 - _m7Y;
+            int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
+            int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
+            int sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (_m7X << 8);
+            int sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (_m7Y << 8);
+            for (int x = 0; x < 256; x++)
+            {
+                _xCoordsMode7[x] = sx + (short)_m7A * x;
+                _yCoordsMode7[x] = sy + (short)_m7C * x;
+            }
+        }
 
         for (int x = 0; x < 256; x++)
         {
@@ -315,15 +344,9 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 if (_bgMode < 7)
                     RenderMode(x, y, bpp);
                 else
-                    RenderMode7(x, y, bpp);
+                    RenderMode7(x, bpp);
 
-                main = _mainBgs[4] && !GetWindow(4, x);
-                sub = _subBgs[4] && !GetWindow(4, x);
-
-                MBgs[4].Color = 0; SBgs[4].Color = 0;
-                MBgs[4].Priority = 0; SBgs[4].Priority = 0;
-
-                RenderSprites(x, y, main, sub);
+                RenderSprites(x, y);
 
                 bool clip = _clip switch
                 {
@@ -332,38 +355,38 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     _ => false
                 };
 
-                Main = GetPriority(_bgMode, MBgs);
+                (mainColor, mainLayer) = GetPriority(_bgMode, _mainColors, _mainPriorities);
 
                 if (clip)
-                    Main.Color = 0;
+                    mainColor = 0;
 
                 half = _colorMath[6] ? 1 : 0;
-                math = _bgMode != 7 && GetMathEnabled(Main.Layer, x);
-
+                math = _bgMode != 7 && GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]);
+                int sr, sg, sb;
                 if (!_colorMath[7] && _addSub)
                 {
-                    Sub = GetPriority(_bgMode, SBgs);
-                    if (Sub.Layer == 5 && _bgMode != 7)
+                    (subColor, subLayer) = GetPriority(_bgMode, _subColors, _subPriorities);
+                    if (subLayer == 5 && _bgMode != 7)
                     {
-                        Sub.Color = Fixed.Color;
+                        subColor = Fixed.Color;
                         half = 0;
                     }
                 }
                 else
-                    Sub.Color = Fixed.Color;
+                    subColor = Fixed.Color;
 
                 float brightness = (float)(_brightness / 15f);
-                int mr = Main.Color & 0x1f;
-                int mg = (Main.Color >> 5) & 0x1f;
-                int mb = (Main.Color >> 10) & 0x1f;
+                int mr = mainColor & 0x1f;
+                int mg = (mainColor >> 5) & 0x1f;
+                int mb = (mainColor >> 10) & 0x1f;
 
                 int red = mr, green = mg, blue = mb;
 
                 if (math)
                 {
-                    int sr = Sub.Color & 0x1f;
-                    int sg = (Sub.Color >> 5) & 0x1f;
-                    int sb = (Sub.Color >> 10) & 0x1f;
+                    sr = subColor & 0x1f;
+                    sg = (subColor >> 5) & 0x1f;
+                    sb = (subColor >> 10) & 0x1f;
                     if (!_colorMath[7])
                     {
                         red += sr; green += sg; blue += sb;
@@ -385,7 +408,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             }
             else
                 rgb = 0;
-            ScreenBuffer[VPos * 256 + x] = 0xff000000 | rgb;
+
+            _screenBuffer[VPos * 256 + x] = 0xff000000 | rgb;
         }
     }
 
@@ -393,12 +417,21 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     {
         int mapaddr;
         int mx = 0, my = 0;
+        int color, pixel, palette;
         for (int i = 0; i < bpp.Length; i++)
         {
-            int paloff = _bgMode == 0 ? i * 32 : 0;
-
+            int paletteOffset = _bgMode == 0 ? i * 32 : 0;
             if (_bgMode < 7)
             {
+                bool main = _mainBgs[i];
+                bool sub = _subBgs[i];
+
+                _mainColors[i] = 0;
+                _subColors[i] = 0;
+
+                if (!main & !sub)
+                    continue;
+
                 if (_mosaicEnabled[i])
                 {
                     mx = _mosaicSize != 0 ? (x % _mosaicSize) : 0;
@@ -407,14 +440,6 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
                 int sx = x - mx + _bgScrollX[i];
                 int sy = y - my + _bgScrollY[i];
-                bool main = _mainBgs[i];
-                bool sub = _subBgs[i];
-
-                MBgs[i].Color = 0; MBgs[i].Priority = 0;
-                SBgs[i].Color = 0; SBgs[i].Priority = 0;
-
-                if (!main & !sub)
-                    continue;
 
                 if (_bgMode == 2)
                 {
@@ -448,54 +473,43 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     mapaddr &= 0x7fff;
                 }
 
-                (var color, var pixel, var pal) = GetColor(sx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paloff);
+                (color, pixel, palette) = GetColor(sx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
                 if (main && pixel != 0)
                 {
-                    MBgs[i].Color = color;
-                    MBgs[i].Palette = pal;
-                    MBgs[i].Priority = (_vram[mapaddr] >> 13) & 1;
-                    MBgs[i].Layer = i;
+                    _mainColors[i] = color;
+                    _mainPalette[i] = palette;
+                    _mainPriorities[i] = (_vram[mapaddr] >> 13) & 1;
+                    _mainLayer = i;
 
                     if (_winMainBgs[i] && GetWindow(i, x))
-                        MBgs[i].Color = 0;
+                        _mainColors[i] = 0;
                 }
 
                 if (sub && pixel != 0)
                 {
-                    SBgs[i].Color = color;
-                    SBgs[i].Palette = pal;
-                    SBgs[i].Priority = (_vram[mapaddr] >> 13) & 1;
-                    SBgs[i].Layer = i;
+                    _subColors[i] = color;
+                    _subPalette[i] = palette;
+                    _subPriorities[i] = (_vram[mapaddr] >> 13) & 1;
+                    _subLayer = i;
 
                     if (_subBgs[i] && GetWindow(i, x))
-                        SBgs[i].Color = 0;
+                        _subColors[i] = 0;
                 }
+
             }
         }
     }
 
-    private void RenderMode7(int x, int y, Span<int> bpp)
+    private void RenderMode7(int x, Span<int> bpp)
     {
         int mapaddr;
         for (int i = 0; i < bpp.Length; i++)
         {
-            MBgs[i].Color = 0; MBgs[i].Priority = 0;
-
             if (!_mainBgs[i])
                 continue;
 
-            //int rx = Mode7Settings[1] ? 255 - x : x;
-            int ry = _mode7Settings[1] ? 255 - y : y;
-            var cx = _scrollXMode7 - _m7X;
-            var cy = _scrollYMode7 - _m7Y;
-            int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
-            int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
-            int sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (_m7X << 8);
-            int sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (_m7Y << 8);
-            var ox = sx + (short)_m7A * x;
-            var oy = sy + (short)_m7C * x;
-            ox >>= 8;
-            oy >>= 8;
+            var ox = _xCoordsMode7[x] >>= 8;
+            var oy = _yCoordsMode7[x] >>= 8;
 
             if (_mode7Settings[3] && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
             {
@@ -508,17 +522,19 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             else
                 mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
 
-            (var color, _, _) = GetColor(ox, oy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], 0);
-
-            MBgs[i].Color = color;
+            (_mainColors[i], _, _) = GetColor(ox, oy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], 0);
         }
     }
 
-    private void RenderSprites(int x, int y, bool main, bool sub)
+    private void RenderSprites(int x, int y)
     {
+        bool main = _mainBgs[4] && !GetWindow(4, x);
+        bool sub = _subBgs[4] && !GetWindow(4, x);
         if (main || sub)
         {
-            for (int i = 0; i < _spritesScanline; i++)
+            _mainColors[4] = _subColors[4] = 0;
+            _mainPriorities[4] = _subPriorities[4] = 0;
+            for (int i = 0; i < _spritesPerScanline; i++)
             {
                 var s = _spriteScan[i];
                 if (s.Y == 224) continue;
@@ -526,14 +542,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int fx = x - s.X;
                 int fy = y - s.Y;
 
-
-
                 if (fx < 0 || fx >= s.Width) continue;
-                if (s.Tile == 0xa8)
-                {
-                }
-
-
                 if ((s.Attrib & 0x40) != 0)
                     fx = s.Width - fx - 1;
 
@@ -544,8 +553,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + (fy & 0xff) / 8 * s.Width * s.Height;
                 int colorid = GetPixel(spraddr, 7 - fx & 7, 4);
                 int palid = (s.Attrib & 0x0e) >> 1;
-                int pal = (0x80 + palid * 16 + colorid) & 0xff;
-                int color = _cram[pal];
+                int palette = (0x80 + palid * 16 + colorid) & 0xff;
+                int color = _cram[palette];
                 if (colorid != 0)
                 {
                     if (_winMainBgs[4] && GetWindow(4, x))
@@ -553,18 +562,18 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
                     if (main)
                     {
-                        MBgs[4].Color = color | 1;
-                        MBgs[4].Palette = pal;
-                        MBgs[4].Layer = 4;
-                        MBgs[4].Priority = s.Priority;
+                        _mainColors[4] = color | 1;
+                        _mainPalette[4] = palette;
+                        _mainPriorities[4] = s.Priority;
+                        _mainLayer = 4;
                     }
 
                     if (sub)
                     {
-                        SBgs[4].Color = color | 1;
-                        SBgs[4].Palette = pal;
-                        SBgs[4].Layer = 4;
-                        SBgs[4].Priority = s.Priority;
+                        _subColors[4] = color | 1;
+                        _subPalette[4] = palette;
+                        _subPriorities[4] = s.Priority;
+                        _subLayer = 4;
                     }
                     break;
                 }
@@ -574,71 +583,37 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private void EvaluateSprites(int y)
     {
-        int c = _spritesScanline = 0;
-        int n = _objPrioRotation ? (_interOamAddr & 0x1fc) / 4 : 0;
+        ;
+        int count = _spritesPerScanline = 0;
+        int number = _objPrioRotation ? (_interOamAddr & 0x1fc) / 4 : 0;
         for (int i = 0; i < 128; i++)
         {
-            if (c > 31)
+            if (count > 31)
                 break;
 
-            var v = _oam[0x200 + n / 4];
-            var t = v >> ((n & 3) << 1) & 3;
+            var v = _oam[0x200 + number / 4];
+            var t = v >> ((number & 3) << 1) & 3;
             var highbit = t & 1;
-            int sy = _oam[n * 4 + 1];
+            int sy = _oam[number * 4 + 1];
             int yp = y - sy - 1;
             int width = _objSizeWidth[((_objSize | t) / 2) << 3 & 0xf];
             int height = _objSizeHeight[((_objSize | t) / 2) << 3 & 0xf];
 
             if (yp >= 0 && yp < height || sy + height > 255 && y < ((sy + height) & 0xff))
             {
-                _spriteScan[c].X = highbit * -256 + _oam[n * 4 + 0];
-                _spriteScan[c].Y = _oam[n * 4 + 1] + 1;
-                _spriteScan[c].Tile = _oam[n * 4 + 2];
-                _spriteScan[c].Attrib = _oam[n * 4 + 3];
-                _spriteScan[c].Priority = (_oam[n * 4 + 3] >> 4) & 3;
-                _spriteScan[c].Width = width;
-                _spriteScan[c].Height = height;
-                _spriteScan[c].Id = n;
-                c++;
+                _spriteScan[count].X = highbit * -256 + _oam[number * 4 + 0];
+                _spriteScan[count].Y = _oam[number * 4 + 1] + 1;
+                _spriteScan[count].Tile = _oam[number * 4 + 2];
+                _spriteScan[count].Attrib = _oam[number * 4 + 3];
+                _spriteScan[count].Priority = (_oam[number * 4 + 3] >> 4) & 3;
+                _spriteScan[count].Width = width;
+                _spriteScan[count].Height = height;
+                _spriteScan[count].Id = number;
+                count++;
             }
-            n = (n + 1) & 0x7f;
+            number = (number + 1) & 0x7f;
         }
-        _spritesScanline = c;
-    }
-
-    public static uint GetRGB555(ushort p, ushort s, int br, bool math, bool add, int half)
-    {
-        var brightness = br / 15f;
-        var mr = p & 0x1f;
-        var mg = (p >> 5) & 0x1f;
-        var mb = (p >> 10) & 0x1f;
-
-        int r = mr, g = mg, b = mb;
-
-        if (math)
-        {
-            var sr = s & 0x1f;
-            var sg = (s >> 5) & 0x1f;
-            var sb = (s >> 10) & 0x1f;
-            if (add)
-            {
-                r += sr; g += sg; b += sb;
-                r = (r > 0x1f ? 0x1f : r) >> half;
-                g = (g > 0x1f ? 0x1f : g) >> half;
-                b = (b > 0x1f ? 0x1f : b) >> half;
-            }
-            else
-            {
-                r -= sr; g -= sg; b -= sb;
-                r = (r < 0 ? 0 : r) >> half;
-                g = (g < 0 ? 0 : g) >> half;
-                b = (b < 0 ? 0 : b) >> half;
-            }
-        }
-
-        r = (int)(r * brightness); g = (int)(g * brightness); b = (int)(b * brightness);
-        var rgb = (uint)((byte)(r << 3 | r >> 2) | (byte)(g << 3 | g >> 2) << 8 | (byte)(b << 3 | b >> 2) << 16);
-        return rgb | 0xff000000;
+        _spritesPerScanline = count;
     }
 
     private bool GetWindow(int i, int x)
@@ -666,7 +641,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         };
     }
 
-    private bool GetMathEnabled(int i, int x)
+    private bool GetMathEnabled(int x, int layer, int palette)
     {
         bool prev = false;
         if (_prevent == 1)
@@ -677,17 +652,13 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         if (prev)
             return false;
 
-        bool colorMathEnabled = _colorMath[i];
-        int mainLayer = Main.Layer;
-        int mainPalette = Main.Palette;
-
-        if (!colorMathEnabled)
+        if (!_colorMath[layer])
             return false;
 
-        return mainLayer != 4 || mainPalette >= 0xc0;
+        return layer != 4 || palette >= 0xc0;
     }
 
-    private GfxColor GetPriority(int mode, GfxColor[] Colors)
+    private (int, int) GetPriority(int mode, int[] colors, int[] priorities)
     {
         int[][] layerArr = _layers[mode];
         int[] layer0 = layerArr[0];
@@ -697,10 +668,10 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             case 0 or 2 or 3 or 4 or 5 or 6:
                 for (int i = 0, len = layer0.Length; i < len; i++)
                 {
-                    int l = layer0[i];
-                    int p = layer1[i];
-                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
-                        return Colors[l];
+                    int layer = layer0[i];
+                    int priority = layer1[i];
+                    if (priorities[layer] == priority && (colors[layer] & 1) != 0)
+                        return (colors[layer], layer);
                 }
                 break;
 
@@ -711,14 +682,14 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int[] layerN2 = layerArr[n + 2];
                 for (int i = 0, len = layerN0.Length; i < len; i++)
                 {
-                    int l = layerN0[i];
-                    int p = layerN2[i];
-                    if (l == 2 && n == 1 && Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
-                        return Colors[2];
-                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
-                        return Colors[l];
-                    if (l == 2 && n == 0 && Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
-                        return Colors[2];
+                    int layer = layerN0[i];
+                    int priority = layerN2[i];
+                    if (layer == 2 && n == 1 && priorities[layer] == priority && (colors[layer] & 1) != 0)
+                        return (colors[2], 2);
+                    if (priorities[layer] == priority && (colors[layer] & 1) != 0)
+                        return (colors[layer], layer);
+                    if (layer == 2 && n == 0 && priorities[layer] == priority && (colors[layer] & 1) != 0)
+                        return (colors[2], 2);
                 }
             }
             break;
@@ -730,18 +701,15 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int[] layerN2 = layerArr[n + 2];
                 for (int i = 0, len = layerN0.Length; i < len; i++)
                 {
-                    int l = layerN0[i];
+                    int layer = layerN0[i];
                     int p = layerN2[i];
-                    if (Colors[l].Priority == p && (Colors[l].Color & 1) != 0)
-                        return Colors[l];
+                    if (priorities[layer] == p && (colors[layer] & 1) != 0)
+                        return (colors[layer], layer);
                 }
             }
             break;
         }
-        Backdrop.Color = _cram[0];
-        Backdrop.Priority = 0;
-        Backdrop.Layer = 5;
-        return Backdrop;
+        return (_cram[0], 5);
     }
 
     private (int, int, int) GetColor(int sx, int sy, int mapaddr, int tilebase, bool bigchar, int bpp, int paloff)
@@ -922,9 +890,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         _wrIo = 0xff;
         _hvbJoy = 0x02;
         _dramRefresh = false;
-        Array.Fill(ScreenBuffer, 0xff000000);
-        MBgs = [new(), new(), new(), new(), new(), new()];
-        SBgs = [new(), new(), new(), new(), new(), new()];
+        Array.Fill(_screenBuffer, 0xff000000);
     }
 
     private readonly Dictionary<int, int[][]> DictLayers = new()
@@ -1024,7 +990,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         WriteArray(bw, _vram);
         WriteArray(bw, _cram);
         WriteArray(bw, _oam);
-        WriteArray(bw, ScreenBuffer);
+        WriteArray(bw, _screenBuffer);
     }
 
     public void Load(BinaryReader br)
@@ -1074,7 +1040,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         _vram = ReadArray<ushort>(br, _vram.Length);
         _cram = ReadArray<ushort>(br, _cram.Length);
         _oam = ReadArray<byte>(br, _oam.Length);
-        ScreenBuffer = ReadArray<uint>(br, ScreenBuffer.Length);
+        _screenBuffer = ReadArray<uint>(br, _screenBuffer.Length);
     }
 }
 
