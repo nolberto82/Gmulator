@@ -9,6 +9,11 @@ rlImGui | https://github.com/raylib-extras/rlImGui |
 ImGui.NET | https://github.com/ImGuiNET/ImGui.NET |
 NLua | https://github.com/NLua/NLua |
 
+# Assets
+
+* naga10 font by Sadakazu Nagao
+* PSX Buttons font by WhoAmI Design
+
 # References
 
 ## GB/GBC
