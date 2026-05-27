@@ -106,8 +106,6 @@ public class Nes : Emulator, IConsole
             Joypad1.Update(IsScreenWindow, Ppu.FrameCounter);
     }
 
-    public override void Render(float MenuHeight) => base.Render(MenuHeight);
-
     public override void Reset(string name, bool reset)
     {
         if (name != "")

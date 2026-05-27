@@ -32,6 +32,7 @@
 	  <Compile Remove="Core.Snes\Sa1\SnesCpu.Mode.cs" />
 	  <Compile Remove="Core.Snes\Sa1\SnesSa1Cpu.cs" />
 	  <Compile Remove="Core.Snes\SnesGui.cs" />
+	  <Compile Remove="Ui\GraphicsWindow.cs" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -47,8 +48,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="ImGui.NET" Version="1.91.6.1" />
-		<PackageReference Include="NLua" Version="1.7.8" />
-		<PackageReference Include="Raylib-cs" Version="7.0.2" />
+		<PackageReference Include="NLua" Version="1.7.9" />
+		<PackageReference Include="Raylib-cs" Version="8.0.0" />
 		<PackageReference Include="rlImgui-cs" Version="3.2.0" />
 	</ItemGroup>
 

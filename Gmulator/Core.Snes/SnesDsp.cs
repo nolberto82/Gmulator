@@ -499,7 +499,7 @@ public sealed class SnesDsp : ISaveState
         _sampleOut = ReadArray<int>(br, _sampleOut.Length); _dirPage = br.ReadInt32();
     }
 
-    public List<RegisterInfo> GetState() =>
+    public static List<RegisterInfo> GetState() =>
     [
 
     ];

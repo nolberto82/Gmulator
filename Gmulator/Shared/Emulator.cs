@@ -50,6 +50,7 @@ public class Emulator
     public void Init(int width, int height, float menuheight, ImFontPtr[] imguifont, Font raylibfont, int system)
     {
         Screen = Raylib.LoadRenderTexture(width, height);
+        //Raylib.SetTextureFilter(Screen.Texture, TextureFilter.Point);
         Dimensions = new(width, height);
         SystemType = system;
         Lua = new(Screen, imguifont, raylibfont, menuheight, Debug);
@@ -159,7 +160,7 @@ public class Emulator
             c = c.Replace("-", "").ReplaceLineEndings("");
             if (!add)
             {
-                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
+                (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, SystemType);
                 if (addr == -1)
                     continue;
                 if (type == GameGenie)
@@ -175,7 +176,7 @@ public class Emulator
             }
             else
             {
-                (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
+                (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, SystemType);
                 if (addr > -1)
                 {
                     codes.Add($"{input[i]}\r\n");
@@ -257,7 +258,7 @@ public class Emulator
                     var c = line.ReplaceLineEndings("").Replace("\r", "").Replace("-", "").Trim();
                     if (c == "")
                         continue;
-                    (int addr, byte cmp, byte val, int type, int console) = Cheat.DecryptCode(c, SystemType);
+                    (int addr, byte cmp, byte val, int type, int console) = DecryptCode(c, SystemType);
                     rawcodes.Add(new(addr, cmp, val, type, cht.Enabled));
                 }
 

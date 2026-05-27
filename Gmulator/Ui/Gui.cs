@@ -6,6 +6,8 @@ using ImGuiNET;
 using rlImGui_cs;
 using System.Data;
 using System.Diagnostics;
+using System.Numerics;
+using System.Reflection;
 using Font = Raylib_cs.Font;
 
 namespace Gmulator.Ui;
@@ -15,12 +17,15 @@ public abstract class Gui
     public const string FontName = "Assets/naga10.ttf";
     public const int MaxTabs = 6;
 
-    public const int ScrGames = 0;
-    public const int ScrCheats = 1;
-    public const int ScrLua = 2;
-    public const int ScrOptions = 3;
-    public const int ScrBrowser = 4;
-    public const int ScrMain = 5;
+    public enum Tab : int
+    {
+        Games,
+        Cheats,
+        ChtBrowser,
+        Lua,
+        Options,
+        About,
+    }
 
     public LuaManager LuaApi { get; private set; }
     private Audio Audio { get; set; }
@@ -28,18 +33,18 @@ public abstract class Gui
     public Dictionary<(int, int), Cheat> Cheats => Emulator?.Cheats;
     public float MenuHeight { get; set; }
     public RenderTexture2D Screen { get; private set; }
-    public RenderTexture2D MenuTarget { get; set; }
     public ImFontPtr[] DebugFont { get; private set; }
     public Font GuiFont { get; private set; }
 
-    public const int FontSize = 28;
+    public const int MenuFontSize = 28;
 
     public ulong FrameCounter { get; set; }
     public int DpadCounter { get; set; }
-    public int TabIndex { get; set; }
-    public int[] SelOption { get; set; } = new int[MaxTabs];
+    public Tab TabIndex { get; set; }
+    public int[] SelectedItem { get; set; } = new int[MaxTabs];
     public int[] OldTotal { get; set; } = new int[MaxTabs];
     public int[] MenuScroll { get; set; } = new int[MaxTabs];
+    public int[] MaxItems { get; set; } = new int[MaxTabs];
 
     public Emulator Emulator { get; private set; }
     public List<FileDetails> GameFiles { get; set; } = [];
@@ -55,14 +60,15 @@ public abstract class Gui
     public bool DeleteFileMode { get; set; }
     public bool Opened;
     private string _gameName;
-
+    private int _cheatTabIndex;
+    public int CheatTabIndex { get => _cheatTabIndex; set => _cheatTabIndex = value; }
     public string WorkingDirectory { get; set; }
     public string[] FileExtensions { get; set; }
 
     public virtual void Run()
     { }
 
-    public virtual void Render()
+    public virtual void Draw()
     {
         if (Raylib.IsKeyPressed(KeyboardKey.F12))
             Raylib.TakeScreenshot($"screenshot{DateTime.Now.Ticks}.png");
@@ -71,81 +77,31 @@ public abstract class Gui
     public virtual void Update(bool isdeck)
     {
         if (!Opened) return;
+
+        int maxgamesview = Raylib.GetScreenHeight() / MenuFontSize;
+        FrameCounter++;
+
+        bool newDownPressed = Raylib.IsGamepadButtonDown(0, BtnDown);
+        bool newUpPressed = Raylib.IsGamepadButtonDown(0, BtnUp);
+        bool newLeftPressed = Raylib.IsGamepadButtonDown(0, BtnLeft);
+        bool newRightPressed = Raylib.IsGamepadButtonDown(0, BtnRight);
+        bool oldDownPressed = Raylib.IsGamepadButtonPressed(0, BtnDown);
+        bool oldUpPressed = Raylib.IsGamepadButtonPressed(0, BtnUp);
+
+        if (newDownPressed || newUpPressed || newLeftPressed || newRightPressed)
+        {
+            DpadCounter--;
+            if (DpadCounter < 0)
+                DpadCounter = 3;
+        }
+        else
+            DpadCounter = 10;
+
         switch (TabIndex)
         {
-            case ScrMain:
-                if (Raylib.IsGamepadButtonPressed(0, BtnB))
-                {
-                    TabIndex = SelOption[ScrMain] switch
-                    {
-                        0 => ScrGames,
-                        1 => ScrCheats,
-                        2 => ScrLua,
-                        3 => ScrOptions,
-                        _ => CopyHacks(true),
-                    };
-                }
-                break;
-            case ScrGames:
-                if (Raylib.IsGamepadButtonPressed(0, BtnB))
-                {
-                    if (DeleteFileMode)
-                        DeleteFile(GameFiles[SelOption[ScrGames]]);
-                    else
-                        LoadGame(GameFiles[SelOption[ScrGames]].Name);
-                }
-                else if (Raylib.IsGamepadButtonPressed(0, BtnX))
-                    DeleteFileMode = !DeleteFileMode;
-                break;
-            case ScrCheats or ScrBrowser:
-                if (Raylib.IsGamepadButtonPressed(0, BtnY) && Emulator?.GameName != "")
-                {
-                    CheatDialog = !CheatDialog;
-                    if (CheatDialog)
-                        TabIndex = ScrBrowser;
-                    else
-                        TabIndex = ScrCheats;
-                }
-
-                if (Raylib.IsGamepadButtonPressed(0, BtnX) && Emulator?.GameName != "")
-                    EnableAllCheats(Emulator);
-
-                if (TabIndex == ScrCheats)
-                {
-                    int j = 0;
-                    var cheats = Emulator.Cheats.Values.ToList();
-                    for (int i = 0; i < cheats.Count;)
-                    {
-                        var res = Emulator.Cheats.Values.ToList();
-                        var cht = res.Where(c => c.Description == res[i].Description).ToList();
-                        if (Raylib.IsGamepadButtonPressed(0, BtnB) && j == SelOption[ScrCheats])
-                        {
-                            ToggleCheat(cht);
-                            break;
-                        }
-                        i += cht.Count;
-                        j++;
-                    }
-                }
-                else
-                {
-                    if (Raylib.IsGamepadButtonPressed(0, BtnB))
-                    {
-                        LoadCheats(CheatFiles[SelOption[ScrBrowser]].Name);
-                        TabIndex = ScrCheats;
-                    }
-                }
-                ToggleAllCheats = false;
-                break;
-            case ScrLua:
-                if (Raylib.IsGamepadButtonPressed(0, BtnB))
-                {
-                    LoadLua(LuaFiles[SelOption[ScrLua]].Name);
-                }
-                break;
-            case ScrOptions:
+            case Tab.Options:
                 if (Options.Count == 0) break;
-                Option o = Options[SelOption[ScrOptions]];
+                Option o = Options[SelectedItem[(int)Tab.Options]];
                 if (o.Func == null)
                 {
                     if (Raylib.IsGamepadButtonPressed(0, BtnB))
@@ -198,14 +154,11 @@ public abstract class Gui
 #endif
 
 #if DECKDEBUG
-        Raylib.SetWindowSize(1400, 900);
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #endif
         if (isdeck)
         {
-            MenuTarget = Raylib.LoadRenderTexture(DeckWidth, DeckHeight);
-
             if (File.Exists(FontName))
             {
                 GuiFont = Raylib.LoadFont(FontName);
@@ -214,7 +167,6 @@ public abstract class Gui
         }
 
         rlImGui.Setup(true);
-        GraphicsWindow.Init();
         var io = ImGui.GetIO();
 
         if (File.Exists(FontName))
@@ -287,7 +239,6 @@ public abstract class Gui
     {
         if (name != "")
         {
-            //Emulator.Close();
             switch (Path.GetExtension(name).ToLowerInvariant())
             {
                 case ".gb" or ".gbc":
@@ -322,8 +273,8 @@ public abstract class Gui
                 default: return;
             }
 
+            Screen = Emulator.Screen;
             LuaApi = Emulator?.Lua;
-            LuaApi.Init();
             Emulator.Reset(name, false);
             Emulator.Config = new();
             Emulator?.Config.Load();
@@ -335,20 +286,6 @@ public abstract class Gui
         _gameName = Emulator?.GameName;
 
         LuaApi?.Load(name, Emulator.Console);
-    }
-
-    public void DisplayFiles(List<FileDetails> list, int x, int y, int width, Font font)
-    {
-        for (int i = 0; i < list.Count; i++)
-        {
-            var file = list[i];
-            if (!file.IsDrive && file.IsFile)
-            {
-                DrawHighlight(x, y, width, i);
-                Raylib.DrawTextEx(font, Path.GetFileName(file.Name), new(x, y), FontSize, 0, DeleteFileMode ? new(128, 0, 0, 255) : Color.White);
-            }
-            y += FontSize;
-        }
     }
 
     public static void DeleteFile(FileDetails file)
@@ -364,24 +301,44 @@ public abstract class Gui
         }
     }
 
-    public void DrawCheats(List<Cheat> cheats, int x, int y, int width)
+    public void DisplayFiles(List<FileDetails> list, Rectangle container, int itemheight, int index)
+    {
+        for (int i = 0; i < list.Count; i++)
+        {
+            var file = list[i];
+            if (!file.IsDrive && file.IsFile)
+            {
+                Rectangle highlight = new(container.X, container.Y + (i * itemheight) - MenuScroll[index], container.Width, itemheight);
+                //DrawHighlight(x, y, width, i, index, MenuFontSize);
+                if (i == SelectedItem[index])
+                    Raylib.DrawRectangleRec(highlight, new(0, 128, 0, 255));
+                Raylib.DrawTextEx(GuiFont, Path.GetFileName(file.Name), new(highlight.X + 10, highlight.Y), itemheight, 1, DeleteFileMode ? new(128, 0, 0, 255) : Color.White);
+            }
+            //y += MenuFontSize;
+        }
+    }
+
+    public void DrawCheats(List<Cheat> cheats, int x, int y, int width, int index)
     {
         int j = 0;
         for (int i = 0; i < cheats.Count;)
         {
-            DrawHighlight(x, y, width, j);
+            DrawHighlight(x, y, width, j, index, 10);
+
             var cht = cheats.Where(c => c.Description == cheats[i].Description).ToList();
             if (cht != null)
             {
                 var chtstatus = cht[0].Enabled ? "ON" : "OFF";
                 var colorstatus = cht[0].Enabled ? Color.White : new(173, 173, 173, 255);
-                if (cht[0].Description.Length > 60)
-                    cht[0].Description = cht[0].Description[..60];
-                Raylib.DrawTextEx(GuiFont, cht[0].Description, new(x, y), FontSize, 0, colorstatus);
-                Raylib.DrawTextEx(GuiFont, $"{chtstatus,-3}", new(x + width - 45, y), FontSize, 0, colorstatus);
+                int max = width / 17;
+                string description = cht[0].Description;
+                if (description.Length > max)
+                    description = description[..max];
+                Raylib.DrawTextEx(GuiFont, description, new(x + 10, y), 10, 0, colorstatus);
+                Raylib.DrawTextEx(GuiFont, $"{chtstatus,-3}", new(x + width - 45, y), 10, 0, colorstatus);
                 i += cht.Count;
             }
-            y += FontSize;
+            y += 10;
             j++;
         }
     }
@@ -391,21 +348,27 @@ public abstract class Gui
         int j = 0;
         for (int i = 0; i < options.Count; i++)
         {
-            DrawHighlight(x, y, width, j);
-            Raylib.DrawTextEx(GuiFont, $"{options[i].Name}", new(x + 5, y), FontSize, 0, Color.White);
+            DrawHighlight(x, y, width, j, (int)Tab.Options, 10);
+            Raylib.DrawTextEx(GuiFont, $"{options[i].Name}", new(x + 10, y), 10, 0, Color.White);
             if (options[i].Status != null)
-                Raylib.DrawTextEx(GuiFont, $"{options[i].Status[options[i].Value],3}", new(x + width - 55, y), FontSize, 0, Color.White);
+                Raylib.DrawTextEx(GuiFont, $"{options[i].Status[options[i].Value],3}", new(x + width - 55, y), 10, 0, Color.White);
             else
-                Raylib.DrawTextEx(GuiFont, $"{options[i].Value,3}", new(x + width - 55, y), FontSize, 0, Color.White);
-            y += FontSize;
+                Raylib.DrawTextEx(GuiFont, $"{options[i].Value,3}", new(x + width - 55, y), 10, 0, Color.White);
+            y += 10;
             j++;
         }
     }
 
-    public void DrawHighlight(int x, int y, int width, int i)
+    public void DrawHighlight(int x, int y, int width, int i, int index, int fontsize)
     {
-        if (i == SelOption[TabIndex])
-            Raylib.DrawRectangle(x, y + 1, width - 1, FontSize - 1, new(0, 128, 0, 255));
+        if (i == SelectedItem[index])
+            Raylib.DrawRectangle(x, y, width, fontsize - 1, new(0, 128, 0, 255));
+    }
+
+    public void DrawHighlightTab(int x, int y, int width, int fontsize, int i)
+    {
+        if (i == (int)TabIndex)
+            Raylib.DrawRectangle(x, y, width, fontsize, new(0, 0, 255, 255));
     }
 
     public void Enumerate(string path)
@@ -421,12 +384,21 @@ public abstract class Gui
                     GameFiles.Add(new(file.Name, file.IsReady, false));
             }
             di = new(WorkingDirectory);
+
+            GameFiles.Clear();
             foreach (var file in di.EnumerateDirectories())
                 GameFiles.Add(new(file.FullName, false, false));
             GameFiles.Insert(0, new("..", false, false));
         }
         else
             di = new(path);
+
+        if (TabIndex == Tab.Games)
+            GameFiles.Clear();
+        else if (TabIndex == Tab.ChtBrowser)
+            CheatFiles.Clear();
+        else if (TabIndex == Tab.Lua)
+            LuaFiles.Clear();
 
         foreach (var file in di.EnumerateFiles())
         {
@@ -437,11 +409,10 @@ public abstract class Gui
                 CheatFiles.Add(new(file.FullName, false, true));
             else if (FileExtensions.Contains(ext))
                 GameFiles.Add(new(file.FullName, false, true));
-
         }
     }
 
-    public static int CopyHacks(bool isdeck)
+    public static void CopyHacks(bool isdeck)
     {
         var src = @$"{Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}\Downloads";
         var dst = @$"D:\MyEmulators2\SNES-master\Games";
@@ -458,7 +429,6 @@ public abstract class Gui
             CreateNoWindow = true,
         };
         using var process = Process.Start(psi);
-        return ScrMain;
     }
 
     public void LoadGame(string filename)
@@ -498,7 +468,7 @@ public abstract class Gui
         //Opened = false;
     }
 
-    public readonly string[] MainEntries = ["Games", "Cheats", "Lua", "Options", "Copy Hacks"];
+    public readonly string[] MainEntries = ["Games", "Cheats", "Cht", "Lua", "Options", "About"];
 
     public record Info(string Button, string Description);
 

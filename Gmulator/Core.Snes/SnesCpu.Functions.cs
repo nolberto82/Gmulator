@@ -2,7 +2,7 @@
 
 public partial class SnesCpu
 {
-    private ushort SetValue(ushort register, int value, bool memoryMode)
+    private static ushort SetValue(ushort register, int value, bool memoryMode)
     {
         if (memoryMode)
             return (ushort)((register & 0xff00) | value & 0xff);

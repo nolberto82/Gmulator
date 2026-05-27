@@ -16,7 +16,6 @@ internal partial class GuiLua
     private readonly ImFontPtr[] _consolas;
     private Font _guiFont;
     private readonly float _menuHeight;
-    private readonly bool _debug;
 
     public GuiLua(Lua state, LuaManager luaManager)
     {
@@ -39,14 +38,6 @@ internal partial class GuiLua
             return;
 
         var fontsize = 10;
-        bool iscaled = false;
-        if (args.Length == 5)
-        {
-            if (args[4] == null)
-                iscaled = Convert.ToBoolean(args[3]);
-            else
-                iscaled = Convert.ToBoolean(args[4]);
-        }
 
         uint textcolor = 0xffffffff;
         if (args.Length > 4 && args[3] != null)
@@ -55,8 +46,6 @@ internal partial class GuiLua
         var text = $"{args[2]}";
         var x = Convert.ToInt32(args[0]);
         var y = Convert.ToInt32(args[1]);
-        var scale = GetScale();
-        var textureHeight = _screen.Texture.Height - 1;
         var textureSize = Raylib.MeasureTextEx(_guiFont, text, fontsize, 1);
         var textRect = new Rectangle(x, y, textureSize.X, textureSize.Y);
         if (args.Length == 5)
@@ -65,21 +54,16 @@ internal partial class GuiLua
         Raylib.DrawTextEx(_guiFont, text, new(x + textRect.Width / 2 - textureSize.X / 2, y), textureSize.Y, 0f, GetColor(textcolor));
 
     }
-    public void DrawRectangle(params object[] args)
+    public static void DrawRectangle(params object[] args)
     {
         if (args.Length < 5)
             return;
 
-        //if (Convert.ToInt32(args[0]) < 0 || Convert.ToInt32(args[0]) > Screen.Width)
-        //    return;
-
-        var scale = GetScale();
         var x = Convert.ToInt32(args[0]);
         var y = Convert.ToInt32(args[1]);
         var w = Convert.ToInt32(args[2]);
         var h = Convert.ToInt32(args[3]);
         var bgcolor = args[4] == null ? 0xffffffff : Convert.ToUInt32(args[4]);
-        var textureHeight = _screen.Texture.Height;
 
         Raylib.DrawRectangle(x, y, w, h, GetColor(bgcolor));
     }
@@ -101,13 +85,10 @@ internal partial class GuiLua
 
         var text = $"{args[2]}";
         (var x, var y, _) = GetScaledPosition(args[0], args[1], _screen);
-        var textureHeight = _screen.Texture.Height;
         var tz = Raylib.MeasureTextEx(_guiFont, text, fontsize, 1);
         Raylib.DrawCircle((int)(x + tz.X / 2), (int)(y + tz.Y / 2), fontsize / 2, GetColor(bgcolor));
         Raylib.DrawTextEx(_guiFont, text, new(x, y), fontsize, 0f, GetColor(textcolor));
     }
-
-
 
     public void DrawImage(params object[] args)
     {

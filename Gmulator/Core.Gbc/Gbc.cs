@@ -102,8 +102,6 @@ namespace Gmulator.Core.Gbc
                 Joypad.Update(IsScreenWindow, Ppu.FrameCounter);
         }
 
-        public override void Render(float MenuHeight) => base.Render(MenuHeight);
-
         public void Tick()
         {
             var c = 4 / Ppu.SpeedMode;

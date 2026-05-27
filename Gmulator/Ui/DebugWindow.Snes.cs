@@ -11,8 +11,8 @@ internal class SnesDebugWindow : DebugWindow
     private readonly string[] testcpu = ["Cpu", "Spc", "Gsu"];
     private const int CpuNumbers = 3;
     private readonly Snes Snes;
-    private readonly SnesCpu Cpu;
-    private readonly SnesPpu Ppu;
+    private new readonly SnesCpu Cpu;
+    private new readonly SnesPpu Ppu;
     private readonly SnesSpc Spc;
     private readonly SnesDsp Dsp;
     private readonly SnesSa1 Sa1;
@@ -55,7 +55,7 @@ internal class SnesDebugWindow : DebugWindow
         GetCpuState = Cpu.GetRegisters;
         GetCpuFlags = Cpu.GetFlags;
         GetPpuState = Ppu.GetState;
-        GetApuState = Dsp.GetState;
+        GetApuState = SnesDsp.GetState;
         GetSpcState = Spc.GetRegisters;
         GetSpcFlags = Spc.GetFlags;
         GetPortState = snes.Apu.GetState;
@@ -91,7 +91,7 @@ internal class SnesDebugWindow : DebugWindow
         //if (Mapper.Coprocessor == SnesMapper.Gsu)
         //    MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BPType.WramWrite | BPType.WramRead));
 
-        MemRegions.Add(new("Prg", mmu.ReadByte, Mapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec));
+        MemRegions.Add(new("Prg", mmu.ReadByte, SnesMapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec));
         MemRegions.Add(new("Register", null, null, -1, -1, -1, 0));
 
     }

@@ -498,7 +498,6 @@ public unsafe class MemoryEditor
 
     private static readonly int[] sizes = [1, 1, 2, 2, 4, 4, 8, 8, sizeof(float), sizeof(double)];
     private readonly Action<int, BpType, int, bool> AddBreakpoint;
-    private readonly Action<int, byte> AddCheat;
 
     private static int DataTypeGetSize(ImGuiDataType data_type)
     {

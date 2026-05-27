@@ -22,7 +22,7 @@ public class Patch
         return rom;
     }
 
-    private byte[] RunBPS(byte[] source, string filename)
+    private static byte[] RunBPS(byte[] source, string filename)
     {
         using BinaryReader br = new(new FileStream(filename, FileMode.Open, FileAccess.Read));
         if (Encoding.Default.GetString(br.ReadBytes(4)) != "BPS1") return source;

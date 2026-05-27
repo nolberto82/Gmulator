@@ -42,7 +42,7 @@ public class Cheat
         public bool Enabled { get; set; } = enabled;
     }
 
-    public (int, byte, byte, int, int) DecryptCode(string c, int Emu)
+    public static (int, byte, byte, int, int) DecryptCode(string c, int Emu)
     {
         switch (Emu)
         {

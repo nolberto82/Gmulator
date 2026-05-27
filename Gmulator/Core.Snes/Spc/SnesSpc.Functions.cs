@@ -4,7 +4,7 @@ public partial class SnesSpc
 {
     private void Asla() => _a = Asl(_a);
 
-    private void Asld(int c) => Write(c, (byte)Asl(Read(c)));
+    private void Asld(int c) => Write(c, Asl(Read(c)));
 
     private byte Asl(int c)
     {
@@ -40,7 +40,7 @@ public partial class SnesSpc
 
     private void Rora() => _a= Ror(_a);
 
-    private void Rord(int c) => Write(c, (byte)Ror(Read(c)));
+    private void Rord(int c) => Write(c, Ror(Read(c)));
 
     private byte Ror(int c)
     {
@@ -99,7 +99,7 @@ public partial class SnesSpc
 
     private void Incy() => _y = Inc(_y);
 
-    private void Incd(int b) => Write(b, (byte)Inc(Read(b)));
+    private void Incd(int b) => Write(b, Inc(Read(b)));
 
     private byte Inc(int c)
     {
@@ -284,7 +284,7 @@ public partial class SnesSpc
 
     private void Ord(int c) => _a = Or(_a, Read(c));
 
-    private void Orxy((int a, int b) t) => Write(t.b, (byte)Or(Read(t.b), t.a));
+    private void Orxy((int a, int b) t) => Write(t.b, Or(Read(t.b), t.a));
 
     private byte Or(int a1, int c)
     {
@@ -297,7 +297,7 @@ public partial class SnesSpc
 
     private void Eord(int c) => _a = Eor(_a, Read(c));
 
-    private void Eorxy((int a, int b) t) => Write(t.b, (byte)Eor(Read(t.b), t.a));
+    private void Eorxy((int a, int b) t) => Write(t.b, Eor(Read(t.b), t.a));
 
     private byte Eor(int a1, int c)
     {

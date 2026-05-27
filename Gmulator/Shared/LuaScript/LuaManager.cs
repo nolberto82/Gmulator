@@ -21,14 +21,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
     private string LuaCwd;
     private string Error = "";
     private string LuaFile = "";
-    private bool _fileChanged;
-
-    public void Init()
-    {
-        Watcher.NotifyFilter = NotifyFilters.LastAccess | NotifyFilters.LastWrite;
-        Watcher.Changed += OnChanged;
-        Watcher.EnableRaisingEvents = true;
-    }
 
     public void Load(string filename, IConsole console)
     {
@@ -112,15 +104,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
             Error += $"{e.Source}\n";
             _state?.Close();
         }
-    }
-
-    private void OnChanged(object sender, FileSystemEventArgs e)
-    {
-        if (e.ChangeType != WatcherChangeTypes.Changed)
-            return;
-
-        _fileChanged = true;
-        //Load(LuaFile, console);
     }
 
     public void Update(bool opened)

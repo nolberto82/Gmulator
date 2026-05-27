@@ -289,8 +289,6 @@ public sealed class Snes : Emulator, IConsole
         SaveBreakpoints(Mapper?.Name);
     }
 
-    public override void Render(float MenuHeight) => base.Render(MenuHeight);
-
     public void SetActions()
     {
         Ppu.SetSnes(this);

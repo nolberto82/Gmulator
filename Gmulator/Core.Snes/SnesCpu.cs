@@ -50,7 +50,6 @@ public partial class SnesCpu : ISaveState, ICpu
     public int StepOverAddr { get; set; }
     private int _debugPC;
     private int _debugAddr;
-    private readonly int _debugMode;
 
     private Snes Snes;
     private SnesPpu Ppu;

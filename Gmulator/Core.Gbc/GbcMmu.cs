@@ -55,10 +55,10 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
     public byte ReadRam(int a) => _ram[a];
     public void WriteRam(int a, byte v) => _ram[a] = v;
     public byte ReadIo(int addr) => MemoryHandlers[0xff00 + (addr & 0xff)].Read(0xff00 + (addr & 0xff));
-    public void WriteIo(int addr, byte value) => _ram[0xff00 + addr & 0xff] = (byte)value;
+    public void WriteIo(int addr, byte value) => _ram[0xff00 + addr & 0xff] = value;
     public byte ReadHram(int a) => MemoryHandlers[0xff80 + (a & 0xff)].Read(0xff80 + (a & 0xff));
 
-    public void WriteHram(int addr, byte value) => _ram[0xff80 + addr & 0xff] = (byte)value;
+    public void WriteHram(int addr, byte value) => _ram[0xff80 + addr & 0xff] = value;
 
     public byte ReadVramBank(int addr) => _vram[(addr & 0x1fff) + (0x2000 * VramBank) & 0x3fff];
 

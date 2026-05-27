@@ -7,7 +7,7 @@ namespace Gmulator.Ui
     internal class GbcDebugWindow : DebugWindow
     {
         private readonly Gbc Gbc;
-        private readonly GbcCpu Cpu;
+        private new readonly GbcCpu Cpu;
 
         public GbcDebugWindow(Gbc gbc) : base(gbc)
         {

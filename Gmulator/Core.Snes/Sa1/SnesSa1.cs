@@ -60,21 +60,17 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
     public int GetSa1IrqVector() => _irqVector;
     public int GetSa1NmiVector() => _nmiVector;
 
-    ICpu IConsole.Cpu => throw new NotImplementedException();
+    ICpu IConsole.Cpu => this;
 
-    public IPpu Ppu => throw new NotImplementedException();
+    public IPpu Ppu => Snes.Ppu;
 
-    IMmu IConsole.Mmu => throw new NotImplementedException();
-
-    public DebugState EmuState { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-    public Debugger Debugger { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
-    public MemoryMap Sa1Map = new(0x1000);
-    private bool HasStepped;
+    IMmu IConsole.Mmu => null;
+    public DebugState EmuState { get; set; }
+    public Debugger Debugger { get; set; }
 
     public int BwSa1Bank { get => _bwSa1Bank; }
-    public List<Breakpoint> Breakpoints { get => throw new NotImplementedException(); set => throw new NotImplementedException(); }
-
+    public MemoryMap Sa1Map = new(0x1000);
+    public List<Breakpoint> Breakpoints { get; set; }
     public string GameName => Snes.GameName;
 
     private void SetMemoryMap()
@@ -112,10 +108,7 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         while (Cycles < syncto)
         {
             if (_sa1Wait || _sa1Reset)
-            {
                 Cycles++;
-                HasStepped = false;
-            }
             else
             {
                 if (Snes.Debug && Snes.Breakpoints.Count > 0)
@@ -135,7 +128,6 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
                 int op = ReadOpcode();
                 int addr = GetAddressMode(Disasm[op].Mode);
                 ExecOp(op, addr);
-                HasStepped = true;
             }
         }
     }

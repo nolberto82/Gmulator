@@ -85,7 +85,7 @@ public sealed class SnesMapper : ISaveState
         return Rom[addr % Rom.Length];
     }
 
-    public void Write(int a, byte v)
+    public static void Write(int a, byte v)
     {
 
     }

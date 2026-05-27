@@ -65,7 +65,7 @@ public static class Constants
     public const int NesWidth = 256;
     public const int NesHeight = 240;
     public const int SnesWidth = 256;
-    public const int SnesHeight = 240;
+    public const int SnesHeight = 224;
     public const int SmsWidth = 256;
     public const int SmsHeight = 192;
 
@@ -119,6 +119,8 @@ public static class Constants
     public const GamepadButton BtnLeft = GamepadButton.LeftFaceLeft;
     public const GamepadButton BtnUp = GamepadButton.LeftFaceUp;
     public const GamepadButton BtnDown = GamepadButton.LeftFaceDown;
+    public const GamepadButton BtnL1 = GamepadButton.LeftTrigger1;
+    public const GamepadButton BtnR1 = GamepadButton.RightTrigger1;
     public const GamepadButton BtnL2 = GamepadButton.LeftTrigger2;
     public const GamepadButton BtnR2 = GamepadButton.RightTrigger2;
     public const GamepadButton BtnX = GamepadButton.RightFaceUp;

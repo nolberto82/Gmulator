@@ -31,7 +31,7 @@ public class GuiDesktop : Gui
             ImGui.PushFont(DebugFont[0]);
 
             Update(false);
-            Render();
+            Draw();
             RenderMenuBar();
             ImGui.PopFont();
 
@@ -86,7 +86,7 @@ public class GuiDesktop : Gui
         }
     }
 
-    public override void Render()
+    public override void Draw()
     {
         if (!Opened) return;
 
@@ -110,11 +110,11 @@ public class GuiDesktop : Gui
             {
                 ImGui.SetColumnWidth(i, 120);
 
-                ImGui.PushStyleColor(ImGuiCol.WindowBg, i == TabIndex ? RED : WHITE);
-                ImGui.PushStyleColor(ImGuiCol.Text, i == TabIndex ? GREEN : WHITE);
+                ImGui.PushStyleColor(ImGuiCol.WindowBg, i == (int)TabIndex ? RED : WHITE);
+                ImGui.PushStyleColor(ImGuiCol.Text, i == (int)TabIndex ? GREEN : WHITE);
 
                 if (ImGui.Selectable(MainEntries[i], false, ImGuiSelectableFlags.NoAutoClosePopups, new(110, 0)))
-                    TabIndex = i;
+                    TabIndex = (Tab)i;
 
                 ImGui.PopStyleColor(2);
                 ImGui.NextColumn();
@@ -123,7 +123,7 @@ public class GuiDesktop : Gui
 
             switch (TabIndex)
             {
-                case ScrGames:
+                case Tab.Games:
                     GameFiles.Clear();
                     Enumerate("");
                     GameFiles = [.. GameFiles.OrderBy(f => Path.GetExtension(f.Name))];
@@ -166,7 +166,7 @@ public class GuiDesktop : Gui
                                 name = file.Name;
 
                             ImGui.PushStyleColor(ImGuiCol.Text, !file.IsFile ? YELLOW : DeleteFileMode ? RED : WHITE);
-                            if (ImGui.Selectable($"{name}", i == SelOption[ScrGames], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
+                            if (ImGui.Selectable($"{name}", i == SelectedItem[(int)Tab.Games], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
                                 if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                     DeleteFile(file);
@@ -199,7 +199,7 @@ public class GuiDesktop : Gui
                         ImGui.EndChild();
                     }
                     break;
-                case ScrCheats:
+                case Tab.Cheats:
                     if (CheatDialog)
                     {
                         if (ImGui.BeginChild("CheatDialog", new(0, 0), ImGuiChildFlags.FrameStyle))
@@ -209,7 +209,7 @@ public class GuiDesktop : Gui
                             for (int i = 0; i < CheatFiles.Count; i++)
                             {
                                 var c = CheatFiles[i];
-                                if (ImGui.Selectable($"{Path.GetFileName(c.Name)}", i == SelOption[ScrBrowser], ImGuiSelectableFlags.AllowDoubleClick))
+                                if (ImGui.Selectable($"{Path.GetFileName(c.Name)}", i == SelectedItem[(int)Tab.ChtBrowser], ImGuiSelectableFlags.AllowDoubleClick))
                                 {
                                     if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                         LoadCheats(c.Name);
@@ -238,13 +238,12 @@ public class GuiDesktop : Gui
 
                             for (int i = 0; i < Cheats?.Count;)
                             {
-
                                 var res = Cheats.Values.ToList();
                                 var cht = res.Where(c => c.Description == res[i].Description).ToList();
                                 if (cht.Count > 0)
                                 {
                                     ImGui.PushID(i);
-                                    if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == SelOption[ScrCheats], ImGuiSelectableFlags.AllowDoubleClick))
+                                    if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == SelectedItem[(int)Tab.Cheats], ImGuiSelectableFlags.AllowDoubleClick))
                                     {
                                         if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                         {
@@ -255,7 +254,7 @@ public class GuiDesktop : Gui
 
                                     CheatWindow(cht[0]);
 
-                                    SetActive(ScrCheats, i);
+                                    SetActive((int)Tab.Cheats, i);
 
                                     ImGui.TableNextColumn();
                                     var enabled = cht[0].Enabled;
@@ -286,7 +285,7 @@ public class GuiDesktop : Gui
                         ImGui.EndChild();
                     }
                     break;
-                case ScrLua:
+                case Tab.Lua:
                     LuaFiles.Clear();
                     Enumerate(CheatDirectory);
                     if (ImGui.BeginChild("##luafiles", new(0, 0), ImGuiChildFlags.FrameStyle))
@@ -294,7 +293,7 @@ public class GuiDesktop : Gui
                         for (int i = 0; i < LuaFiles.Count; i++)
                         {
                             var file = LuaFiles[i];
-                            if (ImGui.Selectable(Path.GetFileName($"{file.Name}"), i == SelOption[ScrLua], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
+                            if (ImGui.Selectable(Path.GetFileName($"{file.Name}"), i == SelectedItem[(int)Tab.Lua], ImGuiSelectableFlags.AllowDoubleClick | ImGuiSelectableFlags.NoAutoClosePopups))
                             {
                                 if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left) || ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                                 {
@@ -310,7 +309,7 @@ public class GuiDesktop : Gui
                     }
                     break;
 
-                case ScrOptions:
+                case Tab.Options:
                     if (ImGui.BeginChild("##emulatoroptions", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
                         ImGui.BeginTable("##options", 2);
@@ -322,9 +321,9 @@ public class GuiDesktop : Gui
                             {
                                 Option o = Options[i];
                                 var v = o.Status == null ? $"{o.Value}" : o.Status[o.Value];
-                                if (TableRowSelect(o.Name, v, i == SelOption[ScrOptions]))
+                                if (TableRowSelect(o.Name, v, i == SelectedItem[(int)Tab.Options]))
                                 {
-                                    SelOption[ScrOptions] = i;
+                                    SelectedItem[(int)Tab.Options] = i;
                                 }
                             }
                             ImGui.EndTable();
@@ -337,10 +336,10 @@ public class GuiDesktop : Gui
         }
         ImGui.PopStyleColor(3);
 
-        base.Render();
+        base.Draw();
     }
 
-    public override void Update(bool isdeck) => base.Update(isdeck);
+    //public override void Update(bool isdeck) => base.Update(isdeck);
 
     public override void Init(bool isdeck)
     {
@@ -349,13 +348,13 @@ public class GuiDesktop : Gui
         _cheatInput = string.Empty;
         _cheatName = string.Empty;
         Open(Emulator.Config);
-        TabIndex = ScrGames;
+        TabIndex = Tab.Games;
     }
 
     private void SetActive(int t, int i)
     {
         if (ImGui.IsItemHovered())
-            SelOption[t] = i;
+            SelectedItem[t] = i;
     }
 
     private void CheatWindow(Cheat cht)

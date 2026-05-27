@@ -32,7 +32,7 @@ internal class Input
             {
                 emu.FastForward = false;
                 Raylib.SetTargetFPS(60);
-                Raylib.SetWindowState(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow);
+                Raylib.SetWindowState(ConfigFlags.VSyncHint);
             }
         }
 
