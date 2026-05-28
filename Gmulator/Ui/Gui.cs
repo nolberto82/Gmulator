@@ -76,6 +76,9 @@ public abstract class Gui
 
     public virtual void Update(bool isdeck)
     {
+        if (Raylib.IsGamepadButtonPressed(0, GamepadButton.LeftTrigger2))
+            Open(Emulator.Config);
+
         if (!Opened) return;
 
         int maxgamesview = Raylib.GetScreenHeight() / MenuFontSize;
@@ -96,6 +99,15 @@ public abstract class Gui
         }
         else
             DpadCounter = 10;
+
+
+        if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceUp, false) && TabIndex == Tab.Games)
+            DeleteFileMode = !DeleteFileMode;
+
+        if (ImGui.IsKeyPressed(ImGuiKey.GamepadL1, false))
+            TabIndex = (TabIndex - 1) < 0 ? Tab.About : TabIndex - 1;
+        else if (ImGui.IsKeyPressed(ImGuiKey.GamepadR1, false))
+            TabIndex = (TabIndex + 1) > Tab.About ? Tab.Games : TabIndex + 1;
 
         switch (TabIndex)
         {

@@ -29,6 +29,7 @@ internal class GuiDeck : Gui
         style.Colors[(int)ImGuiCol.HeaderHovered] = new(0.0f, 0.5f, 0.0f, 1f);
         style.Colors[(int)ImGuiCol.NavCursor] = new(0.0f, 0.5f, 0.0f, 1f);
         style.Colors[(int)ImGuiCol.Header] = new(0.0f, 0.5f, 0.0f, 1f);
+        style.Colors[(int)ImGuiCol.TabSelected] = new(0.0f, 0.5f, 0.0f, 1f);
 
         _tabActions = new Dictionary<int, Action<int>>
         {
@@ -135,17 +136,6 @@ internal class GuiDeck : Gui
     public override void Update(bool isdeck)
     {
         base.Update(isdeck);
-
-        if (Raylib.IsGamepadButtonPressed(0, GamepadButton.LeftTrigger2))
-            Open(Emulator.Config);
-
-        if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceUp, false)  && TabIndex == Tab.Games)
-            DeleteFileMode = !DeleteFileMode;
-
-        if (ImGui.IsKeyPressed(ImGuiKey.GamepadL1, false))
-            TabIndex = (TabIndex - 1) < 0 ? Tab.About : TabIndex - 1;
-        else if (ImGui.IsKeyPressed(ImGuiKey.GamepadR1, false))
-            TabIndex = (TabIndex + 1) > Tab.About ? Tab.Games : TabIndex + 1;
     }
 
     private void DrawGames(int index)
