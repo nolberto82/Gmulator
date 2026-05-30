@@ -24,9 +24,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
 
     public void Load(string filename, IConsole console)
     {
-        if (filename.Contains("alttpr - "))
-            filename = "alttpr";
-
         filename = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(filename)}.lua";
         if (!File.Exists(filename))
             return;
@@ -145,9 +142,6 @@ public class LuaManager(RenderTexture2D screen, ImFontPtr[] consolas, Font font,
 
     public void Save(string filename)
     {
-        if (filename.Contains("alttpr - "))
-            return;
-
         if (File.Exists(LuaFile))
         {
             filename = $"{Environment.CurrentDirectory}\\{CheatDirectory}\\{Path.GetFileNameWithoutExtension(filename)}.lua";

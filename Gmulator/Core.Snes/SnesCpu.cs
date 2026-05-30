@@ -22,7 +22,7 @@ public partial class SnesCpu : ISaveState, ICpu
     public const int BRKe = 0xFFFE;
 
     #region State
-    protected ushort _pc, _sp, _ra, _rx, _ry, dpr;
+    protected ushort _pc, _sp, _ra, _rx, _ry, _dpr;
 
     protected byte _ps, _dbr, _pbr;
     protected bool _emulationMode;
@@ -30,7 +30,7 @@ public partial class SnesCpu : ISaveState, ICpu
     public ushort Y => _ry;
     public bool EmulationMode => _emulationMode;
     public byte DataBank => _dbr;
-    public ushort DirectPageReg => dpr;
+    public ushort DirectPageReg => _dpr;
     public bool FastMem { get; set; }
     public bool NmiEnabled { get; set; }
     public bool IrqEnabled { get; set; }
@@ -38,7 +38,7 @@ public partial class SnesCpu : ISaveState, ICpu
     private ulong cycles;
     #endregion
 
-
+    public ushort A { set => _rx = (ushort)(value & 0xff); }
     public bool XMem => (_ps & FX) != 0;
     public bool MMem => (_ps & FM) != 0;
     public int FlagC => _ps & FC;
@@ -394,7 +394,7 @@ public partial class SnesCpu : ISaveState, ICpu
         new("","X ",$"{_rx:X4}"),
         new("","Y ",$"{_ry:X4}"),
         new("","SP",$"{_sp:X4}"),
-        new("","D ",$"{dpr:X4}"),
+        new("","D ",$"{_dpr:X4}"),
         new("","P ",$"{_ps:X4}"),
         new("","DB",$"{_dbr:X2}"),
         new("","PB",$"{_pbr:X2}"),
@@ -414,27 +414,47 @@ public partial class SnesCpu : ISaveState, ICpu
     {
         switch (reg.ToLowerInvariant())
         {
-            case "a": _ra = (ushort)v; break;
-            case "x": _rx = (ushort)v; break;
-            case "y": _ry = (ushort)v; break;
-            case "p": _ps = (byte)v; break;
-            case "pc": _pc = (ushort)v; break;
+            case "a":
+                if (v < 256)
+                    _ra = (ushort)(_ra & 0xff00 | v);
+                else
+                    _ra = (ushort)v;
+                break;
+            case "x":
+                if (v < 256)
+                    _rx = (ushort)(_rx & 0xff00 | v);
+                else
+                    _rx = (ushort)v;
+                break;
+            case "y":
+                if (v < 256)
+                    _ry = (ushort)(_ry & 0xff00 | v);
+                else
+                    _ry = (ushort)v;
+                break;
+            case "p":
+                _ps = (byte)v;
+                break;
+            case "pc":
+                _pc = (ushort)v;
+                _pbr = (byte)(v >> 16);
+                break;
         }
     }
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(_pc); bw.Write(_sp); bw.Write(_ra); bw.Write(_rx);
+        bw.Write(_pc); bw.Write(_sp); bw.Write(_rx); bw.Write(_rx);
         bw.Write(_ry); bw.Write(_ps); bw.Write(_pbr); bw.Write(_dbr);
-        bw.Write(_emulationMode); bw.Write(dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
+        bw.Write(_emulationMode); bw.Write(_dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
         bw.Write(IrqEnabled); bw.Write(Cycles);
     }
 
     public void Load(BinaryReader br)
     {
-        _pc = br.ReadUInt16(); _sp = br.ReadUInt16(); _ra = br.ReadUInt16(); _rx = br.ReadUInt16();
+        _pc = br.ReadUInt16(); _sp = br.ReadUInt16(); _rx = br.ReadUInt16(); _rx = br.ReadUInt16();
         _ry = br.ReadUInt16(); _ps = br.ReadByte(); _pbr = br.ReadByte(); _dbr = br.ReadByte();
-        _emulationMode = br.ReadBoolean(); dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
+        _emulationMode = br.ReadBoolean(); _dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
         IrqEnabled = br.ReadBoolean(); Cycles = br.ReadUInt64();
     }
 }

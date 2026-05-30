@@ -56,7 +56,6 @@ public abstract class Gui
     public string PreviousName { get; set; }
     public bool OpenDialog { get; set; }
     public bool CheatDialog { get; set; }
-    public bool ToggleAllCheats { get; set; }
     public bool DeleteFileMode { get; set; }
     public bool Opened;
     private string _gameName;
@@ -466,11 +465,11 @@ public abstract class Gui
         Emulator.SaveCheats(CurrentName);
     }
 
-    public void EnableAllCheats(Emulator emulator)
+    public void ToggleAllCheats()
     {
-        foreach (var c in emulator.Cheats.Values)
-            c.Enabled = true;
-        emulator.SaveCheats(CurrentName);
+        foreach (var c in Emulator.Cheats.Values)
+            c.Enabled = !c.Enabled;
+        Emulator.SaveCheats(CurrentName);
     }
 
     public void LoadLua(string filename)

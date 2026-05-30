@@ -68,7 +68,6 @@ public sealed class Snes : Emulator, IConsole
                     if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
                     {
                         EmuState = DebugState.Break;
-                        break;
                     }
 
                     Logger.Log(ppu.HPos);
@@ -77,7 +76,6 @@ public sealed class Snes : Emulator, IConsole
                     {
                         //Gsu.Exec(state, Debug);
                         EmuState = DebugState.Break;
-                        break;
                     }
 
                     if (!Run && Breakpoints.Count > 0 && EmuState == DebugState.Running)
@@ -85,17 +83,18 @@ public sealed class Snes : Emulator, IConsole
                         if (Debugger.Execute(pc))
                         {
                             EmuState = DebugState.Break;
-                            break;
                         }
                     }
+
+                    RunLua();
+
                     if (EmuState == DebugState.Break)
                         break;
                 }
 
                 Cpu.Step();
-                Lua?.OnExec(pc);
-                if (Sa1 != null)
-                    Lua?.OnExec(Sa1.PBPC);
+                RunLua();
+
                 Run = false;
             }
 
@@ -119,6 +118,13 @@ public sealed class Snes : Emulator, IConsole
             else
                 AudioSamples.AddRange(dspSamples);
         }
+    }
+
+    public void RunLua()
+    {
+        Lua?.OnExec(Cpu.PBPC);
+        if (Sa1 != null)
+            Lua?.OnExec(Sa1.PBPC);
     }
 
     public int ReadOp(int a)
@@ -270,7 +276,6 @@ public sealed class Snes : Emulator, IConsole
                 }
                 else
                     base.LoadState(slot, StateResult.Mismatch);
-                Lua?.Load(GameName, this);
             }
             else
                 base.LoadState(slot, StateResult.Failed);
@@ -309,6 +314,10 @@ public sealed class Snes : Emulator, IConsole
 
     public byte ApplyGameGenieCheats(int addr, byte value)
     {
+        if (addr == 0x87DC1C)
+        {
+
+        }
         if (Cheats.Count == 0 && Mmu.RamType != RamType.Rom) return value;
         var addr00 = addr & 0xfffff;
         var addr80 = addr | 0x800000;

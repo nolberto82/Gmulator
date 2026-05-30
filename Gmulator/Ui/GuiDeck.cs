@@ -148,7 +148,7 @@ internal class GuiDeck : Gui
             ImGui.PushStyleColor(ImGuiCol.Text, !file.IsFile ? YELLOW : DeleteFileMode ? RED : WHITE);
             if (ImGui.Selectable(Path.GetFileName(GameFiles[i].Name), SelectedItem[index] == i))
             {
-                if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown,false))
+                if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown, false))
                     DeleteFile(file);
                 else if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                 {
@@ -171,6 +171,9 @@ internal class GuiDeck : Gui
     {
         Enumerate(CheatDirectory);
         List<Cheat> cheats = [.. Cheats.Values];
+
+        if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceUp, false))
+            ToggleAllCheats();
 
         if (cheats.Count == 0)
         {
@@ -196,9 +199,7 @@ internal class GuiDeck : Gui
                 if (ImGui.Selectable(cht[0].Description, SelectedItem[index] == i))
                 {
                     if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
-                    {
-                        cht[0].Enabled = !cht[0].Enabled;
-                    }
+                        ToggleCheat(cht);
                 }
 
                 if (ImGui.IsItemFocused())

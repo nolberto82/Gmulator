@@ -4,7 +4,7 @@ namespace Gmulator.Shared;
 
 public class EmuState
 {
-    public const string Version = "1.19";
+    public const string Version = "1.20";
 
     public static int SetInt(BinaryReader br, BinaryWriter bw, int v, bool save)
     {

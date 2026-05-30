@@ -337,7 +337,7 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         bw.Write(_dmaSrcStartAddr); bw.Write(_dmaDstStartAddr); bw.Write(_dmaTerminalCounter);
         bw.Write(_pc); bw.Write(_sp); bw.Write(_ra); bw.Write(_rx);
         bw.Write(_ry); bw.Write(_ps); bw.Write(_pbr); bw.Write(_dbr);
-        bw.Write(_emulationMode); bw.Write(dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
+        bw.Write(_emulationMode); bw.Write(_dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
         bw.Write(IrqEnabled); bw.Write(Cycles);
     }
 
@@ -354,7 +354,7 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         _dmaSrcStartAddr = br.ReadInt32(); _dmaDstStartAddr = br.ReadInt32(); _dmaTerminalCounter = br.ReadInt32();
         _pc = br.ReadUInt16(); _sp = br.ReadUInt16(); _ra = br.ReadUInt16(); _rx = br.ReadUInt16();
         _ry = br.ReadUInt16(); _ps = br.ReadByte(); _pbr = br.ReadByte(); _dbr = br.ReadByte();
-        _emulationMode = br.ReadBoolean(); dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
+        _emulationMode = br.ReadBoolean(); _dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
         IrqEnabled = br.ReadBoolean(); Cycles = br.ReadUInt64();
     }
 

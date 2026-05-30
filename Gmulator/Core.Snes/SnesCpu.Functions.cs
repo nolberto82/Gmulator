@@ -588,7 +588,7 @@ public partial class SnesCpu
 
     private void Phd()
     {
-        PushWord(dpr);
+        PushWord(_dpr);
         WrapStackPointer();
     }
 
@@ -616,8 +616,8 @@ public partial class SnesCpu
 
     private void Pld()
     {
-        dpr = PopWord();
-        SetFlagZN(dpr, false);
+        _dpr = PopWord();
+        SetFlagZN(_dpr, false);
         WrapStackPointer();
     }
 
@@ -901,14 +901,14 @@ public partial class SnesCpu
 
     private void Tcd()
     {
-        dpr = _ra;
+        _dpr = _ra;
         Idle();
-        SetFlagZN(dpr, false);
+        SetFlagZN(_dpr, false);
     }
 
     private void Tdc()
     {
-        _ra = dpr;
+        _ra = _dpr;
         Idle();
         SetFlagZN(_ra, false);
     }
@@ -1142,7 +1142,7 @@ public partial class SnesCpu
         _ps = 0x34;
         _dbr = 0x00;
         _pbr = 0x00;
-        dpr = 0x0000;
+        _dpr = 0x0000;
         _emulationMode = true;
         FastMem = false;
         NmiEnabled = false;

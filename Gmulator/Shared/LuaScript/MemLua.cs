@@ -51,5 +51,8 @@ public partial class MemLua
         return GetRegister(register);
     }
 
-    public void SetReg(string register, int value) => SetRegister(register, (byte)value);
+    public void SetReg(string register, int value)
+    {
+        SetRegister(register, value);
+    }
 }

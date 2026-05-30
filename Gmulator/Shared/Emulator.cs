@@ -216,9 +216,6 @@ public class Emulator
 
     public virtual void LoadCheats(string filename)
     {
-        if (filename.Contains("alttpr - "))
-            filename = "alttpr";
-
         Cheats?.Clear();
         var name = filename == "" ? GameName : filename;
         name = @$"{CheatDirectory}/{Path.GetFileNameWithoutExtension(name)}";
@@ -270,7 +267,7 @@ public class Emulator
             }
         }
 
-        if (name != "Cheats/alttpr" && Cheats.Count > 0)
+        if (Cheats.Count > 0)
             SaveCheats(name);
     }
 
