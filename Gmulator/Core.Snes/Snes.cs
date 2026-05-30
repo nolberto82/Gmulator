@@ -62,9 +62,9 @@ public sealed class Snes : Emulator, IConsole
             SnesPpu ppu = Ppu;
             while (!Ppu.FrameReady)
             {
-                int pc = Cpu.PBPC;
                 if (Debug)
                 {
+                    int pc = Cpu.PBPC;
                     if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
                     {
                         EmuState = DebugState.Break;
@@ -92,8 +92,8 @@ public sealed class Snes : Emulator, IConsole
                         break;
                 }
 
-                Cpu.Step();
                 RunLua();
+                Cpu.Step();
 
                 Run = false;
             }

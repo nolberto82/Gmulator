@@ -437,7 +437,8 @@ public partial class SnesCpu : ISaveState, ICpu
                 break;
             case "pc":
                 _pc = (ushort)v;
-                _pbr = (byte)(v >> 16);
+                if (v > 0xffff)
+                    _pbr = (byte)(v >> 16);
                 break;
         }
     }

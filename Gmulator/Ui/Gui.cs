@@ -157,7 +157,7 @@ public abstract class Gui
 
 #if DEBUG || RELEASE
         Raylib.SetWindowSize(1280, 980);
-        Raylib.SetWindowPosition(500, 30);
+        Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
         Emulator.Debug = false;
@@ -385,6 +385,13 @@ public abstract class Gui
     public void Enumerate(string path)
     {
         DirectoryInfo di;
+        if (TabIndex == Tab.Games)
+            GameFiles.Clear();
+        else if (TabIndex == Tab.ChtBrowser)
+            CheatFiles.Clear();
+        else if (TabIndex == Tab.Lua)
+            LuaFiles.Clear();
+
         if (!Directory.Exists(WorkingDirectory))
             WorkingDirectory = "C:";
         if (path == "")
@@ -396,20 +403,12 @@ public abstract class Gui
             }
             di = new(WorkingDirectory);
 
-            GameFiles.Clear();
             foreach (var file in di.EnumerateDirectories())
                 GameFiles.Add(new(file.FullName, false, false));
             GameFiles.Insert(0, new("..", false, false));
         }
         else
             di = new(path);
-
-        if (TabIndex == Tab.Games)
-            GameFiles.Clear();
-        else if (TabIndex == Tab.ChtBrowser)
-            CheatFiles.Clear();
-        else if (TabIndex == Tab.Lua)
-            LuaFiles.Clear();
 
         foreach (var file in di.EnumerateFiles())
         {

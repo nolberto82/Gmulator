@@ -124,9 +124,8 @@ public class GuiDesktop : Gui
             switch (TabIndex)
             {
                 case Tab.Games:
-                    GameFiles.Clear();
                     Enumerate("");
-                    GameFiles = [.. GameFiles.OrderBy(f => Path.GetExtension(f.Name))];
+                    //GameFiles = [.. GameFiles.OrderBy(f => Path.GetExtension(f.Name))];
 
                     ImGui.BeginChild("##drives", new(0, 30));
                     {
@@ -286,7 +285,6 @@ public class GuiDesktop : Gui
                     }
                     break;
                 case Tab.Lua:
-                    LuaFiles.Clear();
                     Enumerate(CheatDirectory);
                     if (ImGui.BeginChild("##luafiles", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
