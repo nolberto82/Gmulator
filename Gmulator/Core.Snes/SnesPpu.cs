@@ -421,82 +421,80 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         for (int i = 0; i < bpp.Length; i++)
         {
             int paletteOffset = _bgMode == 0 ? i * 32 : 0;
-            if (_bgMode < 7)
+            bool main = _mainBgs[i];
+            bool sub = _subBgs[i];
+
+            _mainColors[i] = 0;
+            _subColors[i] = 0;
+            _mainPriorities[i] = 0;
+
+            if (!main & !sub)
+                continue;
+
+            if (_mosaicEnabled[i])
             {
-                bool main = _mainBgs[i];
-                bool sub = _subBgs[i];
+                mx = _mosaicSize != 0 ? (x % _mosaicSize) : 0;
+                my = _mosaicSize != 0 ? (y % _mosaicSize) : 0;
+            }
 
-                _mainColors[i] = 0;
-                _subColors[i] = 0;
+            int sx = x - mx + _bgScrollX[i];
+            int sy = y - my + _bgScrollY[i];
 
-                if (!main & !sub)
-                    continue;
-
-                if (_mosaicEnabled[i])
+            if (_bgMode == 2)
+            {
+                if (x > 7)
                 {
-                    mx = _mosaicSize != 0 ? (x % _mosaicSize) : 0;
-                    my = _mosaicSize != 0 ? (y % _mosaicSize) : 0;
+                    int h = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2], _bgMapbase[2]);
+                    int v = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2] + 8, _bgMapbase[2]);
+                    var bit = i == 0 ? 13 : 14;
+                    if ((h & (1 << bit)) != 0)
+                        sx = (sx & 7) + (x & ~7) + h + _bgScrollX[i] & 0x1fff;
+                    if ((v & (1 << bit)) != 0)
+                        sy += v & 0x1fff;
                 }
 
-                int sx = x - mx + _bgScrollX[i];
-                int sy = y - my + _bgScrollY[i];
-
-                if (_bgMode == 2)
-                {
-                    if (x > 7)
-                    {
-                        int h = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2], _bgMapbase[2]);
-                        int v = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2] + 8, _bgMapbase[2]);
-                        var bit = i == 0 ? 13 : 14;
-                        if ((h & (1 << bit)) != 0)
-                            sx = (sx & 7) + (x & ~7) + h + _bgScrollX[i] & 0x1fff;
-                        if ((v & (1 << bit)) != 0)
-                            sy += v & 0x1fff;
-                    }
-
-                    mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
-                    mapaddr += _bgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
-                    mapaddr += (_bgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
-                }
+                mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
+                mapaddr += _bgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
+                mapaddr += (_bgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
+            }
+            else
+            {
+                if (_bgCharSize[i])
+                    mapaddr = _bgMapbase[i] + sy / 2 / 8 * 32 + (sx / 2 / 8);
                 else
                 {
-                    if (_bgCharSize[i])
-                        mapaddr = _bgMapbase[i] + sy / 2 / 8 * 32 + (sx / 2 / 8);
-                    else
-                    {
-                        sx &= _bgSizeX[i];
-                        sy &= _bgSizeY[i];
-                        mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
-                        mapaddr += (sx & 0x100) * 4;
-                    }
-                    mapaddr += (_bgSizeY[i] == 0x1ff) && (sy & 0x100) != 0 ? _bgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0;
-                    mapaddr &= 0x7fff;
+                    sx &= _bgSizeX[i];
+                    sy &= _bgSizeY[i];
+                    mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
+                    mapaddr += (sx & 0x100) * 4;
                 }
-
-                (color, pixel, palette) = GetColor(sx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
-                if (main && pixel != 0)
-                {
-                    _mainColors[i] = color;
-                    _mainPalette[i] = palette;
-                    _mainPriorities[i] = (_vram[mapaddr] >> 13) & 1;
-                    _mainLayer = i;
-
-                    if (_winMainBgs[i] && GetWindow(i, x))
-                        _mainColors[i] = 0;
-                }
-
-                if (sub && pixel != 0)
-                {
-                    _subColors[i] = color;
-                    _subPalette[i] = palette;
-                    _subPriorities[i] = (_vram[mapaddr] >> 13) & 1;
-                    _subLayer = i;
-
-                    if (_subBgs[i] && GetWindow(i, x))
-                        _subColors[i] = 0;
-                }
-
+                mapaddr += (_bgSizeY[i] == 0x1ff) && (sy & 0x100) != 0 ? _bgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0;
+                mapaddr &= 0x7fff;
             }
+
+            (color, pixel, palette) = GetColor(sx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
+            if (main && pixel != 0)
+            {
+                _mainColors[i] = color | 1;
+                _mainPalette[i] = palette;
+                _mainPriorities[i] = (_vram[mapaddr] >> 13) & 1;
+                _mainLayer = i;
+
+                if (_winMainBgs[i] && GetWindow(i, x))
+                    _mainColors[i] = 0;
+            }
+
+            if (sub && pixel != 0)
+            {
+                _subColors[i] = color | 1;
+                _subPalette[i] = palette;
+                _subPriorities[i] = (_vram[mapaddr] >> 13) & 1;
+                _subLayer = i;
+
+                if (_subBgs[i] && GetWindow(i, x))
+                    _subColors[i] = 0;
+            }
+
         }
     }
 
@@ -507,6 +505,10 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         {
             if (!_mainBgs[i])
                 continue;
+
+            _mainColors[i] = 0;
+            _mainPalette[i] = 0;
+            _mainPriorities[i] = 0;
 
             var ox = _xCoordsMode7[x] >>= 8;
             var oy = _yCoordsMode7[x] >>= 8;
@@ -555,8 +557,12 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int palid = (s.Attrib & 0x0e) >> 1;
                 int palette = (0x80 + palid * 16 + colorid) & 0xff;
                 int color = _cram[palette];
+
                 if (colorid != 0)
                 {
+
+                    if (s.Tile == 0xcc && palette != 0xe2)
+                    { }
                     if (_winMainBgs[4] && GetWindow(4, x))
                         continue;
 
@@ -702,8 +708,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 for (int i = 0, len = layerN0.Length; i < len; i++)
                 {
                     int layer = layerN0[i];
-                    int p = layerN2[i];
-                    if (priorities[layer] == p && (colors[layer] & 1) != 0)
+                    int priority = layerN2[i];
+                    if (priorities[layer] == priority && (colors[layer] & 1) != 0)
                         return (colors[layer], layer);
                 }
             }
@@ -715,7 +721,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private (int, int, int) GetColor(int sx, int sy, int mapaddr, int tilebase, bool bigchar, int bpp, int paloff)
     {
         int pixel = 0;
-        int p;
+        int palette;
         ushort vramVal = _vram[mapaddr];
 
         if (_bgMode < 7)
@@ -739,17 +745,19 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             pixel = GetPixel(ta, fx, bpp);
 
             int paletteSize = bpp switch { 4 => 16, 8 => 256, _ => 4 };
-            p = paloff + palid * paletteSize + pixel;
-            ushort cramVal = _cram[p & 0xff];
-            return (cramVal | (pixel != 0 ? 1 : 0), pixel, p);
+            palette = paloff + palid * paletteSize + pixel;
+            ushort cramVal = _cram[palette & 0xff];
+            return (cramVal | (pixel != 0 ? 1 : 0), pixel, palette);
         }
         else
         {
             int tileid = vramVal & 0xff;
             int ta = (tileid * 64 + ((sy & 7) * 8) + (sx & 7)) & 0x3fff;
-            p = _vram[ta] >> 8;
-            ushort cramVal = _cram[p & 0xff];
-            return (cramVal | 1, pixel, p);
+            palette = _vram[ta] >> 8;
+            ushort cramVal = _cram[palette & 0xff];
+            if (cramVal != 0)
+            { }
+            return ((cramVal != 0 ? cramVal | 1 : 0), pixel, palette);
         }
     }
 

@@ -102,6 +102,8 @@ public abstract class Gui
 
         if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceUp, false) && TabIndex == Tab.Games)
             DeleteFileMode = !DeleteFileMode;
+        else if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceRight, false) && TabIndex == Tab.Games)
+            CopyHacks(isdeck);
 
         if (ImGui.IsKeyPressed(ImGuiKey.GamepadL1, false))
             TabIndex = (TabIndex - 1) < 0 ? Tab.About : TabIndex - 1;

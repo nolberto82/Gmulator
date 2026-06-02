@@ -60,7 +60,7 @@ internal class GuiDeck : Gui
 
             ImGui.PushFont(DebugFont[0]);
 
-            Update(false);
+            Update(true);
             Draw();
 
             ImGui.PopFont();
