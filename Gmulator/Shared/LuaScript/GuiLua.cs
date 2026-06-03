@@ -136,7 +136,7 @@ internal partial class GuiLua
         var scale = Math.Min((float)width / textureWidth, (float)height / textureHeight);
         var left = isscaled ? (width - textureWidth * scale) / 2 : 0;
         var top = isscaled ? ((height - textureHeight * scale) / 2) + _menuHeight : _menuHeight;
-        var x = (int)((Convert.ToInt64(vx) * (isscaled ? scale : 1) + left));
+        var x = (int)(Convert.ToInt64(vx) * (isscaled ? scale : 1) + left);
         var y = (int)(Convert.ToInt64(vy) * (isscaled ? scale : 1) + top);
         return (x, y, scale);
     }

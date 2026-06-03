@@ -214,7 +214,7 @@ public class Emulator
         return string.Empty;
     }
 
-    public virtual void LoadCheats(string filename)
+    public virtual void LoadCheats(string filename, bool enabledAll = false)
     {
         Cheats?.Clear();
         var name = filename == "" ? GameName : filename;
@@ -262,7 +262,7 @@ public class Emulator
                 foreach (var r in rawcodes)
                 {
                     if (!Cheats.ContainsKey((r.Address, r.Address80)))
-                        Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, r.Enabled, cht.Codes));
+                        Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, enabledAll ? true : r.Enabled, cht.Codes));
                 }
             }
         }

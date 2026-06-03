@@ -453,7 +453,7 @@ public abstract class Gui
     public void LoadCheats(string filename)
     {
         CheatDialog = false;
-        Emulator.LoadCheats(filename);
+        Emulator.LoadCheats(filename, true);
         if (!File.Exists($"{CheatDirectory}/{Path.GetFileNameWithoutExtension(_gameName)}.cht"))
             Emulator.SaveCheats($"{CheatDirectory}/{Path.GetFileNameWithoutExtension(_gameName)}.cht");
     }

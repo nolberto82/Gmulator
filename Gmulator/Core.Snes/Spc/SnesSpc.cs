@@ -425,7 +425,7 @@ public partial class SnesSpc : ISaveState, ICpu
     public (byte, ushort) DirImm()
     {
         byte a1 = ReadOpcode();
-        int a2 = (ReadOpcode() | GetPage());
+        int a2 = ReadOpcode() | GetPage();
         return (a1, (ushort)a2);
     }
 
@@ -456,7 +456,7 @@ public partial class SnesSpc : ISaveState, ICpu
         var b = a1 | a2 << 8;
         Idle();
         var value = Read(b + X) | Read(b + X + 1 & 0xffff) << 8;
-        return (ushort)(value);
+        return (ushort)value;
     }
 
     public int AbsY()

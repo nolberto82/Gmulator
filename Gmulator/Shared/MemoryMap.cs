@@ -47,7 +47,7 @@ namespace Gmulator.Shared
                 for (int j = addrStart; j <= addrEnd; j += 0x1000)
                 {
                     int a = _size == 0x1000 ? i << 4 | (j >> 12) : j;
-                    Handlers[a].Offset = offset | (mmcbank * 2) * 0x1000;
+                    Handlers[a].Offset = offset | mmcbank * 2 * 0x1000;
                     Handlers[a].Type = RamType.Sram;
                     Handlers[a].Mask = addrEnd - addrStart;
                     Handlers[a].Read = r;

@@ -755,9 +755,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             int ta = (tileid * 64 + ((sy & 7) * 8) + (sx & 7)) & 0x3fff;
             palette = _vram[ta] >> 8;
             ushort cramVal = _cram[palette & 0xff];
-            if (cramVal != 0)
-            { }
-            return ((cramVal != 0 ? cramVal | 1 : 0), pixel, palette);
+            return (cramVal != 0 ? cramVal | 1 : 0, pixel, palette);
         }
     }
 
@@ -810,7 +808,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     {
         int addr = a >> 1;
         if ((a & 1) == 0)
-            return (byte)(_vram[addr & 0x7fff]);
+            return (byte)_vram[addr & 0x7fff];
         else
             return (byte)(_vram[addr & 0x7fff] >> 8);
     }
@@ -864,7 +862,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     public byte ReadCram(int a)
     {
         if ((a & 1) == 0)
-            return (byte)(_cram[a >> 1]);
+            return (byte)_cram[a >> 1];
         else
             return (byte)(_cram[a >> 1] >> 8);
     }
