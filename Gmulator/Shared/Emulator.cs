@@ -319,7 +319,6 @@ public class Emulator
                 Notifications.Init($"Save State {slot} Version Mismatch");
                 break;
         }
-        Lua?.Load(GameName, Console);
     }
 
     public virtual void LoadBreakpoints(string name)
