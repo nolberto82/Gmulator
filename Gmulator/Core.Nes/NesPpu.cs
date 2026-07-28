@@ -84,7 +84,7 @@ namespace Gmulator.Core.Nes
         public bool IsRendering => _background || _sprite;
         public int FineY => ((_vramAddr & 0x7000) >> 12) & 0xff;
         public int GetScanline() => Scanline;
-        public byte ReadOam(int addr) => Oram[addr & 0xff];
+        public int ReadOam(int addr) => Oram[addr & 0xff];
         public void WriteOam(int a, int v) => Oram[a & 0xff] = (byte)v;
         public int ReadVram(int a) => Vram[a & 0x3fff];
 
@@ -241,14 +241,14 @@ namespace Gmulator.Core.Nes
             Cycles++;
         }
 
-        public byte ReadRegister(int addr)
+        public int ReadRegister(int addr)
         {
             switch (addr)
             {
                 case 0x2002:
                 {
-                    byte v = (byte)(((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
-                        | _dummy2007 & 0x1f);
+                    int value = ((_vBlank ? 1 : 0) << 7 | (_sprite0hit ? 1 : 0) << 6 | (_sprOverflow ? 1 : 0) << 5) & 0xe0
+                        | _dummy2007 & 0x1f;
 
                     if (Scanline == 241)
                     {
@@ -258,18 +258,18 @@ namespace Gmulator.Core.Nes
                         }
                         else if (Cycle == 1 || Cycle == 2)
                         {
-                            return v &= 0x7f;
+                            return value &= 0x7f;
                         }
                         else if (Cycle == 3)
                         {
                             NoNmi = false;
                             _vBlank = false;
-                            return (byte)(v & 0x7f);
+                            return (byte)(value & 0x7f);
                         }
                     }
                     _vBlank = false;
                     _writeToggle = false;
-                    return v;
+                    return value;
                 }
                 case 0x2007:
                 {
@@ -289,7 +289,7 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        public void WriteRegister(int addr, byte value)
+        public void WriteRegister(int addr, int value)
         {
             switch (addr)
             {
@@ -365,7 +365,7 @@ namespace Gmulator.Core.Nes
             }
         }
 
-        public void Write4014(int addr, byte value) //4014
+        public void Write4014(int addr, int value) //4014
         {
             for (int i = 0; i < 256; i++)
             {
@@ -575,24 +575,24 @@ namespace Gmulator.Core.Nes
             _atShiftHi = (_atShiftHi << 1) | _atHi;
         }
 
-        public byte Read(int a) => a switch
+        public int Read(int addr) => addr switch
         {
-            < 0x2000 => ReadPattern(a),
-            < 0x3f00 => ReadNametable(a),
-            _ => ReadPalette(a)
+            < 0x2000 => ReadPattern(addr),
+            < 0x3f00 => ReadNametable(addr),
+            _ => ReadPalette(addr)
         };
 
-        public void Write(int a, byte v)
+        public void Write(int addr, int value)
         {
-            switch (a)
+            switch (addr)
             {
-                case < 0x2000: WritePattern(a, v); break;
-                case < 0x3f00: WriteNametable(a, v); break;
-                default: WritePalette(a, v); break;
+                case < 0x2000: WritePattern(addr, value); break;
+                case < 0x3f00: WriteNametable(addr, value); break;
+                default: WritePalette(addr, value); break;
             }
         }
 
-        private byte ReadNametable(int addr)
+        private int ReadNametable(int addr)
         {
             int a = addr % 0x400;
             if (Header.Mirror == SingleNt0)
@@ -622,58 +622,58 @@ namespace Gmulator.Core.Nes
             return 0;
         }
 
-        public byte ReadPattern(int a)
+        public int ReadPattern(int addr)
         {
             if (Header.MapperId == 9)
-                Mmu.Mapper.SetLatch(a, 0);
+                Mmu.Mapper.SetLatch(addr, 0);
             if (Mmu.Mapper.Header.ChrBanks != 0)
-                return Mmu.Mapper.ReadChr(a);
+                return Mmu.Mapper.ReadChr(addr);
             else
-                return Vram[a];
+                return Vram[addr & 0x3fff];
         }
 
-        public byte ReadPalette(int a) => Vram[a & 0x3fff];
+        public int ReadPalette(int addr) => Vram[addr & 0x3fff];
 
-        public void WriteNametable(int addr, int v)
+        public void WriteNametable(int addr, int value)
         {
             var a = addr % 0x400;
             if (Header.Mirror == SingleNt0)
             {
                 var b = MirrorNt0[(addr >> 10) & 3];
-                Vram[0x2000 + a + b * 0x400] = (byte)v;
+                Vram[0x2000 + a + b * 0x400] = (byte)value;
             }
             else if (Header.Mirror == SingleNt1)
             {
                 var b = MirrorNt1[(a >> 10) & 3];
-                Vram[0x2000 + a + b * 0x400] = (byte)v;
+                Vram[0x2000 + a + b * 0x400] = (byte)value;
             }
             else if (Header.Mirror == Horizontal)
             {
                 switch ((addr >> 10) & 3)
                 {
-                    case 0: Vram[0x2000 + a] = (byte)v; break;
-                    case 1: Vram[0x2000 + a] = (byte)v; break;
-                    case 2: Vram[0x2400 + a] = (byte)v; break;
-                    case 3: Vram[0x2400 + a] = (byte)v; break;
+                    case 0: Vram[0x2000 + a] = (byte)value; break;
+                    case 1: Vram[0x2000 + a] = (byte)value; break;
+                    case 2: Vram[0x2400 + a] = (byte)value; break;
+                    case 3: Vram[0x2400 + a] = (byte)value; break;
                 }
             }
             else if (Header.Mirror == Vertical)
             {
                 switch ((addr >> 10) & 3)
                 {
-                    case 0: Vram[0x2000 + a] = (byte)v; break;
-                    case 1: Vram[0x2400 + a] = (byte)v; break;
-                    case 2: Vram[0x2000 + a] = (byte)v; break;
-                    case 3: Vram[0x2400 + a] = (byte)v; break;
+                    case 0: Vram[0x2000 + a] = (byte)value; break;
+                    case 1: Vram[0x2400 + a] = (byte)value; break;
+                    case 2: Vram[0x2000 + a] = (byte)value; break;
+                    case 3: Vram[0x2400 + a] = (byte)value; break;
                 }
             }
         }
 
-        private void WritePattern(int a, int v) => Vram[a & 0x3fff] = (byte)v;
+        private void WritePattern(int addr, int value) => Vram[addr & 0x3fff] = (byte)value;
 
-        public void WritePalette(int a, int v)
+        public void WritePalette(int addr, int value)
         {
-            Vram[a & 0x3fff] = (byte)v;
+            Vram[addr & 0x3fff] = (byte)value;
 
             for (int i = 0; i < 7; i++)
                 Array.Copy(Vram, 0x3f00, Vram, 0x3f20 + i * 32, 0x20);
@@ -681,10 +681,10 @@ namespace Gmulator.Core.Nes
             for (int i = 0; i < 4; i++)
                 Array.Copy(Vram, 0x3f10, Vram, 0x3f04 + i * 0x4, 0x01);
 
-            if (a == 0x3f10)
-                Vram[0x3f00] = (byte)v;
-            else if (a == 0x3f00)
-                Vram[0x3f10] = (byte)v;
+            if (addr == 0x3f10)
+                Vram[0x3f00] = (byte)value;
+            else if (addr == 0x3f00)
+                Vram[0x3f10] = (byte)value;
         }
 
         public void RenderNametable(ref uint[] buffer)

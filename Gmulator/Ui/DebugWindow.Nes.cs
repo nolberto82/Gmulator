@@ -23,18 +23,21 @@ namespace Gmulator.Ui
 
             MemRegions =
             [
-                new("Wram", mmu.ReadByte, mmu.WriteByte, 0x0000, mmu.Wram.Length, 4, BpType.WramWrite | BpType.WramRead),
-                new("Vram", ppu.Read, ppu.Write, 0x0000, ppu.Vram.Length, 4, BpType.WramWrite | BpType.WramRead),
-                new("Oram", ppu.ReadOam, null, 0x0000,ppu.Oram.Length, 2, BpType.WramWrite | BpType.WramRead),
-                new("Sram", mapper.ReadSram, mapper.WriteSram, 0x0000, mapper.Sram == null ? 0 : mapper.Sram.Length,  4, BpType.WramWrite | BpType.WramRead),
-                new("Prg", mapper.ReadPrg, mapper.WritePrg, 0x0000, mapper.PrgRom.Length,  6, BpType.WramWrite | BpType.WramRead),
-                new("Chr", mapper.ReadChr, mapper.Write, 0x0000, mapper.CharRom.Length,  6, BpType.WramWrite | BpType.WramRead),
+                new("Wram", mmu.ReadByte, mmu.WriteByte, 0x0000, mmu.Wram.Length, 4, BpType.WramWrite | BpType.WramRead, RamType.Wram),
+                new("Vram", ppu.Read, ppu.Write, 0x0000, ppu.Vram.Length, 4, BpType.WramWrite | BpType.WramRead, RamType.Vram),
+                new("Oram", ppu.ReadOam, null, 0x0000,ppu.Oram.Length, 2, BpType.WramWrite | BpType.WramRead, RamType.Oram),
+                new("Sram", mapper.ReadSram, mapper.WriteSram, 0x0000, mapper.Sram == null ? 0 : mapper.Sram.Length,  4, BpType.WramWrite | BpType.WramRead, RamType.Sram),
+                new("Prg", mapper.ReadPrg, mapper.WritePrg, 0x0000, mapper.PrgRom.Length,  6, BpType.WramWrite | BpType.WramRead, RamType.Rom),
+                new("Chr", mapper.ReadChr, mapper.Write, 0x0000, mapper.CharRom.Length,  6, BpType.WramWrite | BpType.WramRead, RamType.Rom),
             ];
 
-            OnDisassemble =
+            Disassemble =
             [
-                Logger.Disassemble,
+                new(Logger.Disassemble,CpuType.Nes)
             ];
+
+            ScrollY = new int[Disassemble.Length];
+            JumpAddr = new int[Disassemble.Length];
 
             GetCpuState = Cpu.GetRegisters;
             GetCpuFlags = Cpu.GetFlags;
@@ -42,21 +45,18 @@ namespace Gmulator.Ui
             GetApuState = Nes.Apu.GetState;
             GetPrg = () => Nes.Mapper.Prg;
             GetChr = () => Nes.Mapper.Chr;
-
-            ScrollY = [0];
-            JumpAddr = [-1];
         }
 
         public override void Draw(Texture2D texture)
         {
             base.Draw(texture);
-            base.DrawDebugger(Nes.Cpu.PC, Logger.Logging, MainCpu);
+            base.DrawDebugger(Nes.Cpu.PC, Logger.Logging, CpuType.Nes);
             DrawCartInfo(Nes.Mapper.GetInfo());
             base.DrawRegisters();
             DrawMemory();
         }
 
-        public override void DrawBreakpoints() => base.DrawBreakpoints();
+        public override void DrawBreakpoints(int index) => base.DrawBreakpoints(index);
 
         public override void DrawCpuInfo(ICpu cpu) =>
             base.DrawCpuInfo(cpu);
@@ -65,19 +65,15 @@ namespace Gmulator.Ui
 
         public override void DrawMemory() => base.DrawMemory();
 
-        public override void AddBreakpoint(int a, BpType type, int condition, bool write) => base.AddBreakpoint(a, type, condition, write);
+        public override void AddBreakpoint(int addr, BpType type,RamType ramType, CpuType cpuType, int index, string access, int condition, bool write) => 
+            base.AddBreakpoint(addr, type, ramType, cpuType, index, access, condition, write);
 
-        public override void Continue(DebugState type = 0) => base.Continue(0);
+        public override void Reset() => base.Reset();
+        public override void Continue() => base.Continue();
 
-        public override void Reset(DebugState type)
-        {
-            Nes.Reset("", true);
-            base.Reset(type);
-        }
+        public override void StepInto() => base.StepInto();
 
-        public override void StepInto(DebugState type) => base.StepInto(MainCpu);
-
-        public override void StepOver(DebugState type)
+        public override void StepOver()
         {
             var pc = Nes.Cpu.PC;
             var inst = Nes.Cpu.Disasm[Nes.Mmu.ReadByte(pc)];
@@ -85,15 +81,15 @@ namespace Gmulator.Ui
             if (inst.Name == "jsr")
             {
                 Cpu.StepOverAddr = pc + inst.Size;
-                base.StepOver(MainCpu);
+                base.StepOver();
             }
             else
-                StepInto(MainCpu);
+                StepInto();
         }
 
-        public override void StepScanline(DebugState type) => base.StepScanline(MainCpu);
+        public override void StepScanline() => base.StepScanline();
 
-        public override void ToggleTrace(DebugState type) => Nes.Logger.Toggle();
+        public override void ToggleTrace() => Nes.Logger.Toggle();
 
         public override void JumpTo(int i) => base.JumpTo(i);
     }

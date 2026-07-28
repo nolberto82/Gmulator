@@ -20,7 +20,8 @@ public class Nes : Emulator, IConsole
     IMmu IConsole.Mmu => Mmu;
 
     public Debugger Debugger { get; set; }
-    public DebugState EmuState { get; set; }
+    public DebugState DbgState { get; set; }
+    public bool Run { get; set; }
 
     public Nes()
     {
@@ -53,7 +54,7 @@ public class Nes : Emulator, IConsole
 
     public override void RunFrame(bool opened)
     {
-        if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)
+        if (Mapper != null && (DbgState == DebugState.Running || DbgState == DebugState.StepMain) && !opened)
         {
             var cyclesframe = Header.Region == 0 ? NesNtscCycles : NesPalCycles;
             while (Ppu.Cycles < cyclesframe)
@@ -62,30 +63,28 @@ public class Nes : Emulator, IConsole
 
                 if (Debug)
                 {
-                    if (EmuState == DebugState.StepMain)
+                    if (DbgState == DebugState.StepMain)
                     {
                         Cpu.Step();
-                        EmuState = DebugState.Break;
+                        DbgState = DebugState.Break;
                         return;
                     }
 
                     if (Cpu.StepOverAddr == Cpu.PC)
                     {
-                        EmuState = DebugState.Break;
+                        DbgState = DebugState.Break;
                         Cpu.StepOverAddr = -1;
                         return;
                     }
 
-                    if (!Run && Breakpoints.Count > 0)
-                        Debugger.Execute(pc);
+                    if (Breakpoints.Count > 0)
+                        Debugger.Execute(pc, CpuType.Nes);
 
                     if (Logger.Logging)
                         Logger.Log();
-
-                    Run = false;
                 }
 
-                if (EmuState == DebugState.Break)
+                if (DbgState == DebugState.Break)
                     return;
 
                 Cpu.Step();
@@ -143,7 +142,7 @@ public class Nes : Emulator, IConsole
         {
             using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-            bw.Write(Encoding.ASCII.GetBytes(Shared.EmuState.Version));
+            bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
             Mmu.Save(bw);
             Cpu.Save(bw);
             Ppu.Save(bw);
@@ -166,7 +165,7 @@ public class Nes : Emulator, IConsole
             {
                 using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
 
-                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == Shared.EmuState.Version)
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == EmuState.Version)
                 {
                     Mmu.Load(br);
                     Cpu.Load(br);

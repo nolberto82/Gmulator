@@ -6,18 +6,18 @@ public class Mapper0(byte[] rom, GbcMmu mmu) : BaseMapper(rom, mmu)
 
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
-    public override byte ReadRom(int a) => Rom[a % 0x4000];
+    public override int ReadRom(int addr) => Rom[addr % 0x4000];
 
-    public override Span<byte> ReadRomBlock(int a, int s) => new();
+    public override Span<byte> ReadRomBlock(int addr, int size) => new();
 
-    public override void WriteRom0(int a, byte v)
+    public override void WriteRom0(int addr, int value)
     {
-        //Rom[a] = v;
+        //Rom[addr] = (byte)value;
     }
 
-    public override void WriteRom1(int a, byte v)
+    public override void WriteRom1(int addr, int value)
     {
         //if (edit)
-        ///    Rom[a] = v;
+        ///    Rom[addr] = (byte)value;
     }
 }

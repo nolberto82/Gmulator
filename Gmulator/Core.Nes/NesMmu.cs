@@ -44,16 +44,16 @@ public class NesMmu(Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
         Mapper.Reset();
     }
 
-    private byte ApplyGameGenieCheats(int addr, byte v)
+    private int ApplyGameGenieCheats(int addr, int value)
     {
-        if (Cheats.Count == 0) return v;
+        if (Cheats.Count == 0) return value;
         var addr80 = addr | 0x800000;
-        if (Cheats.TryGetValue((addr, addr80), out Cheat value) && value.Enabled && value.Type == GameGenie)
+        if (Cheats.TryGetValue((addr, addr80), out Cheat cheat) && cheat.Enabled && cheat.Type == GameGenie)
         {
-            if (v == Cheats[(addr, addr80)].Compare)
+            if (value == Cheats[(addr, addr80)].Compare)
                 return Cheats[(addr, addr80)].Value;
         }
-        return v;
+        return value;
     }
 
     public void ApplyParCheats()
@@ -66,28 +66,28 @@ public class NesMmu(Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
         }
     }
 
-    public byte ReadWram(int a) => Wram[a & 0x7ff];
-    public void WriteWram(int a, byte v) => Wram[a & 0x7ff] = v;
-    public byte ReadSram(int a) => Mapper.Sram[a & 0x1fff];
-    public void WriteSram(int a, byte v) => Wram[a & 0xffff] = v;
-    public byte ReadVram(int a) => Vram[a & 0x3fff];
-    public static byte ReadNone(int a) => 0;
-    public static void WriteNone(int a, int v) { }
+    public int ReadWram(int addr) => Wram[addr & 0x7ff];
+    public void WriteWram(int addr, int value) => Wram[addr & 0x7ff] = (byte)value;
+    public int ReadSram(int addr) => Mapper.Sram[addr & 0x1fff];
+    public void WriteSram(int addr, int value) => Wram[addr & 0xffff] = (byte)value;
+    public int ReadVram(int addr) => Vram[addr & 0x3fff];
+    public static int ReadNone(int addr) => 0;
+    public static void WriteNone(int addr, int value) { }
 
-    public byte ReadByte(int addr)
+    public int ReadByte(int addr)
     {
         addr &= 0xffff;
         RamType = MemoryHandlers[addr].Type;
-        byte v = MemoryHandlers[addr].Read(addr);
+        int v = MemoryHandlers[addr].Read(addr);
         if (Cheats.Count > 0 && RamType == RamType.Rom)
             return ApplyGameGenieCheats(addr, v);
         return v;
     }
 
-    public void WriteByte(int a, byte v)
+    public void WriteByte(int addr, int value)
     {
-        RamType = MemoryHandlers[a].Type;
-        MemoryHandlers[a].Write(a, v);
+        RamType = MemoryHandlers[addr].Type;
+        MemoryHandlers[addr].Write(addr, value);
     }
 
     public byte ReadDebug(int addr) => Wram[addr];
@@ -176,19 +176,22 @@ public class NesMmu(Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
         Wram = ReadArray<byte>(br, Wram.Length); Vram = ReadArray<byte>(br, Vram.Length); Oram = ReadArray<byte>(br, Oram.Length);
     }
 
-    public void WriteWord(int a, int v)
+    public void WriteWord(int addr, int value)
     {
-        throw new NotImplementedException();
+        WriteByte(addr, value & 0xff);
+        WriteByte(addr + 1, (value >> 8) & 0xff);
     }
 
-    public int ReadLong(int a)
+    public int ReadLong(int addr)
     {
-        throw new NotImplementedException();
+        return ReadByte(addr) | ReadByte(addr + 1) << 8 | ReadByte(addr + 2) << 16;
     }
 
-    public void WriteLong(int a, int v)
+    public void WriteLong(int addr, int value)
     {
-        throw new NotImplementedException();
+        WriteByte(addr, value & 0xff);
+        WriteByte(addr + 1, (value >> 8) & 0xff);
+        WriteByte(addr + 2, (value >> 16) & 0xff);
     }
 }
 

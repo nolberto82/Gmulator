@@ -7,7 +7,7 @@ public class GbcLogger(Gbc gbc)
     public StreamWriter Outfile { get; private set; }
     public bool Logging { get; private set; }
 
-    public delegate byte ReadDel(int a);
+    public delegate int ReadDel(int a);
     public event ReadDel ReadByte;
 
     private readonly Gbc Gbc = gbc;

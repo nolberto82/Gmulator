@@ -26,29 +26,29 @@ public class Dmc : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x4010, 0x4013, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x4010:
-                RateIndex = v & 0x0f;
-                Irq = (v & 0x80) != 0;
-                Loop = (v & 0x40) != 0;
-                Frequency = (Rate[v & 0x0f] / 2) & 0xffff;
+                RateIndex = value & 0x0f;
+                Irq = (value & 0x80) != 0;
+                Loop = (value & 0x40) != 0;
+                Frequency = (Rate[value & 0x0f] / 2) & 0xffff;
                 break;
             case 0x4011:
-                OutputLevel = (byte)(v & 0x7f);
+                OutputLevel = (byte)(value & 0x7f);
                 break;
             case 0x4012:
-                SampleAddress = 0xc000 + (v << 6);
+                SampleAddress = 0xc000 + (value << 6);
                 break;
             case 0x4013:
-                SampleLength = (v << 4) + 1;
+                SampleLength = (value << 4) + 1;
                 break;
         }
     }
 
-    public void Write4015(int a, int v)
+    public void Write4015(int addr, int value)
     {
         if (Enabled)
         {

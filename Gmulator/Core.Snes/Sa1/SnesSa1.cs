@@ -65,7 +65,8 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
     public IPpu Ppu => Snes.Ppu;
 
     IMmu IConsole.Mmu => null;
-    public DebugState EmuState { get; set; }
+    public DebugState DbgState { get; set; }
+    public bool Run { get; set; }
     public Debugger Debugger { get; set; }
 
     public int BwSa1Bank { get => _bwSa1Bank; }
@@ -113,13 +114,8 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
             {
                 if (Snes.Debug && Snes.Breakpoints.Count > 0)
                 {
-                    if (!Snes.Run && Snes.Debugger.Execute(PBPC))
-                    {
-                        Snes.EmuState = DebugState.Break;
-                        return;
-                    }
-
-                    if (Snes.EmuState == DebugState.Break)
+                    Snes.Debugger.Execute(PBPC, CpuType.Sa1);
+                    if (DbgState == DebugState.Break)
                         return;
 
                     Snes.Logger.LogSaOne(Snes.Ppu.HPos);
@@ -156,9 +152,9 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         WriteByte(addr, v);
     }
 
-    public int ReadIram(int a) => Mmu.ReadIram(a);
+    public int ReadIram(int addr) => Mmu.ReadIram(addr);
 
-    public void WriteIram(int a, byte v) => Mmu.WriteIram(a, v);
+    public void WriteIram(int addr, int value) => Mmu.WriteIram(addr, value);
 
     private void CheckInterrupts()
     {
@@ -183,47 +179,45 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         return value;
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte ReadByte(int addr)
     {
         addr &= 0xffffff;
         byte value = (byte)(Sa1Map.Handlers[addr >> 12].Read(addr) & 0xff);
         if (Snes.Debug)
-            Snes.Debugger.Watchpoint(addr, value, Sa1Map.Handlers[addr >> 12], false);
+            Snes.Debugger.Watchpoint(addr, value, CpuType.Sa1, false);
         return Snes.ApplyGameGenieCheats(addr, value);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void WriteByte(int addr, byte value)
     {
         addr &= 0xffffff;
         Sa1Map.Handlers[addr >> 12].Write(addr, value);
         if (Snes.Debug)
-            Snes.Debugger.Watchpoint(addr, value, Sa1Map.Handlers[addr >> 12], true);
+            Snes.Debugger.Watchpoint(addr, value, CpuType.Sa1, true);
     }
 
     public byte ReadByteDebug(int addr)
     {
         addr &= 0xffffff;
-        return Sa1Map.Handlers[addr >> 12].Read(addr);
+        return (byte)Sa1Map.Handlers[addr >> 12].Read(addr);
     }
 
     public int ReadWordDebug(int a) => (ushort)(ReadByteDebug(a) | ReadByteDebug(a + 1) << 8);
     public int ReadLongDebug(int a) => ReadByteDebug(a) | ReadByteDebug(a + 1) << 8 | ReadByteDebug(a + 2) << 16;
 
 
-    public byte ReadBwRam(int a)
+    public int ReadBwRam(int addr)
     {
         Cycles++;
-        int addr = GetBwAddr(a);
-        return Snes.Mapper.ReadBwRam(addr);
+        int a = GetBwAddr(addr);
+        return Snes.Mapper.ReadBwRam(a);
     }
 
-    public void WriteBwRam(int a, byte v)
+    public void WriteBwRam(int addr, int value)
     {
         Cycles++;
-        int addr = GetBwAddr(a);
-        Snes.Mapper.WriteBwRam(addr, v);
+        int a = GetBwAddr(addr);
+        Snes.Mapper.WriteBwRam(a, value);
     }
 
     private int GetBwAddr(int a) => (BwSa1Bank * 0x2000) | (a & 0x1fff);
@@ -323,6 +317,11 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         cpuMap.Sram(0x80, 0xbf, 0x6000, 0x7fff, Mapper.ReadSram, Mapper.WriteSram, _bwCpuBank);
     }
 
+    public void Reset(string name, bool reset)
+    {
+
+    }
+
     public new void Save(BinaryWriter bw)
     {
 
@@ -359,8 +358,8 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
     }
 
     public List<RegisterInfo> GetIORegisters() =>
-[
-    new("2200","",""),
+    [
+        new("2200","",""),
         new("2200|0-3","Message",$"{_snesMessage:X2}"),
         new("2200|4","Nmi Request",$"{_sa1NmiRequest}"),
         new("2200|5","Reset",$"{_sa1Reset}"),
@@ -388,12 +387,12 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
         new("2224|0-4","Cpu Bw Ram Bank",$"{_bwCpuBank:X2}"),
         new("2225|0-6","Sa1 Bw Ram Bank",$"{_bwSa1Bank:X2}"),
         new("","Dma",$""),
-        new ("2230|0-1","Dma Src Device",$"{_dmaSrcDevice}"),
-        new ("2230|2-3","Dma Src Dst",$"{_dmaDstDevice}"),
-        new ("2230|4","Dma Mode",$"{_dmaMode}"),
-        new ("2230|5","Dma Conv Type",$"{_dmaConvType}"),
-        new ("2230|6","Dma Priority",$"{_dmaPriority}"),
-        new ("2230|7","Dma Enabled",$"{_dmaControl}"),
+        new("2230|0-1","Dma Src Device",$"{_dmaSrcDevice}"),
+        new("2230|2-3","Dma Src Dst",$"{_dmaDstDevice}"),
+        new("2230|4","Dma Mode",$"{_dmaMode}"),
+        new("2230|5","Dma Conv Type",$"{_dmaConvType}"),
+        new("2230|6","Dma Priority",$"{_dmaPriority}"),
+        new("2230|7","Dma Enabled",$"{_dmaControl}"),
         new("2232","Dma Src Addr",$"{_dmaSrcStartAddr:X6}"),
         new("2235","Dma Dst Addr",$"{_dmaDstStartAddr:X6}"),
         new("","Math",$""),

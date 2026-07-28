@@ -12,17 +12,19 @@ public sealed class SnesDma(Snes snes) : ISaveState
     private readonly int[] Mode = new int[MaxChannels];// 7;
     private readonly int[] Port = new int[MaxChannels];
     private readonly int[] ABank = new int[MaxChannels];
-    private readonly int[] AAddress = new int[MaxChannels];// = 0xffff;
-    private readonly int[] Size = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private readonly ushort[] AAddress = new ushort[MaxChannels];// = 0xffff;
+    private readonly ushort[] Size = new ushort[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
     private readonly int[] BAddress = new int[MaxChannels];// { get => (byte)field; set => field = (byte)value; } = 0xff;
     private readonly int[] RamAddress = new int[MaxChannels];// { get; set; }
     private readonly int[] HBank = new int[MaxChannels];// = 0xff;
-    private readonly int[] HAddress = new int[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
+    private readonly ushort[] HAddress = new ushort[MaxChannels];// { get => (ushort)field; set => field = (ushort)value; } = 0xffff;
     private readonly int[] HCounter = new int[MaxChannels];//= 0xff;
     private readonly bool[] Completed = new bool[MaxChannels];
     private readonly bool[] Indirect = new bool[MaxChannels];
     private readonly bool[] Repeat = new bool[MaxChannels];
     private readonly bool[] TransferEnabled = new bool[MaxChannels];
+
+    private readonly int _byteCount;
 
     private readonly Action Idle8 = snes.Cpu.Idle8;
 
@@ -36,13 +38,13 @@ public sealed class SnesDma(Snes snes) : ISaveState
         Array.Fill(Step, 0);
         Array.Fill(Mode, 7);
         Array.Fill(Port, 0);
-        Array.Fill(ABank, 0);
-        Array.Fill(AAddress, 0xffff);
-        Array.Fill(Size, 0xffff);
+        Array.Fill(ABank, 0xff);
+        Array.Fill<ushort>(AAddress, 0xffff);
+        Array.Fill<ushort>(Size, 0xffff);
         Array.Fill(BAddress, 0xff);
         Array.Fill(RamAddress, 0);
         Array.Fill(HBank, 0xff);
-        Array.Fill(HAddress, 0xffff);
+        Array.Fill<ushort>(HAddress, 0xffff);
         Array.Fill(HCounter, 0xff);
         Array.Fill(Completed, false);
         Array.Fill(Indirect, false);
@@ -50,8 +52,8 @@ public sealed class SnesDma(Snes snes) : ISaveState
         Array.Fill(TransferEnabled, false);
     }
 
-    public Func<int, byte> ReadCpu = snes.ReadMemory;
-    public Action<int, byte> WriteCpu = snes.WriteMemory;
+    public Func<int, int> ReadCpu = snes.ReadMemory;
+    public Action<int, int> WriteCpu = snes.WriteMemory;
     private bool DmaEnabled;
     private int DmaState;
     public readonly byte[] Max = [1, 2, 2, 4, 4, 4, 2, 4];
@@ -93,21 +95,25 @@ public sealed class SnesDma(Snes snes) : ISaveState
         {
             if (Enabled[i])
             {
-                var src = ABank[i] << 16 | AAddress[i];
+                if (HdmaEnabled[i])
+                {
+                    HandleHdma();
+                    break;
+                }
+
                 int count = 0;
                 do
                 {
-                    if (!Transfer(src, Mode[i], count, i))
+                    if (!Transfer(ABank[i] << 16 | AAddress[i], Mode[i], count, i))
                     {
                         if (Step[i] == 0)
-                            src++;
+                            AAddress[i]++;
                         else if (Step[i] == 2)
-                            src--;
+                            AAddress[i]--;
                     }
-                    Size[i] = (Size[i] - 1) & 0xffff;
+                    Size[i]--;
                     count = (count + 1) & 3;
                 } while (Size[i] != 0);
-                AAddress[i] = (ushort)src;
                 Enabled[i] = false;
             }
         }
@@ -121,28 +127,25 @@ public sealed class SnesDma(Snes snes) : ISaveState
         {
             if (HdmaEnabled[i] && !Completed[i])
             {
+                //Enabled[i] = false;
                 if (TransferEnabled[i])
                 {
                     int max = Max[Mode[i] & 7];
                     if (Indirect[i])
                     {
-                        int size = Size[i];
                         for (int count = 0; count < max; count++)
                         {
-                            Transfer(HBank[i] << 16 | size, Mode[i], count, i);
-                            size++;
+                            Transfer(HBank[i] << 16 | Size[i], Mode[i], count, i);
+                            Size[i]++;
                         }
-                        Size[i] = size & 0xffff;
                     }
                     else
                     {
-                        int hAddress = HAddress[i];
                         for (int count = 0; count < max; count++)
                         {
-                            Transfer(ABank[i] << 16 | hAddress, Mode[i], count, i);
-                            hAddress++;
+                            Transfer(ABank[i] << 16 | HAddress[i], Mode[i], count, i);
+                            HAddress[i]++;
                         }
-                        HAddress[i] = hAddress;
                     }
                 }
 
@@ -175,7 +178,7 @@ public sealed class SnesDma(Snes snes) : ISaveState
         {
             if (HdmaEnabled[i])
             {
-                Completed[i] = false;
+
                 HAddress[i] = AAddress[i];
                 int v = ReadCpu(ABank[i] << 16 | HAddress[i]);
                 HAddress[i]++;
@@ -195,13 +198,14 @@ public sealed class SnesDma(Snes snes) : ISaveState
             {
                 TransferEnabled[i] = false;
             }
+            Completed[i] = false;
         }
     }
 
-    public int Read(int a)
+    public int Read(int addr)
     {
-        var i = (a & 0xf0) / 0x10;
-        switch (a & 0x0f)
+        var i = (addr & 0xf0) / 0x10;
+        switch (addr & 0x0f)
         {
             case 0x00:
                 return ((Direction[i] ? 0x80 : 0x00) |
@@ -249,15 +253,15 @@ public sealed class SnesDma(Snes snes) : ISaveState
                 Mode[i] = v & 7;
                 RamAddress[i] = Snes.Mmu.RamAddr;
                 break;
-            case 0x01: BAddress[i] = v; break;
-            case 0x02: AAddress[i] = (AAddress[i] & 0xff00) | v; break;
-            case 0x03: AAddress[i] = (AAddress[i] & 0x00ff) | v << 8; break;
-            case 0x04: ABank[i] = v; break;
+            case 0x01: BAddress[i] = (ushort)v; break;
+            case 0x02: AAddress[i] = (ushort)((AAddress[i] & 0xff00) | v); break;
+            case 0x03: AAddress[i] = (ushort)((AAddress[i] & 0x00ff) | v << 8); break;
+            case 0x04: ABank[i] = (byte)v; break;
             case 0x05: Size[i] = (ushort)((Size[i] & 0xff00) | v); break;
             case 0x06: Size[i] = (ushort)((Size[i] & 0x00ff) | v << 8); break;
-            case 0x07: HBank[i] = v; break;
-            case 0x08: HAddress[i] = (HAddress[i] & 0xff00) | v; break;
-            case 0x09: HAddress[i] = (HAddress[i] & 0x00ff) | v << 8; break;
+            case 0x07: HBank[i] = (byte)v; break;
+            case 0x08: HAddress[i] = (ushort)((HAddress[i] & 0xff00) | v); break;
+            case 0x09: HAddress[i] = (ushort)((HAddress[i] & 0x00ff) | v << 8); break;
             case 0x0a:
                 HCounter[i] = v;
                 Repeat[i] = (v & 0x80) != 0;
@@ -306,10 +310,10 @@ public sealed class SnesDma(Snes snes) : ISaveState
             Enabled[i] = br.ReadBoolean(); HdmaEnabled[i] = br.ReadBoolean();
             Direction[i] = br.ReadBoolean(); Step[i] = br.ReadInt32();
             Mode[i] = br.ReadInt32(); Port[i] = br.ReadInt32();
-            ABank[i] = br.ReadInt32(); AAddress[i] = br.ReadInt32();
-            Size[i] = br.ReadInt32(); BAddress[i] = br.ReadInt32();
+            ABank[i] = br.ReadInt32(); AAddress[i] = br.ReadUInt16();
+            Size[i] = br.ReadUInt16(); BAddress[i] = br.ReadInt32();
             RamAddress[i] = br.ReadInt32(); HBank[i] = br.ReadInt32();
-            HAddress[i] = br.ReadInt32(); HCounter[i] = br.ReadInt32();
+            HAddress[i] = br.ReadUInt16(); HCounter[i] = br.ReadInt32();
             Completed[i] = br.ReadBoolean(); Indirect[i] = br.ReadBoolean();
             Repeat[i] = br.ReadBoolean(); TransferEnabled[i] = br.ReadBoolean();
         }

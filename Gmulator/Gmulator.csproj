@@ -81,6 +81,9 @@
 		<None Update="Assets\Super Mario World (USA).lua">
 		  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>
+		<None Update="imgui.ini">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

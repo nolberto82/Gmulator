@@ -158,7 +158,7 @@ public abstract class Gui
         Audio = new();
 
 #if DEBUG || RELEASE
-        Raylib.SetWindowSize(1280, 980);
+        Raylib.SetWindowSize(1180, 980);
         Raylib.SetWindowPosition(10, 30);
         Raylib.ClearWindowState(ConfigFlags.VSyncHint);
 #if RELEASE
@@ -179,7 +179,7 @@ public abstract class Gui
             }
         }
 
-        rlImGui.Setup(true);
+        rlImGui.Setup(true, true);
         var io = ImGui.GetIO();
 
         if (File.Exists(FontName))

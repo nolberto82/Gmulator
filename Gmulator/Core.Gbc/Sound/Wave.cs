@@ -5,11 +5,11 @@ namespace Gmulator.Core.Gbc.Sound;
 public class Wave : BaseChannel, ISaveState
 {
     private byte _wave;
-    private byte _nr30;
-    private byte _nr31;
-    private byte _nr32;
-    private byte _nr33;
-    private byte _nr34;
+    private int _nr30;
+    private int _nr31;
+    private int _nr32;
+    private int _nr33;
+    private int _nr34;
 
     private readonly Gbc Gbc;
 
@@ -29,7 +29,7 @@ public class Wave : BaseChannel, ISaveState
         gbc.CpuMap.Set(0x00, 0x00, 0xff1a, 0xff1e, Read, Write, RamType.Register, 1);
     }
 
-    public byte Read(int a) => a switch
+    public int Read(int addr) => addr switch
     {
         0xff1a => (byte)(_nr30 | 0x7f),
         0xff1b => (byte)(_nr31 | 0xff),
@@ -39,41 +39,41 @@ public class Wave : BaseChannel, ISaveState
         _ => 0xff,
     };
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0xff1a:
-                Dac = (v & 0x80) != 0;
-                _nr30 = v;
+                Dac = (value & 0x80) != 0;
+                _nr30 = value;
                 break;
             case 0xff1b:
-                LengthCounter = 256 - v;
-                _nr31 = v;
+                LengthCounter = 256 - value;
+                _nr31 = value;
                 break;
             case 0xff1c:
-                VolumeShift = ((v & 0x60) >> 5) & 3;
-                _nr32 = v;
+                VolumeShift = ((value & 0x60) >> 5) & 3;
+                _nr32 = value;
                 break;
             case 0xff1d:
-                Frequency = Frequency & 0xff00 | v;
-                _nr33 = v;
+                Frequency = Frequency & 0xff00 | value;
+                _nr33 = value;
                 break;
             case 0xff1e:
                 if (Dac)
                 {
-                    Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-                    LengthEnabled = (v & 0x40) != 0;
-                    if ((v & 0x80) != 0)
+                    Frequency = (Frequency & 0xff) | (value & 0x07) << 8;
+                    LengthEnabled = (value & 0x40) != 0;
+                    if ((value & 0x80) != 0)
                         Trigger(256, 2);
                 }
-                _nr34 = v;
+                _nr34 = value;
                 break;
         }
     }
 
-    private byte ReadWaveRam(int a) => WaveRam[a & 0x0f];
-    private void WriteWaveRam(int a, byte v) => WaveRam[a & 0x0f] = v;//Mmu.WriteByte(0xff00 + a, v);
+    private int ReadWaveRam(int addr) => WaveRam[addr & 0x0f];
+    private void WriteWaveRam(int addr, int value) => WaveRam[addr & 0x0f] = (byte)value;//Mmu.WriteByte(0xff00 + addr, value);
 
     public override void Reset()
     {
@@ -120,8 +120,8 @@ public class Wave : BaseChannel, ISaveState
     {
         Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32();
         CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); VolumeShift = br.ReadInt32(); _wave = br.ReadByte();
-        WaveRam = ReadArray<byte>(br, WaveRam.Length); _nr30 = br.ReadByte(); _nr31 = br.ReadByte(); _nr32 = br.ReadByte();
-        _nr33 = br.ReadByte(); _nr34 = br.ReadByte();
+        WaveRam = ReadArray<byte>(br, WaveRam.Length); _nr30 = br.ReadInt32(); _nr31 = br.ReadInt32(); _nr32 = br.ReadInt32();
+        _nr33 = br.ReadInt32(); _nr34 = br.ReadInt32();
         Dac = (_nr30 & 0x80) != 0;
     }
 

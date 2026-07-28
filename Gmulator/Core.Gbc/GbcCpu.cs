@@ -32,8 +32,8 @@ public partial class GbcCpu : ICpu, ISaveState
     public int SP { get => _sp & 0xffff; set => _sp = value & 0xffff; }
     public int PC { get => _pc & 0xffff; set => _pc = value & 0xffff; }
     public ulong Cycles { get; set; }
-    public byte IE { get => _ie; set => _ie = value; }
-    public byte IF { get => _if; set => _if = value; }
+    public int IE { get => _ie; set => _ie = value; }
+    public int IF { get => _if; set => _if = value; }
     public int Sb { get => _sb; set => _sb = (byte)value; }
     public int Sc { get => _sc; set => _sc = (byte)value; }
     public bool Halt { get => _halt; set => _halt = value; }
@@ -42,11 +42,11 @@ public partial class GbcCpu : ICpu, ISaveState
     public int ImeDelay { get => _imeDelay; set => _imeDelay = value; }
 
     private int _pc, _sp;
-    private byte _a, _f, _b, _c, _d, _e, _h, _l;
-    private byte _ie;
-    private byte _if;
-    private byte _sb;
-    private byte _sc;
+    private int _a, _f, _b, _c, _d, _e, _h, _l;
+    private int _ie;
+    private int _if;
+    private int _sb;
+    private int _sc;
 
     private bool _halt;
     private bool _ime;
@@ -62,10 +62,10 @@ public partial class GbcCpu : ICpu, ISaveState
     public bool FlagH { get => (AF & FH) == FZ; }
     public bool FlagC { get => (AF & FC) == FC; }
 
-    private byte Read0F(int a) => IF;
-    private byte ReadFF(int a) => IE;
-    private void Write0F(int a, byte v) => IF = v;
-    private void WriteFF(int a, byte v) => IE = v;
+    private int Read0F(int a) => IF;
+    private int ReadFF(int a) => IE;
+    private void Write0F(int a, int v) => IF = v;
+    private void WriteFF(int a, int v) => IE = v;
 
 
     private readonly Gbc Gbc;
@@ -124,16 +124,16 @@ public partial class GbcCpu : ICpu, ISaveState
     public byte ReadCycle(int addr)
     {
         Tick();
-        byte v = Mmu.ReadByte(addr);
-        Gbc.Debugger.Watchpoint(addr, v, MemoryHandlers[addr >> 12], false);
-        return v;
+        byte value = (byte)Mmu.ReadByte(addr);
+        Gbc.Debugger.Watchpoint(addr, value, CpuType.Gbc, false);
+        return value;
     }
 
     public void WriteCycle(int addr, byte value)
     {
         Tick();
         Mmu.WriteByte(addr, value);
-        Gbc.Debugger.Watchpoint(addr, value, MemoryHandlers[addr >> 12], true);
+        Gbc.Debugger.Watchpoint(addr, value, CpuType.Gbc, true);
     }
 
     public void CheckInterrupts()

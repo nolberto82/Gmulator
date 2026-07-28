@@ -12,25 +12,25 @@ public class Noise : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x400c, 0x400f, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a,byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x400c:
-                EnvVolume = v & 0x0f;
-                ConstVolumeFlag = (v & 0x10) != 0;
-                EnvLoop = (v & 0x20) != 0;
+                EnvVolume = value & 0x0f;
+                ConstVolumeFlag = (value & 0x10) != 0;
+                EnvLoop = (value & 0x20) != 0;
                 LengthEnabled = !EnvLoop;
                 break;
             case 0x400d:
                 break;
             case 0x400e:
-                Frequency = NoiseTable[v & 0x0f] & 0xffff;
-                Mode = (v & 0x80) != 0;
+                Frequency = NoiseTable[value & 0x0f] & 0xffff;
+                Mode = (value & 0x80) != 0;
                 break;
             case 0x400f:
                 if (Enabled)
-                    LengthCounter = LengthTable[v >> 3];
+                    LengthCounter = LengthTable[value    >> 3];
                 EnvStart = true;
                 break;
         }

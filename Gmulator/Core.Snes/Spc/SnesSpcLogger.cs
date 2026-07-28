@@ -36,7 +36,7 @@ public class SnesSpcLogger()
         string data = string.Empty;
         string access = string.Empty;
 
-        byte[] b = new byte[size];
+        int[] b = new int[size];
         for (int i = 0; i < b.Length; i++)
             b[i] = Spc.ReadDebug(pc + i);
 

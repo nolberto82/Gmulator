@@ -2,10 +2,10 @@
 {
     public partial class SnesSa1
     {
-        public byte ReadRegister(int a)
+        public int ReadRegister(int addr)
         {
-            a &= 0xffff;
-            switch (a)
+            addr &= 0xffff;
+            switch (addr)
             {
                 case 0x2300:
                 {
@@ -43,7 +43,7 @@
                 }
                 case >= 0x2306 and <= 0x230a:
                 {
-                    int shift = (a - 0x2306) * 8;
+                    int shift = (addr - 0x2306) * 8;
                     return (byte)((_mathResult >> shift) & 0xff);
                 }
                 case 0x230b:
@@ -135,31 +135,31 @@
             }
         }
 
-        public void WriteSa1Register(int a, byte v)
+        public void WriteSa1Register(int addr, int value)
         {
-            switch (a & 0xffff)
+            switch (addr & 0xffff)
             {
                 case 0x2209:
-                    _sa1Message = v & 0x0f;
-                    _nmiVectorSelect = (v & 0x10) != 0;
-                    _irqVectorSelect = (v & 0x40) != 0;
-                    _irqRequest = (v & 0x80) != 0;
+                    _sa1Message = value & 0x0f;
+                    _nmiVectorSelect = (value & 0x10) != 0;
+                    _irqVectorSelect = (value & 0x40) != 0;
+                    _irqRequest = (value & 0x80) != 0;
                     CheckInterrupts();
                     break;
                 case 0x220a:
-                    _sa1IrqEnabled = (v & 0x80) != 0;
-                    _sa1NmiEnabled = (v & 0x10) != 0;
+                    _sa1IrqEnabled = (value & 0x80) != 0;
+                    _sa1NmiEnabled = (value & 0x10) != 0;
                     CheckInterrupts();
                     break;
                 case 0x220b:
-                    if ((v & 0x80) != 0)
+                    if ((value & 0x80) != 0)
                         _sa1IrqRequest = false;
-                    if ((v & 0x10) != 0)
+                    if ((value & 0x10) != 0)
                         _sa1NmiRequest = false;
                     CheckInterrupts();
                     break;
                 case 0x2225:
-                    _bwSa1Bank = v & 0x7f;
+                    _bwSa1Bank = value & 0x7f;
                     UpdateRamBanks();
                     break;
                 case 0x2227:
@@ -181,20 +181,20 @@
 
                     break;
                 case 0x2250:
-                    _mathControl = v & 3;
+                    _mathControl = value & 3;
                     break;
                 case 0x2251 or 0x2252:
-                    if (a % 2 == 1)
-                        _multiplicand = (_multiplicand & 0xff00) | v;
+                    if (addr % 2 == 1)
+                        _multiplicand = (_multiplicand & 0xff00) | value;
                     else
-                        _multiplicand = (_multiplicand & 0xff) | v << 8;
+                        _multiplicand = (_multiplicand & 0xff) | value << 8;
                     break;
                 case 0x2253 or 0x2254:
-                    if (a % 2 == 1)
-                        _multiplier = (_multiplier & 0xff00) | v;
+                    if (addr % 2 == 1)
+                        _multiplier = (_multiplier & 0xff00) | value;
                     else
                     {
-                        _multiplier = (_multiplier & 0xff) | v << 8;
+                        _multiplier = (_multiplier & 0xff) | value << 8;
                         if (_mathControl == 0)
                             _mathResult = (short)_multiplicand * (short)_multiplier;
                         else if (_mathControl == 1)
@@ -212,39 +212,39 @@
                 case 0x225b:
                     break;
                 default:
-                    WriteRegister(a, v);
+                    WriteRegister(addr, value);
                     break;
             }
         }
 
-        private void WriteRegister(int a, int v)
+        private void WriteRegister(int addr, int value)
         {
-            switch (a & 0xffff)
+            switch (addr & 0xffff)
             {
                 case 0x2230:
-                    _dmaSrcDevice = v & 3;
-                    _dmaDstDevice = (v >> 2) & 3;
-                    _dmaCharConv = (v & 0x10) != 0;
-                    _dmaMode = (v & 0x20) != 0;
-                    _dmaControl = (v & 0x80) != 0;
+                    _dmaSrcDevice = value & 3;
+                    _dmaDstDevice = (value >> 2) & 3;
+                    _dmaCharConv = (value & 0x10) != 0;
+                    _dmaMode = (value & 0x20) != 0;
+                    _dmaControl = (value & 0x80) != 0;
                     break;
                 case 0x2231:
 
                     break;
                 case 0x2232:
-                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0xffff00) | v;
+                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0xffff00) | value;
                     break;
                 case 0x2233:
-                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0xff00ff) | v << 8;
+                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0xff00ff) | value << 8;
                     break;
                 case 0x2234:
-                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0x00ffff) | v << 16;
+                    _dmaSrcStartAddr = (_dmaSrcStartAddr & 0x00ffff) | value << 16;
                     break;
                 case 0x2235:
-                    _dmaDstStartAddr = (_dmaDstStartAddr & 0xffff00) | v;
+                    _dmaDstStartAddr = (_dmaDstStartAddr & 0xffff00) | value;
                     break;
                 case 0x2236:
-                    _dmaDstStartAddr = (_dmaDstStartAddr & 0xff00ff) | v << 8;
+                    _dmaDstStartAddr = (_dmaDstStartAddr & 0xff00ff) | value << 8;
                     if (_dmaControl && !_dmaCharConv)
                     {
 
@@ -257,7 +257,7 @@
                     }
                     break;
                 case 0x2237:
-                    _dmaDstStartAddr = (_dmaDstStartAddr & 0x00ffff) | v << 16;
+                    _dmaDstStartAddr = (_dmaDstStartAddr & 0x00ffff) | value << 16;
                     break;
             }
         }

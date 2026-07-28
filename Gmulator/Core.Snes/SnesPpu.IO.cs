@@ -1,4 +1,6 @@
-﻿namespace Gmulator.Core.Snes;
+﻿using System.Runtime.CompilerServices;
+
+namespace Gmulator.Core.Snes;
 
 public sealed partial class SnesPpu
 {
@@ -27,9 +29,9 @@ public sealed partial class SnesPpu
     private bool _opvctLatch;
     private int _multiplyRes;
 
-    public byte ReadIO(int a)
+    public int ReadIO(int addr)
     {
-        switch (a & 0xffff)
+        switch (addr & 0xffff)
         {
             case 0x4016: return Snes.Joypad.Read4016();
             case 0x4210:
@@ -45,6 +47,8 @@ public sealed partial class SnesPpu
                 v |= Cpu.OpenBus & 0x7f;
                 _hvbJoy &= 0x3f;
                 _timeUp &= 0x7f;
+                Cpu.IrqEnabled = false;
+                Cpu.IrqActive = false;
                 return (byte)(v & 0xff);
             }
             case 0x4212:
@@ -61,39 +65,39 @@ public sealed partial class SnesPpu
             case 0x4217: return (byte)((MulDivRemainder >> 8) & 0xff);
             case 0x4218: return (byte)(_joy1L & 0xff);
             case 0x4219: return (byte)(_joy1H & 0xff);
-            case >= 0x4300 and <= 0x437f: return (byte)Dma.Read(a);
+            case >= 0x4300 and <= 0x437f: return (byte)Dma.Read(addr);
         }
         return 0x00;
     }
 
-    public void WriteIO(int a, byte v)
+    public void WriteIO(int addr, int value)
     {
-        switch (a & 0xffff)
+        switch (addr & 0xffff)
         {
             case 0x4200:
-                if ((_nmiTimEn & 0x80) == 0 && (v & 0x80) != 0 && _vblank)
+                if ((_nmiTimEn & 0x80) == 0 && (value & 0x80) != 0 && _vblank)
                     SetNmi();
-                _nmiTimEn = v;
+                _nmiTimEn = value;
                 break;
-            case 0x4201: _wrIo = v; break;
-            case 0x4202: _multiplyA = v; break;
-            case 0x4203: MulDivRemainder = _multiplyA * v; break;
-            case 0x4204: _dividend = (_dividend & 0xff00) | v; break;
-            case 0x4205: _dividend = (_dividend & 0x00ff) | v << 8; break;
-            case 0x4206: Division(v); break;
-            case 0x4207: _hTimeLow = v; break;
-            case 0x4208: _hTimeHigh = v; break;
-            case 0x4209: _vTimeLow = v; break;
-            case 0x420a: _vTimeHigh = v; break;
-            case 0x420b or 0x420c: Dma.WriteDma(a, v); break;
-            case 0x420d: Cpu.FastMem = (v & 1) != 0; break;
-            case >= 0x4300 and <= 0x437f: Dma.Write(a, v); break;
+            case 0x4201: _wrIo = value; break;
+            case 0x4202: _multiplyA = value; break;
+            case 0x4203: MulDivRemainder = _multiplyA * value; break;
+            case 0x4204: _dividend = (_dividend & 0xff00) | value; break;
+            case 0x4205: _dividend = (_dividend & 0x00ff) | value << 8; break;
+            case 0x4206: Division(value); break;
+            case 0x4207: _hTimeLow = value; break;
+            case 0x4208: _hTimeHigh = value; break;
+            case 0x4209: _vTimeLow = value; break;
+            case 0x420a: _vTimeHigh = value; break;
+            case 0x420b or 0x420c: Dma.WriteDma(addr, value); break;
+            case 0x420d: Cpu.FastMem = (value & 1) != 0; break;
+            case >= 0x4300 and <= 0x437f: Dma.Write(addr, value); break;
         }
     }
 
     public List<RegisterInfo> GetState() =>
-[
-    new("","HClock",$"{HPos}"),
+    [
+        new("","HClock",$"{HPos}"),
         new("","Scanline", $"{VPos}"),
         new("","Nmi/Irq/Autojoy", $""),
         new("4200|0","Auto Joy", $"{(_hvbJoy & 0x01) != 0}"),
@@ -105,7 +109,8 @@ public sealed partial class SnesPpu
         new("4209/A","VTIME", $"{GetVTime:X4}"),
         new("4212","HVBJOY", $"{_hvbJoy:X2}"),
         new("2105","BGMode", $"{_bgMode:X2}"),
-        new("2100","Brightness", $"{_brightness:X2}"),
+        new("2100|0-3","Brightness", $"{_brightness:X2}"),
+        new("2100|7","Forced Blank", $"{_forcedBlank}"),
         new("2132","Fixed Color", $"{Fixed.Color:X4}"),
         new("4216/7","Remainder", $"{MulDivRemainder:X4}"),
         new("2101|0-2","Oam Table",$"{_objTable1:X4}"),

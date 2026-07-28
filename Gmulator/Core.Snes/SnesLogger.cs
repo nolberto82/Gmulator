@@ -188,7 +188,7 @@ public sealed class SnesLogger(Snes snes)
                 break;
             case ProgramCounterRelative:
                 a = pc + (sbyte)Read(pc + 1) + 2;
-                data += $"${a:x4}";
+                data += $"${a:x6}";
                 break;
             case ProgramCounterRelativeLong:
                 a = pc + (short)(ReadWord(pc + 1) + 3);
@@ -224,9 +224,9 @@ public sealed class SnesLogger(Snes snes)
         {
             foreach (var r in Cpu.GetRegisters())
             {
-                if (r.Value == "P" || r.Value == "PB") continue;
+                if (r.Name == "PB") continue;
                 var v = r.Value == "DB" ? $"{r.Value:x2}" : $"{r.Value:x4}";
-                regtext += $"{r.Name.Replace(" ", "")}:{v.ToLower()} ";
+                regtext += $"{r.Name.Replace(" ", "")}:{v.ToUpper()} ";
             }
 
             string s = "";
@@ -239,7 +239,7 @@ public sealed class SnesLogger(Snes snes)
                 s += $"{k}";
             }
             //regtext += new string([.. s.Reverse()]) + " ";
-            return ($"{data,-20} {regtext}", access, op, size);
+            return ($"{data,-30} {regtext}".TrimEnd(), access, op, size);
         }
         return (data, access, op, size);
     }
@@ -250,7 +250,7 @@ public sealed class SnesLogger(Snes snes)
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
             var (disasm, _, _, _) = Disassemble(Cpu.PBPC, true);
-            Outfile.WriteLine($"{Cpu.PBPC:x6} {disasm,-13} {hpos}");
+            Outfile.WriteLine($"{Cpu.PBPC:X6}  {disasm}");
         }
     }
 
@@ -259,8 +259,8 @@ public sealed class SnesLogger(Snes snes)
         if (!LogSa1) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var (disasm, _, _, _) = Disassemble((int)(Snes?.Sa1?.PBPC), true);
-            Outfile.WriteLine($"{Snes.Sa1.PBPC:x6} {disasm,-13} {hpos}");
+            var (disasm, regtext, _, _) = Disassemble((int)(Snes?.Sa1?.PBPC), true);
+            Outfile.WriteLine($"{Snes.Sa1.PBPC:x6}  {disasm}");
         }
     }
 

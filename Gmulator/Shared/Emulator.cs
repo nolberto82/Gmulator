@@ -62,9 +62,9 @@ public class Emulator
         Debug = true;
 #endif
         if (!Debug)
-            Console.EmuState = DebugState.Running;
+            Console.DbgState = DebugState.Running;
         else
-            Console.EmuState = DebugState.Break;
+            Console.DbgState = DebugState.Break;
         Lua?.SetDebug(Debug);
         if (name != "")
             GameName = name;
@@ -77,10 +77,27 @@ public class Emulator
         var width = Raylib.GetScreenWidth();
         var height = Raylib.GetScreenHeight();
         IsScreenWindow = false;
+
         if (Debug)
         {
+            var viewport = ImGui.GetMainViewport();
+            ImGui.SetNextWindowPos(viewport.WorkPos);
+            ImGui.SetNextWindowSize(viewport.WorkSize);
+            ImGui.SetNextWindowViewport(viewport.ID);
+
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0);
+            ImGui.PushStyleVar(ImGuiStyleVar.WindowRounding, 0);
+            ImGui.Begin("GDockSpace", ImGuiWindowFlags.NoTitleBar | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoResize |
+                ImGuiWindowFlags.NoMove | ImGuiWindowFlags.NoBringToFrontOnFocus | ImGuiWindowFlags.NoNavFocus | ImGuiWindowFlags.NoDocking);
+            ImGui.PopStyleVar(2);
+
+            uint dockId = ImGui.GetID("GDockSpace");
+            ImGui.DockSpace(dockId, new(0, 0), ImGuiDockNodeFlags.AutoHideTabBar);
+
             DebugWindow?.Draw(Screen.Texture);
             IsScreenWindow = true;
+
+            ImGui.End();
         }
         else
         {
@@ -114,7 +131,6 @@ public class Emulator
     {
         if (!Debug)
         {
-            //Array.Reverse(buffer);
             uint[] flippedBuffer = new uint[buffer.Length];
             for (int x = 0; x < texture.Width; x++)
             {
@@ -262,7 +278,7 @@ public class Emulator
                 foreach (var r in rawcodes)
                 {
                     if (!Cheats.ContainsKey((r.Address, r.Address80)))
-                        Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, enabledAll ? true : r.Enabled, cht.Codes));
+                        Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, enabledAll || r.Enabled, cht.Codes));
                 }
             }
         }

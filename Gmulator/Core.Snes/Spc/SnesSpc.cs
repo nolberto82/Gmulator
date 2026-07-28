@@ -80,9 +80,9 @@ public partial class SnesSpc : ISaveState, ICpu
 
     public byte Read(int a) => Apu.Read(a);
 
-    public void Write(int a, byte v) => Apu.Write(a, v);
+    public void Write(int a, int v) => Apu.Write(a, v);
 
-    public byte ReadDebug(int a) => Apu.ReadDebug(a);
+    public int ReadDebug(int addr) => Apu.ReadDebug(addr);
 
     private ushort ReadWord(int a) => (ushort)(Read(a) | Read(a + 1) << 8);
 

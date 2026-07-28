@@ -5,17 +5,17 @@ namespace Gmulator.Core.Gbc.Sound;
 
 public class Noise : BaseChannel, ISaveState
 {
-    private byte _nr41;
-    private byte _nr42;
-    private byte _nr43;
-    private byte _nr44;
+    private int _nr41;
+    private int _nr42;
+    private int _nr43;
+    private int _nr44;
 
     public Noise(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff20, 0xff23, Read, Write, RamType.Register, 1);
     }
 
-    public byte Read(int a) => a switch
+    public int Read(int addr) => addr switch
     {
         0xff20 => (byte)(_nr41 | 0xff),
         0xff21 => _nr42,
@@ -24,36 +24,36 @@ public class Noise : BaseChannel, ISaveState
         _ => 0xff,
     };
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0xff20:
-                LengthCounter = 64 - (v & 0x3f);
-                _nr41 = v;
+                LengthCounter = 64 - (value & 0x3f);
+                _nr41 = value;
                 break;
             case 0xff21:
-                EnvVolume = (v & 0xf0) >> 4;
-                EnvDirection = (v & 0x08) > 0;
-                EnvPeriod = v & 0x07;
-                Dac = (v & 0xf8) > 0;
-                _nr42 = v;
+                EnvVolume = (value & 0xf0) >> 4;
+                EnvDirection = (value & 0x08) > 0;
+                EnvPeriod = value & 0x07;
+                Dac = (value & 0xf8) > 0;
+                _nr42 = value;
                 break;
             case 0xff22:
-                Shift = (v & 0xf0) >> 4;
-                Width = (v & 0x08) >> 3;
-                Divisor = v & 0x07;
-                _nr43 = v;
+                Shift = (value & 0xf0) >> 4;
+                Width = (value & 0x08) >> 3;
+                Divisor = value & 0x07;
+                _nr43 = value;
                 break;
             case 0xff23:
-                LengthEnabled = (v & 0x40) != 0;
-                if ((v & 0x80) != 0)
+                LengthEnabled = (value & 0x40) != 0;
+                if ((value & 0x80) != 0)
                 {
-                    Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
+                    Frequency = (Frequency & 0xff) | (value & 0x07) << 8;
                     Trigger(64, 4);
                     LFSR = 0x7fff;
                 }
-                _nr44 = v;
+                _nr44 = value;
                 break;
         }
     }

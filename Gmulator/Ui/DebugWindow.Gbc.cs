@@ -20,39 +20,39 @@ namespace Gmulator.Ui
             var mapper = mmu.Mapper;
             MemRegions =
             [
-                new("Work", mmu.ReadWram, mmu.WriteWram, 0x0000, 0x8000, 4, BpType.WramWrite | BpType.WramRead),
-                new("Save", mmu.ReadSram, null,0x0000, mapper.Sram.Length, 4, BpType.WramWrite | BpType.WramRead),
-                new("Video", mmu.ReadVram, mmu.WriteVramBank, 0x0000, 0x4000, 4, BpType.VramWrite | BpType.VramRead),
-                new("Sprite", mmu.ReadOam, null, 0x0000, 0x100, 2, BpType.WramWrite | BpType.WramRead),
-                new("IO", mmu.ReadIo, mmu.WriteIo,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead),
-                new("Hram", mmu.ReadHram, mmu.WriteHram,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead),
-                new("Rom", mapper.ReadRom, null, 0x0000, mapper.Rom.Length, 6, BpType.WramWrite | BpType.WramRead),
+                new("Work", mmu.ReadWram, mmu.WriteWram, 0x0000, 0x8000, 4, BpType.WramWrite | BpType.WramRead, RamType.Wram),
+                new("Save", mmu.ReadSram, null,0x0000, mapper.Sram.Length, 4, BpType.WramWrite | BpType.WramRead, RamType.Sram),
+                new("Video", mmu.ReadVram, mmu.WriteVramBank, 0x0000, 0x4000, 4, BpType.VramWrite | BpType.VramRead, RamType.Vram),
+                new("Sprite", mmu.ReadOam, null, 0x0000, 0x100, 2, BpType.WramWrite | BpType.WramRead, RamType.Wram),
+                new("IO", mmu.ReadIo, mmu.WriteIo,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead, RamType.Register),
+                new("Hram", mmu.ReadHram, mmu.WriteHram,0x0000, 0x80, 2, BpType.WramWrite | BpType.WramRead, RamType.Wram),
+                new("Rom", mapper.ReadRom, null, 0x0000, mapper.Rom.Length, 6, BpType.WramWrite | BpType.WramRead, RamType.Rom),
             ];
 
-            OnDisassemble =
+            Disassemble =
             [
-                gbc.Logger.Disassemble,
+                new(gbc.Logger.Disassemble,CpuType.Gbc),
             ];
+
+            ScrollY = new int[Disassemble.Length];
+            JumpAddr = new int[Disassemble.Length];
 
             GetCpuState = Cpu.GetRegisters;
             GetCpuFlags = Cpu.GetFlags;
             GetPpuState = Ppu.GetState;
             GetApuState = Gbc.Apu.GetState;
-
-            ScrollY = [0];
-            JumpAddr = [-1];
         }
 
         public override void Draw(Texture2D texture)
         {
             base.Draw(texture);
-            base.DrawDebugger(Cpu.PC, Gbc.Logger.Logging, MainCpu);
+            base.DrawDebugger(Cpu.PC, Gbc.Logger.Logging, CpuType.Gbc);
             base.DrawRegisters();
             DrawCartInfo(Gbc.Mapper.GetInfo());
             DrawMemory();
 
-            ImGui.SetNextWindowPos(new(470, 272));
-            ImGui.SetNextWindowSize(new(405, 405));
+            //ImGui.SetNextWindowPos(new(470, 272));
+            //ImGui.SetNextWindowSize(new(405, 405));
             ImGui.Begin("Audio");
             {
                 ImGui.Checkbox("Square 1", ref Gbc.Apu.Square1.Play);
@@ -63,7 +63,7 @@ namespace Gmulator.Ui
             }
         }
 
-        public override void DrawBreakpoints() => base.DrawBreakpoints();
+        public override void DrawBreakpoints(int index) => base.DrawBreakpoints(index);
 
         public override void DrawCpuInfo(ICpu cpu) =>
             base.DrawCpuInfo(cpu);
@@ -72,19 +72,17 @@ namespace Gmulator.Ui
 
         public override void DrawMemory() => base.DrawMemory();
 
-        public override void AddBreakpoint(int a, BpType type, int condition, bool write) => base.AddBreakpoint(a, type, condition, write);
+        public override void AddBreakpoint(int a, BpType type, RamType ramType, CpuType cpuType, int index, string access, int condition, bool write) => base.AddBreakpoint(a, type, ramType, cpuType, index, access, condition, write);
 
         public override void SetJumpAddress(object addr, int i) => base.SetJumpAddress(addr, i);
 
-        public override void Continue(DebugState type = 0)
-        {
-            Cpu.Step();
-            base.Continue(0);
-        }
+        public override void Reset() => base.Reset();
 
-        public override void StepInto(DebugState type) => base.StepInto(type);
+        public override void Continue() => base.Continue();
 
-        public override void StepOver(DebugState type)
+        public override void StepInto() => base.StepInto();
+
+        public override void StepOver()
         {
             var Cpu = Gbc.Cpu;
             var pc = Cpu.PC;
@@ -96,17 +94,11 @@ namespace Gmulator.Ui
                 SetState(DebugState.Running);
             }
             else
-                StepInto(MainCpu);
+                StepInto();
         }
 
-        public override void Reset(DebugState type = 0)
-        {
-            Gbc.Reset("", true);
-            base.Reset(type);
-        }
+        public override void StepScanline() => base.StepScanline();
 
-        public override void StepScanline(DebugState type) => base.StepScanline(type);
-
-        public override void ToggleTrace(DebugState type) => Gbc.Logger.Toggle();
+        public override void ToggleTrace() => Gbc.Logger.Toggle();
     }
 }

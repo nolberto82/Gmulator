@@ -7,32 +7,32 @@ public class Square1 : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x4000, 0x4003, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x4000:
-                EnvVolume = v & 0x0f;
-                ConstVolumeFlag = (v & 0x10) != 0;
-                EnvLoop = (v & 0x20) != 0;
-                LengthEnabled = !((v & 0x20) != 0);
-                Duty = (v & 0xc0) >> 6;
+                EnvVolume = value & 0x0f;
+                ConstVolumeFlag = (value & 0x10) != 0;
+                EnvLoop = (value & 0x20) != 0;
+                LengthEnabled = !((value & 0x20) != 0);
+                Duty = (value & 0xc0) >> 6;
                 EnvStart = true;
                 break;
             case 0x4001:
-                SweepShift = v & 0x07;
-                SweepNegate = (v & 0x08) != 0;
-                SweepPeriod = ((v & 0x70) >> 4) + 1;
-                SweepEnabled = (v & 0x80) != 0 && SweepShift > 0;
+                SweepShift = value & 0x07;
+                SweepNegate = (value & 0x08) != 0;
+                SweepPeriod = ((value & 0x70) >> 4) + 1;
+                SweepEnabled = (value & 0x80) != 0 && SweepShift > 0;
                 SweepReload = true;
                 break;
             case 0x4002:
-                Frequency = (ushort)(Frequency & 0x0700 | v);
+                Frequency = (ushort)(Frequency & 0x0700 | value);
                 break;
             case 0x4003:
-                Frequency = (ushort)((Frequency & 0xff) | (v & 0x07) << 8);
+                Frequency = (ushort)((Frequency & 0xff) | (value & 0x07) << 8);
                 if (Enabled)
-                    LengthCounter = LengthTable[v >> 3];
+                    LengthCounter = LengthTable[value >> 3];
                 Position = 0;
                 EnvStart = true;
                 break;

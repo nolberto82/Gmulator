@@ -23,22 +23,23 @@ public partial class SnesCpu : ISaveState, ICpu
 
     #region State
     protected ushort _pc, _sp, _ra, _rx, _ry, _dpr;
-
     protected byte _ps, _dbr, _pbr;
     protected bool _emulationMode;
+    public bool FastMem { get; set; }
+    public bool NmiEnabled { get; set; }
+    public bool IrqEnabled { get; set; }
+    public bool IrqActive { get; set; }
+
+    private ulong cycles;
+    #endregion
+
+    public ushort A { set => _ra = (ushort)(value & 0xff); }
     public ushort X => _rx;
     public ushort Y => _ry;
     public bool EmulationMode => _emulationMode;
     public byte DataBank => _dbr;
     public ushort DirectPageReg => _dpr;
-    public bool FastMem { get; set; }
-    public bool NmiEnabled { get; set; }
-    public bool IrqEnabled { get; set; }
     public ulong Cycles { get => cycles; set => cycles = value; }
-    private ulong cycles;
-    #endregion
-
-    public ushort A { set => _rx = (ushort)(value & 0xff); }
     public bool XMem => (_ps & FX) != 0;
     public bool MMem => (_ps & FM) != 0;
     public int FlagC => _ps & FC;
@@ -77,7 +78,6 @@ public partial class SnesCpu : ISaveState, ICpu
 
         if (debugState == DebugState.StepMain)
         {
-            Snes.Run = true;
             Step();
             return true;
         }
@@ -85,6 +85,12 @@ public partial class SnesCpu : ISaveState, ICpu
         {
             //if (Snes.Sa1?.Cpu.DebugStep() == true)
             //    StepOneCycle();
+            return true;
+        }
+        else if (debugState == DebugState.StepGsu)
+        {
+            Step();
+            //Snes.Gsu.Step();
             return true;
         }
         return false;
@@ -164,13 +170,13 @@ public partial class SnesCpu : ISaveState, ICpu
         return (byte)(OpenBus = Snes?.ReadMemory(addr) & 0xff ?? 0);
     }
 
-    public virtual void Write(int addr, byte v)
+    public virtual void Write(int addr, byte value)
     {
         int speed = GetClockSpeed(addr);
         Ppu?.Step(speed);
         Snes?.HandleDma();
         cycles++;
-        Snes?.WriteMemory(addr, v);
+        Snes?.WriteMemory(addr, value);
     }
 
     public int GetClockSpeed(int addr)
@@ -242,7 +248,11 @@ public partial class SnesCpu : ISaveState, ICpu
 
     public void SetNmi() => NmiEnabled = true;
 
-    public void SetIrq() => IrqEnabled = true;
+    public void SetIrq()
+    {
+        IrqEnabled = true;
+        IrqActive = true;
+    }
 
     public virtual void Step()
     {
@@ -379,25 +389,25 @@ public partial class SnesCpu : ISaveState, ICpu
             new("","C",$"{(_ps & FC) != 0}"),
             new("","Z",$"{(_ps & FZ) != 0}"),
             new("","I",$"{(_ps & FI) != 0}"),
-            new("","D",$"{(_ps & FD) != 0}"),
+            new("-","D",$"{(_ps & FD) != 0}"),
             new("","X",$"{(_ps & FX) != 0}"),
             new("","M",$"{(_ps & FM) != 0}"),
             new("","V",$"{(_ps & FV) != 0}"),
-            new("","N",$"{(_ps & FN) != 0}"),
+            new("-","N",$"{(_ps & FN) != 0}"),
             new("","E",$"{_emulationMode}"),
         ];
     }
 
     public List<RegisterInfo> GetRegisters() =>
     [
-        new("","A ",$"{_ra:X4}"),
-        new("","X ",$"{_rx:X4}"),
-        new("","Y ",$"{_ry:X4}"),
-        new("","SP",$"{_sp:X4}"),
-        new("","D ",$"{_dpr:X4}"),
-        new("","P ",$"{_ps:X4}"),
+        new("","A",$"{_ra:X4}"),
+        new("","X",$"{_rx:X4}"),
+        new("-","Y",$"{_ry:X4}"),
+        new("","S",$"{_sp:X4}"),
+        new("-","D",$"{_dpr:X4}"),
         new("","DB",$"{_dbr:X2}"),
         new("","PB",$"{_pbr:X2}"),
+        new("","P",$"{_ps:X2}"),
     ];
 
     public int GetReg(string reg) => reg.ToLowerInvariant() switch
@@ -445,17 +455,25 @@ public partial class SnesCpu : ISaveState, ICpu
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(_pc); bw.Write(_sp); bw.Write(_rx); bw.Write(_rx);
-        bw.Write(_ry); bw.Write(_ps); bw.Write(_pbr); bw.Write(_dbr);
-        bw.Write(_emulationMode); bw.Write(_dpr); bw.Write(FastMem); bw.Write(NmiEnabled);
-        bw.Write(IrqEnabled); bw.Write(Cycles);
+        bw.Write(_pc); bw.Write(_sp);
+        bw.Write(_ra); bw.Write(_rx);
+        bw.Write(_ry); bw.Write(_dpr);
+        bw.Write(_ps); bw.Write(_dbr);
+        bw.Write(_pbr); bw.Write(_emulationMode);
+        bw.Write(FastMem); bw.Write(NmiEnabled);
+        bw.Write(IrqEnabled); bw.Write(IrqActive);
+        bw.Write(cycles);
     }
 
     public void Load(BinaryReader br)
     {
-        _pc = br.ReadUInt16(); _sp = br.ReadUInt16(); _rx = br.ReadUInt16(); _rx = br.ReadUInt16();
-        _ry = br.ReadUInt16(); _ps = br.ReadByte(); _pbr = br.ReadByte(); _dbr = br.ReadByte();
-        _emulationMode = br.ReadBoolean(); _dpr = br.ReadUInt16(); FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
-        IrqEnabled = br.ReadBoolean(); Cycles = br.ReadUInt64();
+        _pc = br.ReadUInt16(); _sp = br.ReadUInt16();
+        _ra = br.ReadUInt16(); _rx = br.ReadUInt16();
+        _ry = br.ReadUInt16(); _dpr = br.ReadUInt16();
+        _ps = br.ReadByte(); _dbr = br.ReadByte();
+        _pbr = br.ReadByte(); _emulationMode = br.ReadBoolean();
+        FastMem = br.ReadBoolean(); NmiEnabled = br.ReadBoolean();
+        IrqEnabled = br.ReadBoolean(); IrqActive = br.ReadBoolean();
+        cycles = br.ReadUInt64();
     }
 }

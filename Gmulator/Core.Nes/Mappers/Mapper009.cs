@@ -11,13 +11,13 @@ internal class Mapper009 : BaseMapper
         Reset();
     }
 
-    public override byte ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
+    public override int ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
 
-    public override byte ReadChr(int addr) => base.ReadChr(0x1000 * Chr[addr >> 12] + addr % 0x1000);
+    public override int ReadChr(int addr) => base.ReadChr(0x1000 * Chr[addr >> 12] + addr % 0x1000);
 
-    public override void WritePrg(int addr, byte value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
+    public override void WritePrg(int addr, int value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
 
-    public override void Write(int addr, byte value)
+    public override void Write(int addr, int value)
     {
         if (addr >= 0xa000 && addr <= 0xafff)
         {
@@ -39,7 +39,7 @@ internal class Mapper009 : BaseMapper
         base.Write(addr, value);
     }
 
-    public override byte ReadVram(int a) => base.ReadVram(a);
+    public override int ReadVram(int addr) => base.ReadVram(addr);
 
     public override void Reset()
     {
@@ -52,24 +52,24 @@ internal class Mapper009 : BaseMapper
 
     public override void Scanline() => base.Scanline();
 
-    public override void SetLatch(int a, byte v)
+    public override void SetLatch(int addr, int value)
     {
-        if (a == 0x0fd8)
+        if (addr == 0x0fd8)
         {
             Latch1 = 0xfd;
             UpdateChr = true;
         }
-        else if (a == 0x0fe8)
+        else if (addr == 0x0fe8)
         {
             Latch1 = 0xfe;
             UpdateChr = true;
         }
-        else if (a >= 0x1fd8 && a <= 0x1fdf)
+        else if (addr >= 0x1fd8 && addr <= 0x1fdf)
         {
             Latch2 = 0xfd;
             UpdateChr = true;
         }
-        else if (a >= 0x1fe8 && a <= 0x1fef)
+        else if (addr >= 0x1fe8 && addr <= 0x1fef)
         {
             Latch2 = 0xfe;
             UpdateChr = true;

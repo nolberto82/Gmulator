@@ -6,9 +6,9 @@ namespace Gmulator.Shared.LuaScript;
 public partial class MemLua
 {
     private readonly Lua _state;
-    private readonly Func<int, byte> Read;
-    private readonly Action<int, byte> Write;
-    private readonly Func<int, byte> ReadVramByte;
+    private readonly Func<int, int> Read;
+    private readonly Action<int, int> Write;
+    private readonly Func<int, int> ReadVramByte;
     private readonly Func<string, int> GetRegister;
     private readonly Action<string, int> SetRegister;
 

@@ -141,11 +141,11 @@ public static class Constants
     public static readonly string ConfigDirectory = "Config";
     public static readonly string DebugDirectory = "Debugger";
 
-    public class RegisterInfo(string address, string name, string value)
+    public class RegisterInfo(string address, string name, dynamic value)
     {
         public string Address { get; private set; } = address;
         public string Name { get; private set; } = name;
-        public string Value { get; private set; } = value;
+        public dynamic Value { get; private set; } = value;
     }
 
     public class DisasmEntry(int pc, string disasm, string name, string oper, string regtext, int size, string bytetext = "")

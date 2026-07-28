@@ -7,7 +7,7 @@
             Reset();
         }
 
-        public override byte ReadPrg(int addr) => base.ReadPrg(0x4000 * Prg[(addr & 0x4000) >> 14] + addr % 0x4000);
+        public override int ReadPrg(int addr) => base.ReadPrg(0x4000 * Prg[(addr & 0x4000) >> 14] + addr % 0x4000);
 
         public override void Reset()
         {
@@ -21,6 +21,6 @@
 
         public override void Scanline() => base.Scanline();
 
-        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
+        public override void SetLatch(int addr, int value) => base.SetLatch(addr, value);
     }
 }

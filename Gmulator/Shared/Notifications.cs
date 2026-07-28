@@ -4,10 +4,10 @@ namespace Gmulator.Shared;
 
 internal static class Notifications
 {
-    private static List<TextEntry> Text = [];
+    private static readonly List<TextEntry> Text = [];
     private static ImFontPtr ImGuiFont;
     private static Font GuiFont;
-    private static int _framesLeft;
+    private static readonly int _framesLeft;
 
     public class TextEntry
     {

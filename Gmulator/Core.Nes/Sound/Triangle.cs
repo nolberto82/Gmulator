@@ -14,24 +14,24 @@ public class Triangle : BaseChannel
         nes.CpuMap.Set(0x00, 0x00, 0x4008, 0x400b, a => 0xff, Write, RamType.Register, 1);
     }
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x4008:
-                LinearControl = (v & 0x80) != 0;
-                LengthEnabled = (v & 0x80) == 0;
-                LinearLoad = v & 0x7f;
+                LinearControl = (value & 0x80) != 0;
+                LengthEnabled = (value & 0x80) == 0;
+                LinearLoad = value & 0x7f;
                 break;
             case 0x4009:
                 break;
             case 0x400a:
-                Frequency = (ushort)(Frequency & 0x0700 | v);
+                Frequency = (ushort)(Frequency & 0x0700 | value);
                 break;
             case 0x400b:
-                Frequency = (ushort)((Frequency & 0xff) | (v & 0x07) << 8);
+                Frequency = (ushort)((Frequency & 0xff) | (value & 0x07) << 8);
                 if (Enabled)
-                    LengthCounter = LengthTable[v >> 3];
+                    LengthCounter = LengthTable[value >> 3];
                 LinearReload = true;
                 break;
         }

@@ -10,9 +10,9 @@ public class Mapper2 : BaseMapper
 
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
-    public override byte ReadRom(int a)
+    public override int ReadRom(int addr)
     {
-        var addr = a + (0x4000 * (Rombank - 1));
+        addr = addr + (0x4000 * (Rombank - 1));
         if (Rombank > 1)
             return Rom[addr];
         else
@@ -27,19 +27,19 @@ public class Mapper2 : BaseMapper
             return new(Rom, a + 0x4000 * (Rombank - 1), size);
     }
 
-    public override void WriteRom0(int a, byte v)
+    public override void WriteRom0(int addr, int value)
     {
 
     }
 
-    public override void WriteRom1(int a, byte v)
+    public override void WriteRom1(int addr, int value)
     {
         //if (edit)
-        //    Rom[a + (0x4000 * (Rombank - 1))] = v;
+        //    Rom[addr + (0x4000 * (Rombank - 1))] = (byte)value;
         //else
         {
-            if (a >= 0x2000)
-                Rombank = v & 0x1f;
+            if (addr >= 0x2000)
+                Rombank = value & 0x1f;
         }
     }
 }

@@ -5,17 +5,17 @@ namespace Gmulator.Core.Gbc.Sound;
 
 public class Square2 : BaseChannel, ISaveState
 {
-    private byte _nr21;
-    private byte _nr22;
-    private byte _nr23;
-    private byte _nr24;
+    private int _nr21;
+    private int _nr22;
+    private int _nr23;
+    private int _nr24;
 
     public Square2(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff16, 0xff19, Read, Write, RamType.Register, 1);
     }
 
-    public byte Read(int a) => a switch
+    public int Read(int addr) => addr switch
     {
         0xff16 => (byte)(_nr21 | 0x3f),
         0xff17 => _nr22,
@@ -24,32 +24,32 @@ public class Square2 : BaseChannel, ISaveState
         _ => 0xff,
     };
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0xff16:
-                Duty = (v & 0xc0) >> 6;
-                LengthCounter = 64 - (v & 0x3f);
-                _nr21 = v;
+                Duty = (value & 0xc0) >> 6;
+                LengthCounter = 64 - (value & 0x3f);
+                _nr21 = value;
                 break;
             case 0xff17:
-                EnvVolume = (v & 0xf0) >> 4;
-                EnvDirection = (v & 0x08) > 0;
-                EnvPeriod = v & 0x07;
-                Dac = (v & 0xf8) > 0;
-                _nr22 = v;
+                EnvVolume = (value & 0xf0) >> 4;
+                EnvDirection = (value & 0x08) > 0;
+                EnvPeriod = value & 0x07;
+                Dac = (value & 0xf8) > 0;
+                _nr22 = value;
                 break;
             case 0xff18:
-                Frequency = Frequency & 0xff00 | v;
-                _nr23 = v;
+                Frequency = Frequency & 0xff00 | value;
+                _nr23 = value;
                 break;
             case 0xff19:
-                Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
-                LengthEnabled = (v & 0x40) != 0;
-                if ((v & 0x80) != 0)
+                Frequency = (Frequency & 0xff) | (value & 0x07) << 8;
+                LengthEnabled = (value & 0x40) != 0;
+                if ((value & 0x80) != 0)
                     Trigger(64, 4);
-                _nr24 = v;
+                _nr24 = value;
                 break;
         }
     }
@@ -81,8 +81,8 @@ public class Square2 : BaseChannel, ISaveState
     public void Load(BinaryReader br)
     {
         Frequency = br.ReadInt32(); LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32();
-        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); _nr21 = br.ReadByte(); _nr22 = br.ReadByte();
-        _nr23 = br.ReadByte(); _nr24 = br.ReadByte();
+        CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32(); _nr21 = br.ReadInt32(); _nr22 = br.ReadInt32();
+        _nr23 = br.ReadInt32(); _nr24 = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() =>

@@ -40,13 +40,13 @@ public abstract class BaseMapper : ISaveState
             MapperType = "Unknown";
     }
 
-    public virtual byte ReadRom(int a) => Rom[a % Rom.Length];
-    public abstract Span<byte> ReadRomBlock(int a, int size);
-    public abstract void WriteRom0(int a, byte v);
-    public abstract void WriteRom1(int a, byte v);
+    public virtual int ReadRom(int addr) => Rom[addr % Rom.Length];
+    public abstract Span<byte> ReadRomBlock(int addr, int size);
+    public abstract void WriteRom0(int addr, int value);
+    public abstract void WriteRom1(int addr, int value);
 
     public virtual void Write() =>
-        //Sram[a % Sram.Length] = v;
+        //Sram[addr % Sram.Length] = value;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
 
     public void LoadSram()

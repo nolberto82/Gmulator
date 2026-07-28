@@ -13,7 +13,7 @@ public partial class SnesCpu
         public int Size = size;
     };
 
-	public List<Opcode> Disasm = new();
+	public List<Opcode> Disasm = [];
 
 	public void CreateOpcodes() 
 	{

@@ -21,7 +21,8 @@ namespace Gmulator.Core.Gbc
         IMmu IConsole.Mmu => Mmu;
 
         public Debugger Debugger { get; set; }
-        public DebugState EmuState { get; set; }
+        public DebugState DbgState { get; set; }
+        public bool Run { get; set; }
 
         public Gbc()
         {
@@ -44,7 +45,7 @@ namespace Gmulator.Core.Gbc
 
         public override void RunFrame(bool opened)
         {
-            if (Mapper != null && (EmuState == DebugState.Running || EmuState == DebugState.StepMain) && !opened)
+            if (Mapper != null && (DbgState == DebugState.Running || DbgState == DebugState.StepMain) && !opened)
             {
                 ulong cyclesframe = GbcCycles;
                 while (Cpu?.Cycles < cyclesframe)
@@ -52,16 +53,16 @@ namespace Gmulator.Core.Gbc
                     int pc = Cpu.PC;
                     if (Debug)
                     {
-                        if (EmuState == DebugState.StepMain)
+                        if (DbgState == DebugState.StepMain)
                         {
                             Cpu.Step();
-                            EmuState = DebugState.Break;
+                            DbgState = DebugState.Break;
                             return;
                         }
 
                         if (Cpu.StepOverAddr == Cpu.PC)
                         {
-                            EmuState = DebugState.Break;
+                            DbgState = DebugState.Break;
                             Cpu.StepOverAddr = -1;
                             return;
                         }
@@ -69,17 +70,15 @@ namespace Gmulator.Core.Gbc
                         if (Logger?.Logging == true)
                             Logger?.Log();
 
-                        if (!Run && Breakpoints?.Count > 0)
+                        if (Breakpoints?.Count > 0)
                         {
-                            Debugger.Execute(pc);
+                            Debugger.Execute(pc,CpuType.Gbc);
                         }
 
-                        Run = false;
+                        //if (DbgState != DebugState.Running)
+                        //    DbgState = DebugState.Break;
 
-                        if (EmuState != DebugState.Running)
-                            EmuState = DebugState.Break;
-
-                        if (EmuState == DebugState.Break)
+                        if (DbgState == DebugState.Break)
                             return;
                     }
 
@@ -159,7 +158,7 @@ namespace Gmulator.Core.Gbc
                 {
                     using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
 
-                    bw.Write(Encoding.ASCII.GetBytes(Shared.EmuState.Version));
+                    bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
                     Mmu?.Save(bw);
                     Cpu?.Save(bw);
                     Ppu?.Save(bw);
@@ -184,7 +183,7 @@ namespace Gmulator.Core.Gbc
                     using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));
 
                     var version = Encoding.ASCII.GetString(br.ReadBytes(4));
-                    if (version == Shared.EmuState.Version)
+                    if (version == EmuState.Version)
                     {
                         Mmu?.Load(br);
                         Cpu?.Load(br);

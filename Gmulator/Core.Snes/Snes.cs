@@ -1,4 +1,5 @@
-﻿using Gmulator.Core.Snes.Sa1;
+﻿using Gmulator.Core.Snes.Gsu;
+using Gmulator.Core.Snes.Sa1;
 using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
 using System.Runtime.CompilerServices;
@@ -11,14 +12,16 @@ public sealed class Snes : Emulator, IConsole
     public SnesPpu Ppu;
     public SnesMmu Mmu;
     public SnesSpc Spc;
-    public SnesSa1 Sa1;
     public SnesApu Apu;
     public SnesDsp Dsp;
     public SnesDma Dma;
+    public SnesSa1 Sa1;
+    public SnesGsu Gsu;
     public SnesMapper Mapper;
     public readonly SnesJoypad Joypad;
     public SnesLogger Logger;
     public SnesSpcLogger SpcLogger;
+    public SnesGsuLogger GsuLogger;
     public MemoryMap CpuMap;
 
     private readonly List<float> AudioSamples = [];
@@ -29,7 +32,7 @@ public sealed class Snes : Emulator, IConsole
     IMmu IConsole.Mmu => Mmu;
 
     public Debugger Debugger { get; set; }
-    public DebugState EmuState { get; set; }
+    public DebugState DbgState { get; set; }
 
     public Snes() : base()
     {
@@ -46,6 +49,7 @@ public sealed class Snes : Emulator, IConsole
         Dma = new(this);
         Logger = new(this);
         SpcLogger = new();
+        GsuLogger = new(this);
 
         Buttons = new bool[16];
         Joypad = new();
@@ -57,7 +61,9 @@ public sealed class Snes : Emulator, IConsole
 
     public override void RunFrame(bool opened)
     {
-        if (!opened && (EmuState == DebugState.Running || EmuState == DebugState.StepMain || EmuState == DebugState.StepSa1 || EmuState == DebugState.StepSpc))
+        if (!opened && (DbgState == DebugState.Running ||
+            DbgState == DebugState.StepMain || DbgState == DebugState.StepSa1 ||
+            DbgState == DebugState.StepGsu || DbgState == DebugState.StepSpc))
         {
             SnesPpu ppu = Ppu;
             while (!Ppu.FrameReady)
@@ -65,36 +71,33 @@ public sealed class Snes : Emulator, IConsole
                 if (Debug)
                 {
                     int pc = Cpu.PBPC;
-                    if (Cpu.StepEnd(EmuState) || Spc.StepEnd(EmuState))
+                    if (Cpu.StepEnd(DbgState) || Spc.StepEnd(DbgState))
                     {
-                        EmuState = DebugState.Break;
+                        DbgState = DebugState.Break;
                     }
 
                     Logger.Log(ppu.HPos);
 
-                    if (Mapper.Coprocessor == SnesMapper.Gsu && EmuState == DebugState.StepGsu)
+                    if (Mapper.Coprocessor == SnesMapper.Gsu && DbgState == DebugState.StepGsu)
                     {
-                        //Gsu.Exec(state, Debug);
-                        EmuState = DebugState.Break;
+                        Gsu.Exec(true);
+                        DbgState = DebugState.Break;
                     }
 
-                    if (!Run && Breakpoints.Count > 0 && EmuState == DebugState.Running)
+                    if (Breakpoints.Count > 0 && DbgState == DebugState.Running)
                     {
-                        if (Debugger.Execute(pc))
-                        {
-                            EmuState = DebugState.Break;
-                        }
+                        if (!Run && Debugger.Execute(pc, CpuType.Snes))
+                            DbgState = DebugState.Break;
                     }
 
                     RunLua();
 
-                    if (EmuState == DebugState.Break)
+                    if (DbgState == DebugState.Break)
                         break;
                 }
 
                 RunLua();
                 Cpu.Step();
-
                 Run = false;
             }
 
@@ -132,22 +135,20 @@ public sealed class Snes : Emulator, IConsole
         return Mmu.ReadByte(a);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public byte ReadMemory(int addr)
+    public int ReadMemory(int addr)
     {
         addr &= 0xffffff;
-        byte value = Mmu.ReadByte(addr);
+        int value = Mmu.ReadByte(addr);
         if (Debug)
-            Debugger.Watchpoint(addr, value, CpuMap.Handlers[addr >> 12], false);
+            Debugger.Watchpoint(addr, value, CpuType.Snes, false);
         return ApplyGameGenieCheats(addr, value);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    internal void WriteMemory(int a, byte v)
+    internal void WriteMemory(int addr, int value)
     {
-        Mmu.WriteByte(a, v);
+        Mmu.WriteByte(addr, value);
         if (Debug)
-            Debugger.Watchpoint(a, v, CpuMap.Handlers[a >> 12], true);
+            Debugger.Watchpoint(addr, value, CpuType.Snes, true);
     }
 
     public void HandleDma() => Dma.HandleDma();
@@ -191,12 +192,13 @@ public sealed class Snes : Emulator, IConsole
 
             if (Mapper.Coprocessor == SnesMapper.Sa1)
                 Sa1 ??= new(this);
+            else if (Mapper.Coprocessor == SnesMapper.Gsu)
+                Gsu ??= new(this);
 
             Mapper.Reset(this);
 
 #if DEBUG || RELEASE
             DebugWindow = new SnesDebugWindow(this);
-            DebugWindow.Reset(this);
 #endif
             SetActions();
             Mapper?.LoadSram();
@@ -204,11 +206,13 @@ public sealed class Snes : Emulator, IConsole
             Dsp.Reset();
             Apu.Reset();
             Sa1?.Reset();
+            Gsu?.Reset(Mapper.RamSize);
             Ppu.Reset();
             Cpu.Reset(false);
             Spc.Reset();
             Dma.Reset();
             Logger.Reset();
+            GsuLogger?.Reset();
             SpcLogger.Reset();
             LoadCheats(name);
             LoadBreakpoints(Mapper.Name);
@@ -229,7 +233,7 @@ public sealed class Snes : Emulator, IConsole
             if (name != "")
             {
                 using BinaryWriter bw = new(new FileStream(name, FileMode.Create, FileAccess.Write));
-                bw.Write(Encoding.ASCII.GetBytes(Shared.EmuState.Version));
+                bw.Write(Encoding.ASCII.GetBytes(EmuState.Version));
                 Cpu.Save(bw);
                 Ppu.Save(bw);
                 Mmu.Save(bw);
@@ -239,6 +243,7 @@ public sealed class Snes : Emulator, IConsole
                 Dma.Save(bw);
                 Sa1?.Save(bw);
                 Sa1?.Mmu.Save(bw);
+                Gsu?.Save(bw);
                 Mapper.Save(bw);
                 base.SaveState(slot, StateResult.Success);
             }
@@ -260,7 +265,7 @@ public sealed class Snes : Emulator, IConsole
                 using Stream stream = fs;
                 using BinaryReader br = new(fs);
 
-                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == Shared.EmuState.Version)
+                if (Encoding.ASCII.GetString(br.ReadBytes(4)) == EmuState.Version)
                 {
                     Cpu.Load(br);
                     Ppu.Load(br);
@@ -271,6 +276,7 @@ public sealed class Snes : Emulator, IConsole
                     Dma.Load(br);
                     Sa1?.Load(br);
                     Sa1?.Mmu.Load(br);
+                    Gsu?.Load(br);
                     Mapper.Load(br);
                     base.LoadState(slot, StateResult.Success);
                 }
@@ -312,20 +318,16 @@ public sealed class Snes : Emulator, IConsole
         Joypad.SetJoy1High = Ppu.SetJoy1High;
     }
 
-    public byte ApplyGameGenieCheats(int addr, byte value)
+    public byte ApplyGameGenieCheats(int addr, int value)
     {
-        if (addr == 0x87DC1C)
-        {
-
-        }
-        if (Cheats.Count == 0 && Mmu.RamType != RamType.Rom) return value;
+        if (Cheats.Count == 0 && Mmu.RamType != RamType.Rom) return (byte)value;
         var addr00 = addr & 0xfffff;
         var addr80 = addr | 0x800000;
         var cht = Cheats.ContainsKey((addr00, addr80)) &&
             Cheats[(addr00, addr80)].Enabled && Cheats[(addr00, addr80)].Type == GameGenie;
         if (cht)
             return Cheats[(addr00, addr80)].Value;
-        return value;
+        return (byte)value;
     }
 
     public void ApplyRawCheats()

@@ -3,6 +3,7 @@ using Gmulator.Shared.LuaScript;
 using System.Collections.Frozen;
 using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 
 namespace Gmulator.Core.Snes;
 
@@ -199,6 +200,9 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     public void Step(int cycles)
     {
         Snes?.Sa1?.Step(Cycles);
+        if (Snes.DbgState != DebugState.StepGsu)
+            Snes?.Gsu?.Step(Cycles);
+
         for (int i = 0; i < cycles / 2; i++)
         {
             Cycles += 2;
@@ -215,11 +219,12 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             {
                 _hblank = true;
                 _hvbJoy |= 0x40;
+
             }
             //else
             //    _hvbJoy &= 0x3f;
 
-            if (HPos == 1104)
+            if (HPos == 1100)
             {
                 if (!_vblank)
                     ProcessHdma();
@@ -227,7 +232,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
             if (GetHIrq && !GetVIrq)
             {
-                if (HPos == GetHTime * 6)
+                if (HPos == GetHTime * 4)
                 {
                     SetIRQ();
                     _timeUp = 0x80;
@@ -235,7 +240,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             }
             if (GetVIrq && VPos == GetVTime)
             {
-                if (HPos == 0 || HPos == GetHTime * 6)
+                if (HPos == GetHTime * 4)
                 {
                     SetIRQ();
                     _timeUp = 0x80;
@@ -251,7 +256,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     _oamAddr = _interOamAddr;
                 }
 
-                if (VPos != 0 && HPos == 512)
+                if (VPos != 0 && HPos == 1096)
                 {
                     if (!_forcedBlank)
                         EvaluateSprites(VPos);
@@ -322,7 +327,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
         if (_bgMode == 7)
         {
-            //int rx = Mode7Settings[1] ? 255 - x : x;
+            //int rx = _scrollXMode7;
             int ry = _mode7Settings[1] ? 255 - y : y;
             var cx = _scrollXMode7 - _m7X;
             var cy = _scrollYMode7 - _m7Y;
@@ -361,7 +366,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     mainColor = 0;
 
                 half = _colorMath[6] ? 1 : 0;
-                math = _bgMode != 7 && GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]);
+                math = GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]);
                 int sr, sg, sb;
                 if (!_colorMath[7] && _addSub)
                 {
@@ -410,25 +415,25 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 rgb = 0;
 
             _screenBuffer[VPos * 256 + x] = 0xff000000 | rgb;
+            //ReadOnlySpan<byte> span = MemoryMarshal.Cast<uint, byte>(_screenBuffer.AsSpan());
+            //File.WriteAllBytes("pixels", span);
         }
     }
 
     private void RenderMode(int x, int y, Span<int> bpp)
     {
-        int mapaddr;
+        int mapaddr = 0;
         int mx = 0, my = 0;
         int color, pixel, palette;
         for (int i = 0; i < bpp.Length; i++)
         {
             int paletteOffset = _bgMode == 0 ? i * 32 : 0;
-            bool main = _mainBgs[i];
-            bool sub = _subBgs[i];
 
             _mainColors[i] = 0;
             _subColors[i] = 0;
             _mainPriorities[i] = 0;
 
-            if (!main & !sub)
+            if (!_mainBgs[i] && !_subBgs[i])
                 continue;
 
             if (_mosaicEnabled[i])
@@ -437,8 +442,13 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 my = _mosaicSize != 0 ? (y % _mosaicSize) : 0;
             }
 
-            int sx = x - mx + _bgScrollX[i];
-            int sy = y - my + _bgScrollY[i];
+            int sx = (ushort)(x - mx + _bgScrollX[i]);
+            int sy = (ushort)(y - my + _bgScrollY[i]);
+            int tx = sx;
+            int ty = sy;
+
+            if (x == 0 && y == 8 && i == 2)
+            { }
 
             if (_bgMode == 2)
             {
@@ -459,21 +469,23 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             }
             else
             {
+
+                int col = sx >> 3;
+                int row = sy >> (_bgCharSize[i] ? 4 : 3);
+
                 if (_bgCharSize[i])
-                    mapaddr = _bgMapbase[i] + sy / 2 / 8 * 32 + (sx / 2 / 8);
-                else
                 {
-                    sx &= _bgSizeX[i];
-                    sy &= _bgSizeY[i];
-                    mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
-                    mapaddr += (sx & 0x100) * 4;
+                    col >>= 1;
                 }
-                mapaddr += (_bgSizeY[i] == 0x1ff) && (sy & 0x100) != 0 ? _bgSizeX[i] == 0x1ff ? 0x800 : 0x400 : 0;
+
+                mapaddr = _bgMapbase[i] | ((row & 0x1f) << 5 | (col & 0x1f));
+                mapaddr += _bgSizeX[i] == 0x1ff ? ((col & 0x20) << 5) : 0;
+                mapaddr += _bgSizeY[i] == 0x1ff ? ((row & 0x20) << (_bgSizeX[i] == 0x1ff ? 6 : 5)) : 0;
                 mapaddr &= 0x7fff;
             }
 
-            (color, pixel, palette) = GetColor(sx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
-            if (main && pixel != 0)
+            (color, pixel, palette) = GetColor(tx, ty, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
+            if (_mainBgs[i] && pixel != 0)
             {
                 _mainColors[i] = color | 1;
                 _mainPalette[i] = palette;
@@ -484,7 +496,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     _mainColors[i] = 0;
             }
 
-            if (sub && pixel != 0)
+            if (_subBgs[i] && pixel != 0)
             {
                 _subColors[i] = color | 1;
                 _subPalette[i] = palette;
@@ -530,8 +542,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private void RenderSprites(int x, int y)
     {
-        bool main = _mainBgs[4] && !GetWindow(4, x);
-        bool sub = _subBgs[4] && !GetWindow(4, x);
+        bool main = _mainBgs[4];// && !GetWindow(5, x);
+        bool sub = _subBgs[4];// && !GetWindow(5, x);
         if (main || sub)
         {
             _mainColors[4] = _subColors[4] = 0;
@@ -552,7 +564,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     fy = s.Height - fy - 1;
 
                 int baseaddr = _objTable1 + ((s.Attrib & 1) != 0 ? _objTable2 : 0);
-                int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + (fy & 0xff) / 8 * s.Width * s.Height;
+                int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + fy / 8 * 256;
                 int colorid = GetPixel(spraddr, 7 - fx & 7, 4);
                 int palid = (s.Attrib & 0x0e) >> 1;
                 int palette = (0x80 + palid * 16 + colorid) & 0xff;
@@ -560,10 +572,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
                 if (colorid != 0)
                 {
-
-                    if (s.Tile == 0xcc && palette != 0xe2)
-                    { }
-                    if (_winMainBgs[4] && GetWindow(4, x))
+                    if (_winMainBgs[4] && !GetWindow(5, x))
                         continue;
 
                     if (main)
@@ -589,7 +598,6 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private void EvaluateSprites(int y)
     {
-        ;
         int count = _spritesPerScanline = 0;
         int number = _objPrioRotation ? (_interOamAddr & 0x1fc) / 4 : 0;
         for (int i = 0; i < 128; i++)
@@ -597,15 +605,15 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             if (count > 31)
                 break;
 
-            var v = _oam[0x200 + number / 4];
-            var t = v >> ((number & 3) << 1) & 3;
+            var v = _oam[0x200 + (number >> 2)];
+            var t = v >> ((number << 1) & 6);
             var highbit = t & 1;
             int sy = _oam[number * 4 + 1];
             int yp = y - sy - 1;
-            int width = _objSizeWidth[((_objSize | t) / 2) << 3 & 0xf];
-            int height = _objSizeHeight[((_objSize | t) / 2) << 3 & 0xf];
+            int width = _objSizeWidth[_objSize | (t & 2) << 2 & 0xf];
+            int height = _objSizeHeight[_objSize | (t & 2) << 2 & 0xf];
 
-            if (yp >= 0 && yp < height || sy + height > 255 && y < ((sy + height) & 0xff))
+            if (yp >= 0 && yp < height || sy + height > 255 && y < (sy + height & 0xff))
             {
                 _spriteScan[count].X = highbit * -256 + _oam[number * 4 + 0];
                 _spriteScan[count].Y = _oam[number * 4 + 1] + 1;
@@ -624,7 +632,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private bool GetWindow(int i, int x)
     {
-        if (!_win1Enabled[i] && !_win2Enabled[i]) return false;
+        if (!_win1Enabled[i] && !_win2Enabled[i])
+            return false;
 
         bool w1 = x >= _w1Left && x <= _w1Right;
         bool w2 = x >= _w2Left && x <= _w2Right;
@@ -761,42 +770,49 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private int GetMode2Tile(int x, int y, int mapaddr) => _vram[(mapaddr + y / 8 * 32 + x / 8) & 0x7fff];
 
-    private int GetPixel(int ta, int fx, int bpp)
+    private int GetPixel(int tileAddr, int fx, int bpp)
     {
-        int idx0 = ta & 0x7fff;
+        tileAddr &= 0x7fff;
         switch (bpp)
         {
             case 2:
             {
-                ushort b0 = _vram[idx0];
+                byte b0 = (byte)_vram[tileAddr];
+                byte b1 = (byte)(_vram[tileAddr] >> 8);
                 int bit0 = (b0 >> fx) & 1;
-                int bit1 = (b0 >> (8 + fx)) & 1;
+                int bit1 = (b1 >> fx) & 1;
                 return bit0 | (bit1 << 1);
             }
             case 4:
             {
-                ushort b0 = _vram[idx0];
-                ushort b1 = _vram[(ta + 8) & 0x7fff];
+                byte b0 = (byte)_vram[tileAddr];
+                byte b1 = (byte)(_vram[tileAddr] >> 8);
+                byte b2 = (byte)_vram[tileAddr + 8];
+                byte b3 = (byte)(_vram[tileAddr + 8] >> 8);
                 int bit0 = (b0 >> fx) & 1;
-                int bit1 = (b0 >> (8 + fx)) & 1;
-                int bit2 = (b1 >> fx) & 1;
-                int bit3 = (b1 >> (8 + fx)) & 1;
+                int bit1 = (b1 >> fx) & 1;
+                int bit2 = (b2 >> fx) & 1;
+                int bit3 = (b3 >> fx) & 1;
                 return bit0 | (bit1 << 1) | (bit2 << 2) | (bit3 << 3);
             }
             case 8:
             {
-                ushort b0 = _vram[idx0];
-                ushort b1 = _vram[(ta + 0x08) & 0x7fff];
-                ushort b2 = _vram[(ta + 0x10) & 0x7fff];
-                ushort b3 = _vram[(ta + 0x18) & 0x7fff];
+                byte b0 = (byte)_vram[tileAddr];
+                byte b1 = (byte)(_vram[tileAddr] >> 8);
+                byte b2 = (byte)_vram[tileAddr + 8];
+                byte b3 = (byte)(_vram[tileAddr + 8] >> 8);
+                byte b4 = (byte)_vram[tileAddr + 16];
+                byte b5 = (byte)(_vram[tileAddr + 16] >> 8);
+                byte b6 = (byte)_vram[tileAddr + 24];
+                byte b7 = (byte)(_vram[tileAddr + 24] >> 8);
                 int bit0 = (b0 >> fx) & 1;
-                int bit1 = (b0 >> (8 + fx)) & 1;
-                int bit2 = (b1 >> fx) & 1;
-                int bit3 = (b1 >> (8 + fx)) & 1;
-                int bit4 = (b2 >> fx) & 1;
-                int bit5 = (b2 >> (8 + fx)) & 1;
-                int bit6 = (b3 >> fx) & 1;
-                int bit7 = (b3 >> (8 + fx)) & 1;
+                int bit1 = (b1 >> fx) & 1;
+                int bit2 = (b2 >> fx) & 1;
+                int bit3 = (b3 >> fx) & 1;
+                int bit4 = (b4 >> fx) & 1;
+                int bit5 = (b5 >> fx) & 1;
+                int bit6 = (b6 >> fx) & 1;
+                int bit7 = (b7 >> fx) & 1;
                 return bit0 | (bit1 << 1) | (bit2 << 2) | (bit3 << 3)
                      | (bit4 << 4) | (bit5 << 5) | (bit6 << 6) | (bit7 << 7);
             }
@@ -804,22 +820,22 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         return 0;
     }
 
-    public byte ReadByte(int a)
+    public int ReadByte(int addr)
     {
-        int addr = a >> 1;
-        if ((a & 1) == 0)
-            return (byte)_vram[addr & 0x7fff];
+        int a = addr >> 1;
+        if ((addr & 1) == 0)
+            return (byte)_vram[a & 0x7fff];
         else
-            return (byte)(_vram[addr & 0x7fff] >> 8);
+            return (byte)(_vram[a & 0x7fff] >> 8);
     }
 
-    public void WriteByte(int a, byte v)
+    public void WriteByte(int addr, int value)
     {
-        int addr = a >> 1;
-        if ((a & 1) == 0)
-            _vram[addr] = (ushort)((_vram[addr] & 0xff00) | v);
+        int off = addr >> 1;
+        if ((addr & 1) == 0)
+            _vram[off] = (ushort)((_vram[off] & 0xff00) | value);
         else
-            _vram[addr] = (ushort)((_vram[addr] & 0x00ff) | v << 8);
+            _vram[off] = (ushort)((_vram[off] & 0x00ff) | value << 8);
     }
 
     private int GetVramRemap()
@@ -856,25 +872,25 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         }
     }
 
-    public byte ReadOram(int a) => _oam[a];
-    public void WriteOram(int a, byte v) => _oam[a] = v;
+    public int ReadOram(int addr) => _oam[addr];
+    public void WriteOram(int addr, int value) => _oam[addr] = (byte)value;
 
-    public byte ReadCram(int a)
+    public int ReadCram(int addr)
     {
-        if ((a & 1) == 0)
-            return (byte)_cram[a >> 1];
+        if ((addr & 1) == 0)
+            return (byte)_cram[addr >> 1];
         else
-            return (byte)(_cram[a >> 1] >> 8);
+            return (byte)(_cram[addr >> 1] >> 8);
     }
 
-    public void WriteCram(int a, byte v)
+    public void WriteCram(int addr, int value)
     {
-        if ((a & 1) == 0)
-            _cram[a & 0xff] = v;
+        if ((addr & 1) == 0)
+            _cram[addr & 0xff] = (ushort)value;
         else
         {
-            var s = _cram[a >> 1];
-            _cram[a >> 1] = (ushort)(s & 0x00ff | v << 8);
+            var s = _cram[addr >> 1];
+            _cram[addr >> 1] = (ushort)(s & 0x00ff | value << 8);
         }
     }
 
@@ -901,7 +917,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private readonly Dictionary<int, int[][]> DictLayers = new()
     {
-        [0] = [[4, 0, 1, 4, 0, 1, 4, 2, 4, 4, 2, 4],
+        [0] = [[4, 0, 1, 4, 0, 1, 4, 2, 3, 4, 2, 3],
                [3, 1, 1, 2, 0, 0, 1, 1, 1, 0, 0, 0],
                [2, 2, 2, 2]],
         [1] = [[4, 0, 1, 4, 0, 1, 4, 2, 4, 2], [2, 4, 0, 1, 4, 0, 1, 4, 4, 2],

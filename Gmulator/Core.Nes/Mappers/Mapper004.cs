@@ -15,13 +15,13 @@ internal class Mapper004 : BaseMapper
         Reset();
     }
 
-    public override byte ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
+    public override int ReadPrg(int addr) => base.ReadPrg(0x2000 * Prg[(addr >> 13) % 4] + addr % 0x2000);
 
-    public override byte ReadChr(int addr) => base.ReadChr(0x0400 * Chr[addr >> 10] + addr % 0x0400);
+    public override int ReadChr(int addr) => base.ReadChr(0x0400 * Chr[addr >> 10] + addr % 0x0400);
 
-    public override void WritePrg(int addr, byte value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
+    public override void WritePrg(int addr, int value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
 
-    public override void Write(int addr, byte value)
+    public override void Write(int addr, int value)
     {
         if (addr <= 0x9fff)
         {
@@ -158,5 +158,5 @@ internal class Mapper004 : BaseMapper
         }
     }
 
-    public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
+    public override void SetLatch(int addr, int value) => base.SetLatch(addr, value);
 }

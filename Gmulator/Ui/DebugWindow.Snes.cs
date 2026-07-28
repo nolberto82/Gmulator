@@ -1,4 +1,5 @@
 ﻿using Gmulator.Core.Snes;
+using Gmulator.Core.Snes.Gsu;
 using Gmulator.Core.Snes.Sa1;
 using Gmulator.Core.Snes.Spc;
 using Gmulator.Interfaces;
@@ -9,16 +10,17 @@ namespace Gmulator.Ui;
 internal class SnesDebugWindow : DebugWindow
 {
     private readonly string[] testcpu = ["Cpu", "Spc", "Gsu"];
-    private const int CpuNumbers = 3;
+    private const int CpuNumbers = 4;
     private readonly Snes Snes;
     private new readonly SnesCpu Cpu;
     private new readonly SnesPpu Ppu;
     private readonly SnesSpc Spc;
     private readonly SnesDsp Dsp;
     private readonly SnesSa1 Sa1;
+    private readonly SnesGsu Gsu;
     private readonly SnesLogger Logger;
     private readonly SnesSpcLogger SpcLogger;
-
+    private readonly SnesGsuLogger GsuLogger;
     private readonly Func<int, int> ReadOp;
 
     private readonly int CoProcessor;
@@ -33,10 +35,12 @@ internal class SnesDebugWindow : DebugWindow
         Spc = snes.Spc;
         Dsp = snes.Dsp;
         Sa1 = snes.Sa1;
+        Gsu = snes.Gsu;
         Mapper = snes.Mapper;
         Dma = snes.Dma;
         Logger = snes.Logger;
         SpcLogger = snes.SpcLogger;
+        GsuLogger = snes.GsuLogger;
         Breakpoints = snes.Breakpoints;
         ReadOp = snes.ReadOp;
         SaveBreakpoints = snes.SaveBreakpoints;
@@ -44,13 +48,16 @@ internal class SnesDebugWindow : DebugWindow
 
         GameName = Mapper.Name ?? "";
 
-        OnDisassemble =
+        Disassemble =
         [
-            Logger.Disassemble,
-            Logger.Disassemble,
-            SpcLogger.Disassemble,
-            null
+           new(Logger.Disassemble,CpuType.Snes),
+           new(SpcLogger.Disassemble,CpuType.Spc),
+           new(Logger.Disassemble,CpuType.Sa1),
+           new(GsuLogger.Disassemble, CpuType.Gsu),
         ];
+
+        ScrollY = new int[Disassemble.Length];
+        JumpAddr = new int[Disassemble.Length];
 
         GetCpuState = Cpu.GetRegisters;
         GetCpuFlags = Cpu.GetFlags;
@@ -68,39 +75,48 @@ internal class SnesDebugWindow : DebugWindow
             GetSa1IORegs = Sa1!.GetIORegisters;
         }
 
-        ScrollY = new int[CpuNumbers];
-        JumpAddr = new int[CpuNumbers];
+        if (Gsu != null)
+        {
+            GetGsuState = Gsu!.GetRegisters;
+            //GetGsuFlags = Gsu!.GetFlags;
+            GetGsuIORegs = Gsu!.GetRegisterInfo;
+        }
+
+        SetMemoryDomains();
     }
 
-    public override void Reset(Snes snes)
+    public void SetMemoryDomains()
     {
-        var mmu = snes.Mmu;
+        var mmu = Snes.Mmu;
 
         MemRegions =
         [
-            new("Work", mmu.ReadWram, mmu.WriteWram, 0x7e0000, 0x20000, 6, BpType.WramRead | BpType.WramWrite),
-            new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length,$"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead),
-            new("Video", Ppu.ReadByte, Ppu.WriteByte, 0x0000, 0x10000, 4, BpType.VramWrite | BpType.VramRead),
-            new("Oam", Ppu.ReadOram,Ppu.WriteOram, 0x0000, 0x220, 3, BpType.OramWrite | BpType.OramRead),
-            new("Color", Ppu.ReadCram ,Ppu.WriteCram, 0x0000, 0x200, 3, BpType.CramWrite | BpType.CramRead),
-            new("Spc",Spc.ReadDebug, Spc.Write,0x0000, 0x10000, 4, BpType.SpcWrite | BpType.SpcRead),
+            new("Work", mmu.ReadWram, mmu.WriteWram, 0x7e0000, 0x20000, 6, BpType.WramRead | BpType.WramWrite, RamType.Wram),
+            new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length,$"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead, RamType.Sram),
+            new("Video", Ppu.ReadByte, Ppu.WriteByte, 0x0000, 0x10000, 4, BpType.VramWrite | BpType.VramRead, RamType.Vram),
+            new("Oam", Ppu.ReadOram,Ppu.WriteOram, 0x0000, 0x220, 3, BpType.OramWrite | BpType.OramRead, RamType.Oram),
+            new("Color", Ppu.ReadCram ,Ppu.WriteCram, 0x0000, 0x200, 3, BpType.CramWrite | BpType.CramRead, RamType.Cram),
+            new("Spc",Spc.ReadDebug, Spc.Write,0x0000, 0x10000, 4, BpType.SpcWrite | BpType.SpcRead, RamType.SpcRam),
         ];
 
         if (Mapper.Coprocessor == SnesMapper.Sa1)
-            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BpType.Sa1Write | BpType.Sa1Read));
-        //if (Mapper.Coprocessor == SnesMapper.Gsu)
-        //    MemRegions.Add(new("Gsu", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BPType.WramWrite | BPType.WramRead));
-
-        MemRegions.Add(new("Prg", mmu.ReadByte, SnesMapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec));
-        MemRegions.Add(new("Register", null, null, -1, -1, -1, 0));
+            MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BpType.Sa1Write | BpType.Sa1Read, RamType.Iram));
+        if (Mapper.Coprocessor == SnesMapper.Gsu)
+        {
+            MemRegions[1] = new("Gsu", Gsu.Mmu.Read, Gsu.Mmu.Write, 0x0000, Mapper.RamSize, 4, BpType.GsuWrite | BpType.GsuRead, RamType.GsuRam);
+            MemRegions.Add(new("Prg", Gsu.ReadPrg2, Gsu.WritePrg2, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
+        }
+        else
+            MemRegions.Add(new("Prg", Mapper.Read, Mapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
+        MemRegions.Add(new("Register", null, null, -1, -1, -1, BpType.RegWrite | BpType.RegRead, RamType.Register));
 
     }
 
     public override void Draw(Texture2D texture)
     {
         base.Draw(texture);
-        DrawDebugger(Cpu.PBPC, Logger.LogMain, SelectedCpu);
-        DrawCoProcessors(Logger.LogSa1);
+        DrawDebugger(Cpu.PBPC, Logger.LogMain, CpuType.Snes);
+        //DrawGsuInfo();
         //DrawStackInfo(Snes.Ram.AsSpan(0, 0x2000), Snes.Cpu.SP, 0x1fff, "cpu");
         DrawCartInfo(Mapper.GetCartInfo());
         DrawRegisters();
@@ -108,13 +124,11 @@ internal class SnesDebugWindow : DebugWindow
         DrawMemory();
 
 #if DEBUG || DECKDEBUG
-        DrawTestAddr([Cpu.TestAddr, Spc.TestAddr], testcpu);
+        //DrawTestAddr([Cpu.TestAddr, Spc.TestAddr], testcpu);
 #endif
     }
 
-    public override void DrawButtons(bool logging, int processor) => base.DrawButtons(logging, processor);
-
-    public override void DrawBreakpoints() => base.DrawBreakpoints();
+    public override void DrawButtons(bool logging, CpuType processor) => base.DrawButtons(logging, processor);
 
     public override void DrawCpuInfo(ICpu cpu) =>
         base.DrawCpuInfo(cpu);
@@ -125,8 +139,8 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void DrawDmaInfo()
     {
-        ImGui.SetNextWindowPos(new(559, 680));
-        ImGui.SetNextWindowSize(new(299, 291));
+        //ImGui.SetNextWindowPos(new(559, 680));
+        //ImGui.SetNextWindowSize(new(299, 291));
         ImGui.Begin("Dma", NoScrollFlags);
         for (int c = 0; c < 8; c++)
         {
@@ -153,69 +167,68 @@ internal class SnesDebugWindow : DebugWindow
         ImGui.End();
     }
 
-    public override void DrawStackInfo(Span<byte> data, int addr, int start, string name) => base.DrawStackInfo(data, addr, !Cpu.EmulationMode ? start : 0x1ff, name);
-
-    public override void AddBreakpoint(int addr, BpType type, int condition, bool write)
+    private void DrawGsuInfo()
     {
-        if (addr == -1) return;
-        var bp = Breakpoints.Find(b => b.Addr == addr && b.Type == type);
-        if (bp == null)
+        if (CoProcessor != SnesMapper.Gsu) return;
+        ImGui.BeginChild("##cpuflags", new(0, 140));
         {
-            Breakpoints.Add(new(addr, -1, type, write, true));
-            SaveBreakpoints(GameName);
+
+            ImGui.EndChild();
         }
-        //base.AddBreakpoint(addr, type, condition, write);
     }
 
-    public override void Continue(DebugState type)
+    public override void DrawStackInfo(Span<byte> data, int addr, int start, string name) => base.DrawStackInfo(data, addr, !Cpu.EmulationMode ? start : 0x1ff, name);
+
+    public override void AddBreakpoint(int addr, BpType type, RamType ramType, CpuType cpuType, int index, string access, int condition, bool write) =>
+        base.AddBreakpoint(addr, type, ramType, cpuType, index, access, condition, write);
+
+    public override void Reset() => base.Reset();
+
+    public override void Continue()
     {
-        if (SelectedCpu == SpcCpu)
+        if (SelectedCpu == CpuType.Spc)
         {
             SpcLogger.Log();
             Spc.Step();
         }
-        else if (SelectedCpu == GsuCpu)
+        else if (SelectedCpu == CpuType.Gsu)
         {
             //Snes.SpcLogger.Log(Snes.Spc.PC);
             //SetState(DebugState.StepGsu);
             //Snes.Gsu.Exec(Snes.State,Snes.Debug);
         }
+
+        //Snes?.Sa1?.DbgState = DebugState.Running;
+        //Snes?.Gsu?.DbgState = DebugState.Running;
+        Snes.DbgState = DebugState.Running;
         Snes.Run = true;
-        base.Continue(MainCpu);
+        base.Continue();
     }
 
-    public override void Reset(DebugState type)
+    public override void StepInto()
     {
-        Snes.Reset(GameName, true);
-        base.Reset(MainCpu);
-    }
-
-    public override void StepInto(DebugState type)
-    {
-        DebugState step = DebugState.StepMain;
+        Snes.Run = true;
         switch (SelectedCpu)
         {
-            case Sa1Cpu:
-                step = DebugState.StepSa1;
+            case CpuType.Sa1:
                 break;
-            case SpcCpu:
-                //Spc.Step();
+            case CpuType.Spc:
                 SpcLogger.Log();
-                step = DebugState.StepSpc;
                 break;
-            case GsuCpu:
-                //SetState(DebugState.StepGsu);
-                //Snes.Gsu.Exec(Snes.State, Snes.Debug);
-                break;
+            case CpuType.Gsu:
+                Snes.DbgState = DebugState.StepGsu;
+                Snes.Gsu.Step(Gsu.Cycles + 1, true);
+                Snes.DbgState = DebugState.Break;
+                return;
         }
-        base.StepInto(step);
+        base.StepInto();
     }
 
-    public override void StepOver(DebugState type)
+    public override void StepOver()
     {
         switch (SelectedCpu)
         {
-            case MainCpu:
+            case CpuType.Snes:
             {
                 var pc = Cpu.PBPC;
                 var inst = Cpu.Disasm[ReadOp(pc)];
@@ -223,14 +236,14 @@ internal class SnesDebugWindow : DebugWindow
                 {
                     Cpu.StepOverAddr = pc + inst.Size;
                     Cpu.Step();
-                    base.StepOver(MainCpu);
+                    base.StepOver();
                 }
                 else
-                    StepInto(MainCpu);
+                    StepInto();
                 Logger.Log(Ppu.HPos);
                 break;
             }
-            case Sa1Cpu:
+            case CpuType.Sa1:
             {
                 var pc = Sa1.PBPC;
                 var inst = Sa1.Disasm[ReadOp(pc)];
@@ -238,42 +251,38 @@ internal class SnesDebugWindow : DebugWindow
                 {
                     Sa1.StepOverAddr = pc + inst.Size;
                     Sa1.Step();
-                    base.StepOver(MainCpu);
+                    base.StepOver();
                 }
                 else
-                    StepInto(MainCpu);
+                    StepInto();
                 Logger.Log(Ppu.HPos);
                 break;
             }
-            case SpcCpu:
-                StepInto(MainCpu);
+            case CpuType.Spc:
+                StepInto();
                 SpcLogger.Log();
                 break;
         }
     }
 
-    public override void StepScanline(DebugState type)
+    public override void StepScanline()
     {
-        switch (SelectedCpu)
+        var oldline = Ppu.VPos;
+        while (oldline == Ppu.VPos)
         {
-            case MainCpu:
-            {
-                var oldline = Ppu.VPos;
-                while (oldline == Ppu.VPos)
-                    Cpu.Step();
-                Snes.EmuState = DebugState.Break;
-                break;
-            }
+            Cpu.Step();
         }
+        Snes.DbgState = DebugState.Break;
     }
 
-    public override void ToggleTrace(DebugState type)
+    public override void ToggleTrace()
     {
         switch (SelectedCpu)
         {
-            case MainCpu: Logger.Toggle(false); break;
-            case Sa1Cpu: Logger.Toggle(true); break;
-            case SpcCpu: SpcLogger.Toggle(); break;
+            case CpuType.Snes: Logger.Toggle(false); break;
+            case CpuType.Spc: SpcLogger.Toggle(); break;
+            case CpuType.Sa1: Logger.Toggle(true); break;
+            case CpuType.Gsu: GsuLogger.Toggle(); break;
         }
     }
 

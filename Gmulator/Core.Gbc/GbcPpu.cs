@@ -24,15 +24,15 @@ public partial class GbcPpu : IPpu, ISaveState
 
     private int _dots;
     private bool _cgb;
-    private byte _oamDma;
-    private byte _key1;
-    private byte _ly, _lyc, _lcdc, _stat;
-    private byte _scy, _scx;
-    private byte _wy, _wx, _wly;
-    private byte _bgp, _obp0, _obp1;
-    private byte _bgpi, _bgpd;
-    private byte _obpi, _obpd;
-    private byte _hdma1, _hdma2, _hdma3, _hdma4, _hdma5;
+    private int _oamDma;
+    private int _key1;
+    private int _ly, _lyc, _lcdc, _stat;
+    private int _scy, _scx;
+    private int _wy, _wx, _wly;
+    private int _bgp, _obp0, _obp1;
+    private int _bgpi, _bgpd;
+    private int _obpi, _obpd;
+    private int _hdma1, _hdma2, _hdma3, _hdma4, _hdma5;
     private byte[] _cgbBkgPal, _cgbObjPal;
     private uint[] _screenBuffer;
     public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;

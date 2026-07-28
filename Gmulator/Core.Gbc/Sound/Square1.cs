@@ -11,18 +11,18 @@ public class Square1 : BaseChannel, ISaveState
     private bool _sweepEnabled;
     private int _shadowFrequency;
 
-    private byte _nr10;
-    private byte _nr11;
-    private byte _nr12;
-    private byte _nr13;
-    private byte _nr14;
+    private int _nr10;
+    private int _nr11;
+    private int _nr12;
+    private int _nr13;
+    private int _nr14;
 
     public Square1(Gbc gbc)
     {
         gbc.CpuMap.Set(0x00, 0x01, 0xff10, 0xff14, Read, Write, RamType.Register, 1);
     }
 
-    public byte Read(int a) => a switch
+    public int Read(int addr) => addr switch
     {
         0xff10 => (byte)(_nr10 | 0x80),
         0xff11 => (byte)(_nr11 | 0x3f),
@@ -32,44 +32,44 @@ public class Square1 : BaseChannel, ISaveState
         _ => 0xff,
     };
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0xff10:
-                _sweepPeriod = (v & 0x70) >> 4;
-                _sweepNegate = (v & 0x08) > 0 ? -1 : 1;
-                _sweepShift = v & 0x07;
-                _nr10 = v;
+                _sweepPeriod = (value & 0x70) >> 4;
+                _sweepNegate = (value & 0x08) > 0 ? -1 : 1;
+                _sweepShift = value & 0x07;
+                _nr10 = value;
                 break;
             case 0xff11:
-                Duty = (v & 0xc0) >> 6;
-                LengthCounter = 64 - (v & 0x3f);
-                _nr11 = v;
+                Duty = (value & 0xc0) >> 6;
+                LengthCounter = 64 - (value & 0x3f);
+                _nr11 = value;
                 break;
             case 0xff12:
-                EnvVolume = (v & 0xf0) >> 4;
-                EnvDirection = (v & 0x08) > 0;
-                EnvPeriod = v & 0x07;
-                Dac = (v & 0xf8) > 0;
-                _nr12 = v;
+                EnvVolume = (value & 0xf0) >> 4;
+                EnvDirection = (value & 0x08) > 0;
+                EnvPeriod = value & 0x07;
+                Dac = (value & 0xf8) > 0;
+                _nr12 = value;
                 break;
             case 0xff13:
-                Frequency = Frequency & 0x0700 | v;
-                _nr13 = v;
+                Frequency = Frequency & 0x0700 | value;
+                _nr13 = value;
                 break;
             case 0xff14:
-                Frequency = (Frequency & 0xff) | (v & 0x07) << 8;
+                Frequency = (Frequency & 0xff) | (value & 0x07) << 8;
                 _shadowFrequency = Frequency;
-                LengthEnabled = (v & 0x40) != 0;
+                LengthEnabled = (value & 0x40) != 0;
                 _sweepEnabled = _sweepPeriod > 0 || _sweepShift > 0;
 
                 if (_sweepShift > 0)
                     UpdateFrequency();
 
-                if ((v & 0x80) != 0)
+                if ((value & 0x80) != 0)
                     Trigger(64, 4);
-                _nr14 = v;
+                _nr14 = value;
                 break;
         }
     }
@@ -132,8 +132,8 @@ public class Square1 : BaseChannel, ISaveState
     public void Load(BinaryReader br)
     {
         _sweepPeriod = br.ReadInt32(); _sweepNegate = br.ReadInt32(); _sweepShift = br.ReadInt32(); _sweepTimer = br.ReadInt32();
-        _sweepEnabled = br.ReadBoolean(); _shadowFrequency = br.ReadInt32(); _nr10 = br.ReadByte(); _nr11 = br.ReadByte();
-        _nr12 = br.ReadByte(); _nr13 = br.ReadByte(); _nr14 = br.ReadByte(); Duty = br.ReadInt32();
+        _sweepEnabled = br.ReadBoolean(); _shadowFrequency = br.ReadInt32(); _nr10 = br.ReadInt32(); _nr11 = br.ReadInt32();
+        _nr12 = br.ReadInt32(); _nr13 = br.ReadInt32(); _nr14 = br.ReadInt32(); Duty = br.ReadInt32();
         EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32(); Timer = br.ReadInt32();
     }
 

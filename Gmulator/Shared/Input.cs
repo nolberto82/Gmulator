@@ -19,8 +19,8 @@ internal class Input
 
         if (menu?.Opened == false)
         {
-            if (emu.Console?.EmuState == DebugState.Paused)
-                emu.Console.EmuState = DebugState.Running;
+            if (emu.Console?.DbgState == DebugState.Paused)
+                emu.Console.DbgState = DebugState.Running;
 
             if (Raylib.IsGamepadButtonDown(0, GamepadButton.RightTrigger2) && !emu.FastForward)
             {

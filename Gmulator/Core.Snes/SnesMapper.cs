@@ -3,21 +3,21 @@ using System.ComponentModel.Design;
 
 namespace Gmulator.Core.Snes;
 
-public sealed class SnesMapper : ISaveState
+public sealed class SnesMapper(MemoryMap map) : ISaveState
 {
     public string Name { get; private set; }
     public int Map { get; private set; }
     public bool Speed { get; private set; }
     public bool SramEnabled { get; set; }
-    public int Coprocessor { get; private set; }
+    public int Coprocessor { get; private set; } = 0;
     public byte[] Rom { get; private set; }
-    public int Romsize { get; private set; }
-    public int Ramsize { get; private set; }
+    public int RomSize { get; private set; }
+    public int RamSize { get; private set; }
     public byte[] Sram { get; private set; }
     public SnesMmu Mmu { get; private set; }
 
-    public List<MemoryHandler> MemoryHandler;
-    private Timer Timer;
+    public List<MemoryHandler> MemoryHandler = map.Handlers;
+    private Timer _saveTimer;
     private Mapmode Mapper;
     public enum Mapmode
     {
@@ -29,12 +29,6 @@ public sealed class SnesMapper : ISaveState
 
     private readonly int[] offsets = [0x00000, 0x000200, 0x008000, 0x008200, 0x408000, 0x408200];
 
-    public SnesMapper(MemoryMap map)
-    {
-        MemoryHandler = map.Handlers;
-        Coprocessor = 0;
-    }
-
     public void Reset(Snes snes)
     {
         var CpuMap = snes.CpuMap;
@@ -42,8 +36,11 @@ public sealed class SnesMapper : ISaveState
         {
             CpuMap.LoRom(0x00, 0x7d, 0x8000, 0xffff, Read, Write);
             CpuMap.LoRom(0x80, 0xff, 0x8000, 0xffff, Read, Write);
-            CpuMap.Sram(0x70, 0x7d, 0x0000, 0x7fff, ReadSram, WriteSram);
-            CpuMap.Sram(0xf0, 0xff, 0x0000, 0x7fff, ReadSram, WriteSram);
+            if (Coprocessor != Gsu)
+            {
+                CpuMap.Sram(0x70, 0x7d, 0x0000, 0x7fff, ReadSram, WriteSram);
+                CpuMap.Sram(0xf0, 0xff, 0x0000, 0x7fff, ReadSram, WriteSram);
+            }
         }
         else
         {
@@ -76,40 +73,54 @@ public sealed class SnesMapper : ISaveState
             CpuMap.LoRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write);
             CpuMap.LoRom(0x80, 0xbf, 0x8000, 0xffff, Read, Write);
         }
+        else if (Coprocessor == Gsu)
+        {
+            var GsuMap = snes.Gsu.GsuMap;
+            GsuMap.LoRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write);
+            GsuMap.LoRom(0x80, 0xff, 0x8000, 0xffff, Read, Write);
+
+            CpuMap.LoRom(0x00, 0x3f, 0x8000, 0xffff, Read, Write);
+            CpuMap.LoRom(0x80, 0xbf, 0x8000, 0xffff, Read, Write);
+
+            //GsuMap.Sram(0x70, 0x71, 0x0000, RamSize - 1, ReadSram, WriteSram);
+            //GsuMap.Sram(0x7c, 0x7d, 0x0000, RamSize - 1, ReadSram, WriteSram);
+            CpuMap.Sram(0x00, 0x3f, 0x6000, 0x7fff, ReadSram, WriteSram);
+            CpuMap.Sram(0x80, 0xbf, 0x6000, 0x7fff, ReadSram, WriteSram);
+        }
     }
 
-    public byte Read(int a)
+    public int Read(int addr)
     {
         if (Rom == null) return 0;
-        var addr = MemoryHandler[a >> 12].Offset + (a & 0xfff);
-        return Rom[addr % Rom.Length];
+        int a = MemoryHandler[addr >> 12].Offset + (addr & 0xfff);
+        return Rom[a % Rom.Length];
     }
 
-    public static void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
 
     }
 
-    public byte ReadSram(int a)
+    public int ReadSram(int addr)
     {
         if (!SramEnabled || Sram == null)
             return 0;
-        int addr = MemoryHandler[a >> 12].Offset + (a & 0xfff);
+        int a = MemoryHandler[addr >> 12].Offset + (addr & 0xfff);
         return Sram[addr & (Sram.Length - 1)];
     }
 
-    public void WriteSram(int a, byte v)
+    public void WriteSram(int addr, int value)
     {
         if (!SramEnabled || Sram == null)
             return;
-        int addr = MemoryHandler[a >> 12].Offset + (a & 0xfff);
-        Sram[addr & (Sram.Length - 1)] = v;
-        Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        int a = MemoryHandler[addr >> 12].Offset + (addr & 0xfff);
+        Sram[addr & (Sram.Length - 1)] = (byte)value;
+        _saveTimer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
-    public byte ReadBwRam(int a) => Sram[a & Sram.Length - 1];
+    public int ReadBwRam(int addr) => Sram[addr & Sram.Length - 1];
 
-    public void WriteBwRam(int a, byte v) => Sram[a & Sram.Length - 1] = v;
+    public void WriteBwRam(int addr, int value) => Sram[addr & Sram.Length - 1] = (byte)value;
 
     public void LoadSram()
     {
@@ -131,8 +142,8 @@ public sealed class SnesMapper : ISaveState
         }
         catch (IOException)
         {
-            Timer?.Dispose();
-            Timer = null;
+            _saveTimer?.Dispose();
+            _saveTimer = null;
         }
     }
 
@@ -159,9 +170,9 @@ public sealed class SnesMapper : ISaveState
             Map = rom[o + 0x7fd5] & 0xef;
             Speed = (rom[o + 0x7fd5] & 0x10) != 0;
             SramEnabled = rom[o + 0x7fd6] != 0;
-            Coprocessor = (rom[o + 0x7fd6] & 0xf0) >> 4;
-            Romsize = 0x400 << rom[o + 0x7fd7];
-            Ramsize = 0x400 << rom[o + 0x7fd8];
+            Coprocessor = rom[o + 0x7fd6] & 0xf0;
+            RomSize = 0x400 << rom[o + 0x7fd7];
+            RamSize = 0x400 << rom[o + 0x7fd8];
 
             var map = Map & 0x37;
 
@@ -194,24 +205,33 @@ public sealed class SnesMapper : ISaveState
 
             if (score > highscore)
             {
-                Sram = new byte[Ramsize];
                 if (o <= 0x0200)
                 {
                     if (map == 0x23)
                     {
                         Coprocessor = Sa1;
                         Mapper = Mapmode.LoROM;
+                        Sram = new byte[RamSize];
                         return true;
                     }
                     else
                     {
                         Mapper = Mapmode.LoROM;
+                        if (Coprocessor == 0x10)
+                        {
+                            Coprocessor = Gsu;
+                            RamSize = 0x400 << rom[o + 0x7fbd];
+                            if (RamSize == 0)
+                                RamSize = 0x10000;
+                        }
+                        Sram = new byte[RamSize];
                         return true;
                     }
                 }
                 else if (o <= 0x8200)
                 {
                     Mapper = Mapmode.HiROM;
+                    Sram = new byte[RamSize];
                     return true;
                 }
                 highscore = score;

@@ -208,9 +208,9 @@ public class NesApu : ISaveState
         Noise.Length();
     }
 
-    public byte Read(int a)
+    public int Read(int addr)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x4015:
             {
@@ -236,17 +236,17 @@ public class NesApu : ISaveState
         }
     }
 
-    public void Write(int a, byte v)
+    public void Write(int addr, int value)
     {
-        switch (a)
+        switch (addr)
         {
             case 0x4015:
             {
-                Square1.Enabled = (v & 0x01) != 0;
-                Square2.Enabled = (v & 0x02) != 0;
-                Triangle.Enabled = (v & 0x04) != 0;
-                Noise.Enabled = (v & 0x08) != 0;
-                Dmc.Enabled = (v & 0x10) != 0;
+                Square1.Enabled = (value & 0x01) != 0;
+                Square2.Enabled = (value & 0x02) != 0;
+                Triangle.Enabled = (value & 0x04) != 0;
+                Noise.Enabled = (value & 0x08) != 0;
+                Dmc.Enabled = (value & 0x10) != 0;
 
                 if (!Square1.Enabled)
                     Square1.LengthCounter = 0;
@@ -260,18 +260,18 @@ public class NesApu : ISaveState
                 Dmc.OutputLevel = 0;
 
                 if (Dmc.Enabled)
-                    Dmc.Write4015(a, v);
+                    Dmc.Write4015(addr, value);
 
-                Status = v;
+                Status = value;
                 break;
             }
             case 0x4017:
             {
-                FrameCounter = v;
+                FrameCounter = value;
 
-                IrqEnabled = v == 0 && !((v & 0x40) == 0) && !((v & 0x80) == 0);
+                IrqEnabled = value == 0 && !((value & 0x40) == 0) && !((value & 0x80) == 0);
 
-                if ((v & 0x80) != 0)
+                if ((value & 0x80) != 0)
                 {
                     QuarterFrame();
                     HalfFrame();

@@ -39,16 +39,16 @@ public class BaseMapper : ISaveState
 
     public NesMmu Mmu { get; set; }
 
-    public byte ReadSram(int a)
+    public int ReadSram(int a)
     {
         if (!SramEnabled) return 0;
         return Sram[a & 0x1fff];
     }
 
-    public void WriteSram(int a, byte v)
+    public void WriteSram(int addr, int value)
     {
         if (!SramEnabled) return;
-        Sram[a & 0x1fff] = v;
+        Sram[addr & 0x1fff] = (byte)value;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
@@ -66,24 +66,28 @@ public class BaseMapper : ISaveState
         }
     }
 
-    public virtual byte ReadPrg(int a) => PrgRom[a % PrgRom.Length];
+    public virtual int ReadPrg(int addr)
+    {
+        if (PrgRom.Length == 0) return 0;
+        return PrgRom[addr % PrgRom.Length];
+    }
 
-    public virtual byte ReadChr(int a)
+    public virtual int ReadChr(int addr)
     {
         if (CharRom.Length == 0) return 0;
-        return CharRom[a % CharRom.Length];
+        return CharRom[addr % CharRom.Length];
     }
 
-    public virtual void WritePrg(int a, byte v) => PrgRom[a % PrgRom.Length] = v;
+    public virtual void WritePrg(int addr, int value) => PrgRom[addr % PrgRom.Length] = (byte)value;
 
-    public virtual void Write(int a, byte v)
+    public virtual void Write(int addr, int value)
     {
 
     }
 
-    public virtual byte ReadVram(int a) => Header.Mmu.Vram[a % 0x4000];
+    public virtual int ReadVram(int addr) => Header.Mmu.Vram[addr % 0x4000];
 
-    public virtual void SetLatch(int a, byte v)
+    public virtual void SetLatch(int addr, int value)
     {
 
     }

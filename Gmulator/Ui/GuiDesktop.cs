@@ -55,8 +55,8 @@ public class GuiDesktop : Gui
                     if (!Opened)
                     {
                         Open(Emulator.Config);
-                        if (Emulator.Console?.EmuState != DebugState.Break)
-                            Emulator.Console?.EmuState = DebugState.Paused;
+                        if (Emulator.Console?.DbgState != DebugState.Break)
+                            Emulator.Console?.DbgState = DebugState.Paused;
                         ImGui.OpenPopup("Menu");
                     }
                 }
@@ -199,87 +199,84 @@ public class GuiDesktop : Gui
                     }
                     break;
                 case Tab.Cheats:
-                    if (CheatDialog)
+
+                    if (ImGui.IsMouseClicked(ImGuiMouseButton.Right) && !_cheatDialogOpened)
                     {
-                        if (ImGui.BeginChild("CheatDialog", new(0, 0), ImGuiChildFlags.FrameStyle))
-                        {
-                            CheatFiles.Clear();
-                            Enumerate(CheatDirectory);
-                            for (int i = 0; i < CheatFiles.Count; i++)
-                            {
-                                var c = CheatFiles[i];
-                                if (ImGui.Selectable($"{Path.GetFileName(c.Name)}", i == SelectedItem[(int)Tab.ChtBrowser], ImGuiSelectableFlags.AllowDoubleClick))
-                                {
-                                    if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-                                        LoadCheats(c.Name);
-                                }
-                            }
-                            ImGui.EndChild();
-                        }
+                        _cheatDialogOpened = true;
+                        ImGui.OpenPopup("Add/Edit Cheat");
                     }
-                    else
+
+                    CheatWindow(null);
+
+                    if (ImGui.BeginChild("##cheats", new(0, 0), ImGuiChildFlags.FrameStyle))
                     {
-                        if (ImGui.IsMouseClicked(ImGuiMouseButton.Right) && !_cheatDialogOpened)
+                        ImGui.BeginTable("##cheattable", 3);
+                        ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthFixed, vp.Size.X - Raylib.MeasureText("OFF ", (int)ImGui.GetFontSize() * 2));
+                        ImGui.TableSetupColumn("Enabled");
+                        ImGui.TableSetupColumn("");
+                        ImGui.TableNextColumn();
+
+                        for (int i = 0; i < Cheats?.Count;)
                         {
-                            _cheatDialogOpened = true;
-                            ImGui.OpenPopup("Add/Edit Cheat");
-                        }
-
-                        CheatWindow(null);
-
-                        if (ImGui.BeginChild("##cheats", new(0, 0), ImGuiChildFlags.FrameStyle))
-                        {
-                            ImGui.BeginTable("##cheattable", 3);
-                            ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthFixed, vp.Size.X - Raylib.MeasureText("OFF ", (int)ImGui.GetFontSize() * 2));
-                            ImGui.TableSetupColumn("Enabled");
-                            ImGui.TableSetupColumn("");
-                            ImGui.TableNextColumn();
-
-                            for (int i = 0; i < Cheats?.Count;)
+                            var res = Cheats.Values.ToList();
+                            var cht = res.Where(c => c.Description == res[i].Description).ToList();
+                            if (cht.Count > 0)
                             {
-                                var res = Cheats.Values.ToList();
-                                var cht = res.Where(c => c.Description == res[i].Description).ToList();
-                                if (cht.Count > 0)
+                                ImGui.PushID(i);
+                                if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == SelectedItem[(int)Tab.Cheats], ImGuiSelectableFlags.AllowDoubleClick))
                                 {
-                                    ImGui.PushID(i);
-                                    if (ImGui.Selectable($"{cht[0].Description.Replace(@"""", "")}", i == SelectedItem[(int)Tab.Cheats], ImGuiSelectableFlags.AllowDoubleClick))
+                                    if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
                                     {
-                                        if (ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
-                                        {
-                                            _cheatDialogOpened = true;
-                                            ImGui.OpenPopup("Add/Edit Cheat");
-                                        }
+                                        _cheatDialogOpened = true;
+                                        ImGui.OpenPopup("Add/Edit Cheat");
                                     }
-
-                                    CheatWindow(cht[0]);
-
-                                    SetActive((int)Tab.Cheats, i);
-
-                                    ImGui.TableNextColumn();
-                                    var enabled = cht[0].Enabled;
-                                    if (ImGui.Checkbox("", ref enabled))
-                                        ToggleCheat(cht);
-
-                                    ImGui.TableNextColumn();
-
-                                    ImGui.SameLine();
-                                    if (ImGui.Button("x"))
-                                    {
-                                        foreach (var c in cht)
-                                            Cheats.Remove((c.Address, c.Address80));
-                                        Emulator.SaveCheats(CurrentName);
-                                    }
-
-                                    if (!cht[0].Enabled)
-                                        res.ForEach(x => { if (x.Description == cht[0].Description) x.Enabled = false; });
-                                    else
-                                        res.ForEach(x => { if (x.Description == cht[0].Description) x.Enabled = true; });
-                                    ImGui.PopID();
-                                    i += cht.Count;
-                                    ImGui.TableNextColumn();
                                 }
+
+                                CheatWindow(cht[0]);
+
+                                SetActive((int)Tab.Cheats, i);
+
+                                ImGui.TableNextColumn();
+                                var enabled = cht[0].Enabled;
+                                if (ImGui.Checkbox("", ref enabled))
+                                    ToggleCheat(cht);
+
+                                ImGui.TableNextColumn();
+
+                                ImGui.SameLine();
+                                if (ImGui.Button("x"))
+                                {
+                                    foreach (var c in cht)
+                                        Cheats.Remove((c.Address, c.Address80));
+                                    Emulator.SaveCheats(CurrentName);
+                                }
+
+                                if (!cht[0].Enabled)
+                                    res.ForEach(x => { if (x.Description == cht[0].Description) x.Enabled = false; });
+                                else
+                                    res.ForEach(x => { if (x.Description == cht[0].Description) x.Enabled = true; });
+                                ImGui.PopID();
+                                i += cht.Count;
+                                ImGui.TableNextColumn();
                             }
-                            ImGui.EndTable();
+                        }
+                        ImGui.EndTable();
+                    }
+                    ImGui.EndChild();
+                    break;
+                case Tab.ChtBrowser:
+                    if (ImGui.BeginChild("CheatDialog", new(0, 0), ImGuiChildFlags.FrameStyle))
+                    {
+                        CheatFiles.Clear();
+                        Enumerate(CheatDirectory);
+                        for (int i = 0; i < CheatFiles.Count; i++)
+                        {
+                            var c = CheatFiles[i];
+                            if (ImGui.Selectable($"{Path.GetFileName(c.Name)}", i == SelectedItem[(int)Tab.ChtBrowser], ImGuiSelectableFlags.AllowDoubleClick))
+                            {
+                                if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown) || ImGui.IsMouseDoubleClicked(ImGuiMouseButton.Left))
+                                    LoadCheats(c.Name);
+                            }
                         }
                         ImGui.EndChild();
                     }

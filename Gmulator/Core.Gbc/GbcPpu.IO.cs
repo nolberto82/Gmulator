@@ -2,7 +2,7 @@
 {
     public partial class GbcPpu
     {
-        public byte Read(int a) => a switch
+        public int Read(int a) => a switch
         {
             0xff40 => _lcdc,
             0xff41 => _stat,
@@ -31,53 +31,53 @@
             _ => 0xff,
         };
 
-        public void Write(int a, byte v)
+        public void Write(int addr, int value)
         {
-            switch (a)
+            switch (addr)
             {
-                case 0xff40: _lcdc = v; break;
+                case 0xff40: _lcdc = value; break;
                 case 0xff41:
-                    _stat = (byte)(v & 0x78 | _stat & 7 | 0x80);
-                    if (((v & 0x08) != 0 || (v & 0x10) != 0 || (v & 0x20) != 0) && (v & 0x40) == 0)
+                    _stat = (byte)(value & 0x78 | _stat & 7 | 0x80);
+                    if (((value & 0x08) != 0 || (value & 0x10) != 0 || (value & 0x20) != 0) && (value & 0x40) == 0)
                         Gbc.Cpu.RequestIF(IntLcd);
                     break;
-                case 0xff42: _scy = v; break;
-                case 0xff43: _scx = v; break;
-                case 0xff44: _ly = v; break;
-                case 0xff45: _lyc = v; break;
+                case 0xff42: _scy = value; break;
+                case 0xff43: _scx = value; break;
+                case 0xff44: _ly = value; break;
+                case 0xff45: _lyc = value; break;
                 case 0xff46:
-                    Mmu.WriteDMA(v);
-                    _oamDma = v;
+                    Mmu.WriteDMA(value);
+                    _oamDma = value;
                     break;
                 case 0xff47:
-                    _bgp = v;
+                    _bgp = value;
                     break;
                 case 0xff48:
-                    _obp0 = v;
+                    _obp0 = value;
                     break;
                 case 0xff49:
-                    _obp1 = v;
+                    _obp1 = value;
                     break;
                 case 0xff4A:
-                    _wy = v;
+                    _wy = value;
                     break;
                 case 0xff4B:
-                    _wx = v;
+                    _wx = value;
                     break;
-                case 0xff4d: _key1 = v; break;
+                case 0xff4d: _key1 = value; break;
                 case 0xff4f:
                     if (Mmu.Mapper.CGB)
-                        Mmu.VramBank = (byte)(v & 1);
+                        Mmu.VramBank = (byte)(value & 1);
                     break;
-                case 0xff51: _hdma1 = v; break;
-                case 0xff52: _hdma2 = v; break;
-                case 0xff53: _hdma3 = v; break;
-                case 0xff54: _hdma4 = v; break;
+                case 0xff51: _hdma1 = value; break;
+                case 0xff52: _hdma2 = value; break;
+                case 0xff53: _hdma3 = value; break;
+                case 0xff54: _hdma4 = value; break;
                 case 0xff55:
-                    _hdma5 = (byte)(v & 0x7f);
+                    _hdma5 = (byte)(value & 0x7f);
                     if (!DMAactive)
                     {
-                        DMAHBlank = (v & 0x80) != 0;
+                        DMAHBlank = (value & 0x80) != 0;
                         if (!DMAHBlank)
                         {
                             var src = (_hdma1 << 8 | _hdma2) & 0xfff0;
@@ -86,22 +86,22 @@
                         }
                     }
                     break;
-                case 0xff68: _bgpi = v; break;
+                case 0xff68: _bgpi = value; break;
                 case 0xff69:
-                    _bgpd = v;
-                    SetBkgPalette(_bgpi, v);
+                    _bgpd = value;
+                    SetBkgPalette(_bgpi, value);
                     _bgpi += (byte)((_bgpi & 0x80) != 0 ? 1 : 0);
                     break;
-                case 0xff6a: _obpi = v; break;
+                case 0xff6a: _obpi = value; break;
                 case 0xff6b:
-                    _obpd = v;
-                    SetObjPalette(_obpi, v);
+                    _obpd = value;
+                    SetObjPalette(_obpi, value);
                     _obpi += (byte)((_obpi & 0x80) != 0 ? 1 : 0);
                     break;
                 case 0xff70:
                 {
                     if (Mmu.Mapper.CGB)
-                        Mmu.WramBank = (byte)(v == 0 ? 1 : v & 7);
+                        Mmu.WramBank = (byte)(value == 0 ? 1 : value & 7);
                     break;
                 }
             }
@@ -115,14 +115,14 @@
             return v;
         }
 
-        byte Read69()
+        int Read69()
         {
             _bgpd = _cgbBkgPal[_bgpi & 0x3f];
             _bgpi += (byte)((_bgpi & 0x80) != 0 ? 1 : 0);
             return _bgpd;
         }
 
-        byte Read6b()
+        int Read6b()
         {
             _obpd = _cgbObjPal[_obpi & 0x3f];
             _obpi += (byte)((_obpi & 0x80) != 0 ? 1 : 0);

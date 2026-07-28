@@ -28,6 +28,7 @@ namespace Gmulator.Shared
                     int a = _size == 0x1000 ? i << 4 | (j >> 12) : j;
                     Handlers[a].Offset = offset;
                     Handlers[a].Type = RamType.Wram;
+                    Handlers[a].Mask = addrEnd - addrStart;
                     Handlers[a].Read = r;
                     Handlers[a].Write = w;
                     offset += 0x1000;
@@ -48,7 +49,7 @@ namespace Gmulator.Shared
                 {
                     int a = _size == 0x1000 ? i << 4 | (j >> 12) : j;
                     Handlers[a].Offset = offset | mmcbank * 2 * 0x1000;
-                    Handlers[a].Type = RamType.Sram;
+                    Handlers[a].Type = r.Method.Name == "ReadGsuRam" ? RamType.GsuRam :  RamType.Sram;
                     Handlers[a].Mask = addrEnd - addrStart;
                     Handlers[a].Read = r;
                     Handlers[a].Write = w;

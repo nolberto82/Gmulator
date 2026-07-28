@@ -12,29 +12,29 @@
             Reset();
         }
 
-        public override byte ReadPrg(int a) => base.ReadPrg(0x4000 * Prg[a >> 14 & 1] + a % 0x4000);
+        public override int ReadPrg(int addr) => base.ReadPrg(0x4000 * Prg[addr >> 14 & 1] + addr % 0x4000);
 
-        public override byte ReadChr(int a)
+        public override int ReadChr(int addr)
         {
             if (Header.ChrBanks > 0)
-                return base.ReadChr(0x1000 * Chr[a >> 12] + a % 0x1000);
+                return base.ReadChr(0x1000 * Chr[addr >> 12] + addr % 0x1000);
             else
-                return Header.Mmu.Vram[a];
+                return Header.Mmu.Vram[addr];
         }
 
-        public override void WritePrg(int a, byte v)
+        public override void WritePrg(int addr, int value)
         {
-            if (a < 0xc000)
-                base.WritePrg(0x4000 * Prg[0] + a % 0x4000, v);
+            if (addr < 0xc000)
+                base.WritePrg(0x4000 * Prg[0] + addr % 0x4000, value);
             else
-                base.WritePrg(0x4000 * Prg[1] + a % 0x4000, v);
+                base.WritePrg(0x4000 * Prg[1] + addr % 0x4000, value);
         }
 
-        public override void Write(int addr, byte value)
+        public override void Write(int addr, int value)
         {
             if ((value & 0x80) != 0)
             {
-                Control |= 0xc;
+                Control |= 0x0c;
                 Shift = 0x10;
                 Reset();
             }
@@ -74,7 +74,7 @@
             base.Write(addr, value);
         }
 
-        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
+        public override void SetLatch(int addr, int value) => base.SetLatch(addr, value);
 
         public override void Reset()
         {

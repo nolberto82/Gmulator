@@ -63,13 +63,13 @@ public partial class NesCpu : EmuState, ICpu
         return Mmu.ReadByte(a);
     }
 
-    private int TickRead(int a, int opbit = 0)
+    private int TickRead(int addr, int opbit = 0)
     {
         Cycles++;
         PpuStep(3);
-        var v = Mmu.ReadByte(a) & 0xff;
-        Nes.Debugger.Watchpoint(a, v, MemoryHandlers[a >> 12], false);
-        return v;
+        byte value = (byte)(Mmu.ReadByte(addr) & 0xff);
+        Nes.Debugger.Watchpoint(addr, value, CpuType.Nes, false);
+        return value;
     }
 
     private void TickWrite(int addr, byte value)
@@ -77,7 +77,7 @@ public partial class NesCpu : EmuState, ICpu
         Cycles++;
         PpuStep(3);
         Mmu.WriteByte(addr, value);
-        Nes.Debugger.Watchpoint(addr, value & 0xff, MemoryHandlers[addr >> 12], true);
+        Nes.Debugger.Watchpoint(addr, value, CpuType.Nes, true);
     }
 
     public void Step()

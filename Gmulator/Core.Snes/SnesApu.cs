@@ -28,8 +28,8 @@ public sealed class SnesApu : ISaveState
     private SnesSpcLogger Logger;
 
     private List<Breakpoint> Breakpoints;
-    private Func<int, bool> ExecuteCheck;
-    private Action<int, int, RamType, bool> AccessCheckSpc;
+    private Func<int, CpuType, bool> ExecuteCheck;
+    private Action<int, int, CpuType, bool> AccessCheckSpc;
 
     public SnesApu()
     {
@@ -50,7 +50,7 @@ public sealed class SnesApu : ISaveState
         if (snes.DebugWindow != null)
         {
             ExecuteCheck = snes.Debugger.Execute;
-            AccessCheckSpc = snes.Debugger.AccessSpc;
+            AccessCheckSpc = snes.Debugger.Watchpoint;
         }
     }
 
@@ -62,19 +62,12 @@ public sealed class SnesApu : ISaveState
 #if !DECKRELEASE
             if (Snes.Debug)
             {
-                DebugState state = Snes.EmuState;
+                DebugState state = Snes.DbgState;
                 if (Logger.Logging)
                     Logger.Log();
 
                 if (Breakpoints.Count > 0 && state == DebugState.Running)
-                {
-                    if (ExecuteCheck(Spc.PC))
-                    {
-                        Snes.EmuState = DebugState.Break;
-                        return;
-                    }
-
-                }
+                    ExecuteCheck(Spc.PC, CpuType.Spc);
 
                 if (state == DebugState.Break || state == DebugState.StepSpc)
                     return;
@@ -120,7 +113,7 @@ public sealed class SnesApu : ISaveState
         Cycle();
 #if DEBUG || RELEASE
         if (Snes.Debug)
-            AccessCheckSpc(a, -1, RamType.SpcRam, false);
+            AccessCheckSpc(a, -1, CpuType.Spc, false);
 #endif
 
         switch (a)
@@ -143,13 +136,13 @@ public sealed class SnesApu : ISaveState
         return ram[a];
     }
 
-    public void Write(int addr, byte value, bool debug = false)
+    public void Write(int addr, int val, bool debug = false)
     {
         int a = addr & 0xffff;
-
+        byte value = (byte)val;
 #if DEBUG || RELEASE
         if (Snes.Debug)
-            AccessCheckSpc(a, value, RamType.SpcRam, true);
+            AccessCheckSpc(a, value, CpuType.Spc, true);
 #endif
 
         switch (a)
@@ -204,7 +197,7 @@ public sealed class SnesApu : ISaveState
         ram[a] = value;
     }
 
-    public byte ReadDebug(int a)
+    public int ReadDebug(int a)
     {
         if (a >= 0xffc0)
             return IplBootrom[a & 0x3f];

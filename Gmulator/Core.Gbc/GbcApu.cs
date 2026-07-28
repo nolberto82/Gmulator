@@ -6,9 +6,9 @@ namespace Gmulator.Core.Gbc;
 
 public class GbcApu : ISaveState
 {
-    private byte _nr50;
-    private byte _nr51;
-    private byte _nr52;
+    private int _nr50;
+    private int _nr51;
+    private int _nr52;
 
     private int _frameSequencer;
     private int _frameSequencerCycles;
@@ -16,8 +16,8 @@ public class GbcApu : ISaveState
     private int _nextSampleTimer;
     private int _bufferPosition;
 
-    private byte _volumeLeft;
-    private byte _volumeRight;
+    private int _volumeLeft;
+    private int _volumeRight;
 
     public Square1 Square1 { get; private set; }
     public Square2 Square2 { get; private set; }
@@ -123,7 +123,7 @@ public class GbcApu : ISaveState
         }
     }
 
-    public byte Read(int a) => a switch
+    public int Read(int a) => a switch
     {
         0xff24 => _nr50,
         0xff25 => _nr51,
@@ -131,7 +131,7 @@ public class GbcApu : ISaveState
         _ => 0,
     };
 
-    public void Write(int a, byte v)
+    public void Write(int a, int v)
     {
         switch (a)
         {

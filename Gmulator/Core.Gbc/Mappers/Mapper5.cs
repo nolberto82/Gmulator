@@ -10,12 +10,12 @@ public class Mapper5 : BaseMapper
 
     public override void Init(byte[] rom, string filename) => base.Init(rom, filename);
 
-    public override byte ReadRom(int a)
+    public override int ReadRom(int addr)
     {
-        if (Rombank > 1 && a >= 0x4000)
-            return base.ReadRom(a % 0x4000 + (0x4000 * Rombank));
+        if (Rombank > 1 && addr >= 0x4000)
+            return base.ReadRom(addr % 0x4000 + (0x4000 * Rombank));
         else
-            return base.ReadRom(a);
+            return base.ReadRom(addr);
     }
 
     public override Span<byte> ReadRomBlock(int a, int size)
@@ -26,29 +26,29 @@ public class Mapper5 : BaseMapper
             return new(Rom, a % 0x4000 + (0x4000 * Rombank), size);
     }
 
-    public override void WriteRom0(int a, byte v)
+    public override void WriteRom0(int a, int value)
     {
         //if (edit)
-        //    Rom[a] = v;
+        //    Rom[a] = (byte)value;
         //else
         {
             if (a <= 0x1fff)
-                CartRamEnabled = v == 0x0a;
+                CartRamEnabled = value == 0x0a;
             else if (a <= 0x3fff)
-                Rombank = v & 0xff;
+                Rombank = value & 0xff;
         }
     }
 
-    public override void WriteRom1(int a, byte v)
+    public override void WriteRom1(int a, int value)
     {
         //if (edit)
-        //    Rom[a % 0x4000 + (0x4000 * Rombank)] = v;
+        //    Rom[a % 0x4000 + (0x4000 * Rombank)] = (byte)value;
         //else
         {
             if (a <= 0x3fff)
-                Rombank |= (v << 9) & 0x100;
+                Rombank |= (value << 9) & 0x100;
             else if (a <= 0x5fff)
-                Rambank = v & 3;
+                Rambank = value  & 3;
 
         }
     }

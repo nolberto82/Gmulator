@@ -9,7 +9,7 @@
             Reset();
         }
 
-        public override void Write(int addr, byte value)
+        public override void Write(int addr, int value)
         {
             if (addr == 0x5100)
                 PrgMode = value & 3;
@@ -51,7 +51,7 @@
             }
         }
 
-        public override byte ReadPrg(int a)
+        public override int ReadPrg(int a)
         {
             if (PrgMode == 1)
                 return base.ReadPrg(a);
@@ -68,7 +68,7 @@
             return base.ReadPrg(0x10000 * Prg[a >> 14] + a % 0x10000);
         }
 
-        public override byte ReadChr(int addr)
+        public override int ReadChr(int addr)
         {
             if (addr >= 0x2000) return 0;
             if (ChrMode == 1)
@@ -88,9 +88,9 @@
             return base.ReadChr(0x0400 * Chr[addr >> 10] + addr % 0x0400);
         }
 
-        public override void WritePrg(int addr, byte value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
+        public override void WritePrg(int addr, int value) => base.WritePrg(0x2000 * Prg[(addr % 0x8000) >> 13] + addr % 0x2000, value);
 
-        public override byte ReadVram(int addr) => base.ReadVram(0x400 * NametableBank + addr % 0x400 + 0x2000);
+        public override int ReadVram(int addr) => base.ReadVram(0x400 * NametableBank + addr % 0x400 + 0x2000);
 
         public override void Reset()
         {
@@ -101,9 +101,9 @@
 
         public override void Scanline() => base.Scanline();
 
-        public override void SetLatch(int a, byte v) => base.SetLatch(a, v);
+        public override void SetLatch(int addr, int value) => base.SetLatch(addr, value);
 
-        private void UpdatePrgBanks(int addr, byte value)
+        private void UpdatePrgBanks(int addr, int value)
         {
             switch (PrgMode)
             {
