@@ -564,7 +564,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     fy = s.Height - fy - 1;
 
                 int baseaddr = _objTable1 + ((s.Attrib & 1) != 0 ? _objTable2 : 0);
-                int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + (fy & 7) + fy / 8 * 256;
+                int spraddr = baseaddr + (s.Tile + (fx / 8)) * 16 + ((byte)fy & 7) + (byte)fy / 8 * 256;
                 int colorid = GetPixel(spraddr, 7 - fx & 7, 4);
                 int palid = (s.Attrib & 0x0e) >> 1;
                 int palette = (0x80 + palid * 16 + colorid) & 0xff;
@@ -572,8 +572,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
                 if (colorid != 0)
                 {
-                    if (_winMainBgs[4] && !GetWindow(5, x))
-                        continue;
+                    //if (_winMainBgs[4] && !GetWindow(5, x))
+                    //    continue;
 
                     if (main)
                     {
