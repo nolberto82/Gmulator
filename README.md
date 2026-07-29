@@ -32,3 +32,4 @@ NLua | https://github.com/NLua/NLua |
 * https://snes.nesdev.org/wiki/SNESdev_Wiki
 * https://wiki.superfamicom.org/
 * https://github.com/angelo-wf/LakeSnes and https://github.com/Kookpot/SuperNintendoEmulator - sound emulation
+* https://github.com/nesdev-org/MesenCE/tree/master - Superfx/Gsu emulation
