@@ -127,7 +127,7 @@ public sealed class SnesDma(Snes snes) : ISaveState
         {
             if (HdmaEnabled[i] && !Completed[i])
             {
-                //Enabled[i] = false;
+                Enabled[i] = false;
                 if (TransferEnabled[i])
                 {
                     int max = Max[Mode[i] & 7];
@@ -269,7 +269,7 @@ public sealed class SnesDma(Snes snes) : ISaveState
         }
     }
 
-    public List<RegisterInfo> GetIoRegs(int i) =>
+    public List<RegisterInfo> GetState(int i) =>
     [
         new($"420B.{i}","DMA Enabled",$"{Enabled[i]}"),
         new($"420C.{i}","HDMA Enabled",$"{HdmaEnabled[i]}"),

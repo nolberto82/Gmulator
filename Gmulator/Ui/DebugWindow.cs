@@ -48,12 +48,22 @@ namespace Gmulator.Ui
         public Func<List<RegisterInfo>> GetSpcState { get; set; }
         public Func<List<RegisterInfo>> GetSpcFlags { get; set; }
         public Func<List<RegisterInfo>> GetPortState { get; set; }
+        public Func<int, List<RegisterInfo>> GetDmaState { get; set; }
         public Func<int> GetSpcPC { get; set; }
         public Func<int[]> GetPrg { get; set; }
         public Func<int[]> GetChr { get; set; }
         public IConsole Console { get; set; }
         public ICpu Cpu { get; set; }
         public IPpu Ppu { get; set; }
+
+        public int GetCpuIndex()
+        {
+            int index= Math.Abs(Array.FindIndex(Disassemble, k => k.CpuType == SelectedCpu));
+            if (index == -1)
+                return 0;
+            else 
+                return index;
+        }
 
         public DebugWindow(IConsole console)
         {
@@ -70,12 +80,6 @@ namespace Gmulator.Ui
                 new("Line", StepScanline),
                 new("Trace", ToggleTrace),
             ];
-
-            int size = Console.GetType().Name switch
-            {
-                "Snes" => 4,
-                _ => 0,
-            };
 
             MemoryEditor = new();
         }
@@ -101,80 +105,20 @@ namespace Gmulator.Ui
 
             ImGui.Begin("Processors");
             {
-                if (ImGui.BeginTabBar("##cputabs"))
-                {
-                    if (ImGui.BeginTabItem("Main"))
-                    {
-                        ImGui.Columns(2);
-                        ImGui.SetColumnWidth(0, 210);
-                        SelectedCpu = n;
-                        DrawButtons(logging, SelectedCpu);
-                        DrawDisassembly(pc, index);
-                        ImGui.NextColumn();
-                        DrawCpuInfo(Cpu);
-                        DrawBreakpoints(index);
-                        ImGui.EndTabItem();
-                        ImGui.Columns(1);
-                    }
-
-                    if ((Console as Snes) != null)
-                    {
-                        if (ImGui.BeginTabItem("Spc"))
-                        {
-                            ImGui.Columns(2);
-                            ImGui.SetColumnWidth(0, 210);
-                            SnesSpc spc = (Console as Snes).Spc;
-                            SelectedCpu = CpuType.Spc;
-                            DrawButtons(logging, SelectedCpu);
-                            DrawDisassembly(spc.PC, index);
-                            ImGui.NextColumn();
-                            DrawCpuInfo(spc);
-                            DrawBreakpoints(index);
-                            ImGui.EndTabItem();
-                            ImGui.Columns(1);
-                        }
-
-                        if (Console is Snes { Mapper.Coprocessor: SnesMapper.Sa1 } && ImGui.BeginTabItem("Sa1"))
-                        {
-                            ImGui.Columns(2);
-                            ImGui.SetColumnWidth(0, 210);
-                            SnesSa1 sa1 = (Console as Snes).Sa1;
-                            SelectedCpu = CpuType.Sa1;
-                            DrawButtons(logging, SelectedCpu);
-                            (Console as Snes).Logger.IsSa1 = true;
-                            DrawDisassembly((Console as Snes).Sa1.PBPC, index);
-                            (Console as Snes).Logger.IsSa1 = false;
-                            ImGui.NextColumn();
-                            DrawCpuInfo(sa1);
-                            DrawBreakpoints(index);
-                            ImGui.EndTabItem();
-                            ImGui.Columns(1);
-                        }
-
-                        if (Console is Snes { Mapper.Coprocessor: SnesMapper.Gsu } && ImGui.BeginTabItem("Gsu"))
-                        {
-                            ImGui.Columns(2);
-                            ImGui.SetColumnWidth(0, 210);
-                            SnesGsu gsu = (Console as Snes).Gsu;
-                            SelectedCpu = CpuType.Gsu;
-                            DrawButtons(logging, SelectedCpu);
-                            DrawDisassembly((Console as Snes).Gsu.PC, index);
-                            ImGui.NextColumn();
-                            DrawCpuInfo(gsu);
-                            DrawBreakpoints(index);
-                            ImGui.EndTabItem();
-                            ImGui.Columns(1);
-                        }
-                    }
-
-                    ImGui.Columns(1);
-                    ImGui.EndTabBar();
-                }
+                ImGui.Columns(2);
+                ImGui.SetColumnWidth(0, 210);
+                SelectedCpu = CpuType.Snes;
+                DrawButtons(logging, CpuType.Snes);
+                DrawDisassembly(pc, 2);
+                ImGui.NextColumn();
+                DrawCpuInfo(Cpu);
+                DrawBreakpoints((int)n);
+                ImGui.Columns(1);
             }
             ImGui.End();
         }
 
-        private void DrawDisassembly(int Pc, int n)
+        public void DrawDisassembly(int Pc, int n)
         {
             ImGui.PushID(n);
             ImGui.BeginChild($"Disassembly{n}");
@@ -269,14 +213,18 @@ namespace Gmulator.Ui
                         ImGui.SameLine();
                 }
                 ImGui.Separator();
-                ImGui.Text($"H Clock: {Ppu.GetState()[0].Value}");
-                ImGui.Text($"Scanline: {Ppu.GetState()[1].Value}");
+                if (cpu is SnesCpu)
+                {
+                    ImGui.Text($"H Clock: {Ppu.GetState()[0].Value}");
+                    ImGui.Text($"Scanline: {Ppu.GetState()[1].Value}");
+                }
+
                 ImGui.Text($"Cycles: {cpu.Cycles}");
                 ImGui.EndChild();
             }
 
             ImGui.SeparatorText("Flags");
-            ImGui.BeginChild("##cpuflags", new(0, 80));
+            ImGui.BeginChild("##cpuflags", new(0, cpu is not SnesGsu ? 80 : 50));
             {
                 var flags = cpu.GetFlags();
                 for (int i = 0; i < flags.Count; i++)
@@ -330,8 +278,6 @@ namespace Gmulator.Ui
 
         public virtual void DrawCartInfo(Dictionary<string, string> info)
         {
-            //ImGui.SetNextWindowPos(new(266, 30));
-            //ImGui.SetNextWindowSize(new(409, 240));
             ImGui.Begin("Cartridge");
             {
                 var v = info;
@@ -376,7 +322,33 @@ namespace Gmulator.Ui
             ImGui.EndChild();
         }
 
-        public virtual void DrawDmaInfo() { }
+        public virtual void DrawDmaInfo(Func<int, List<RegisterInfo>> regs)
+        {
+            ImGui.BeginChild("Dma");
+            for (int c = 0; c < 8; c++)
+            {
+                if (ImGui.BeginTabBar("##dmatab"))
+                {
+                    if (ImGui.BeginTabItem($"{c:X2}"))
+                    {
+                        if (ImGui.BeginTable("##dmainfo", 3, ImGuiTableFlags.RowBg))
+                        {
+                            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 60);
+                            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 140);
+                            var v = regs(c);
+                            for (int i = 0; i < v.Count; i++)
+                            {
+                                TableRowCol3(v[i].Address, v[i].Name, v[i].Value);
+                            }
+                            ImGui.EndTable();
+                        }
+                        ImGui.EndTabItem();
+                    }
+                    ImGui.EndTabBar();
+                }
+            }
+            ImGui.EndChild();
+        }
 
         public virtual void Continue()
         {
@@ -476,7 +448,8 @@ namespace Gmulator.Ui
 
         public virtual void DrawBreakpoints(int index)
         {
-            if (ImGui.Begin("Breakpoints"))
+            ImGui.SeparatorText("Breakpoints");
+            if (ImGui.BeginChild("Breakpoints"))
             {
                 const int columns = 4;
                 Breakpoint cbp = null;
@@ -494,7 +467,7 @@ namespace Gmulator.Ui
                     for (int i = 0; i < Breakpoints.Count; i++)
                     {
                         Breakpoint bp = Breakpoints[i];
-                        if (bp.CpuType != SelectedCpu)
+                        if (bp.CpuType != (CpuType)index)
                             continue;
                         cbp = bp;
                         ImGui.PushID(i);
@@ -555,7 +528,7 @@ namespace Gmulator.Ui
                 if (ImGui.BeginPopupModal("Add Breakpoint"))
                     DrawBpMenu(cbp);
             }
-            ImGui.End();
+            ImGui.EndChild();
         }
 
         public virtual void DrawBpMenu(Breakpoint bp, bool edit = false)
@@ -600,8 +573,6 @@ namespace Gmulator.Ui
 
         public virtual void DrawRegisters()
         {
-            //ImGui.SetNextWindowPos(new(870, 30));
-            //ImGui.SetNextWindowSize(new(325, 648));
             ImGui.Begin("IO Registers", NoScrollFlags);
             {
                 ImGui.BeginTabBar("##ioregtab");
@@ -611,6 +582,7 @@ namespace Gmulator.Ui
                     DrawIORegisters(GetPpuState());
                     ImGui.EndTabItem();
                 }
+
                 if (ImGui.BeginTabItem("Apu"))
                 {
                     DrawIORegisters(GetApuState());
@@ -620,6 +592,12 @@ namespace Gmulator.Ui
                 if (GetPortState != null && ImGui.BeginTabItem("Ports"))
                 {
                     DrawIORegisters(GetPortState());
+                    ImGui.EndTabItem();
+                }
+
+                if (GetDmaState != null && ImGui.BeginTabItem("Dma"))
+                {
+                    DrawDmaInfo(GetDmaState);
                     ImGui.EndTabItem();
                 }
 

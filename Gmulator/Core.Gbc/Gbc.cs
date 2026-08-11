@@ -22,7 +22,6 @@ namespace Gmulator.Core.Gbc
 
         public Debugger Debugger { get; set; }
         public DebugState DbgState { get; set; }
-        public bool Run { get; set; }
 
         public Gbc()
         {
@@ -153,7 +152,7 @@ namespace Gmulator.Core.Gbc
 
             lock (StateLock)
             {
-                var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Name)}.gs";
+                string name = GetSaveStateName(slot, Mapper.Name);
                 if (name != "")
                 {
                     using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
@@ -177,7 +176,7 @@ namespace Gmulator.Core.Gbc
 
             lock (StateLock)
             {
-                var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Name)}.gs";
+                string name = GetSaveStateName(slot, Mapper.Name);
                 if (File.Exists(name))
                 {
                     using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));

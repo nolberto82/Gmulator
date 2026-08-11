@@ -127,7 +127,7 @@ public class Emulator
         Raylib.DrawFPS(width - 80, (int)(5 + MenuHeight));
     }
 
-    public virtual unsafe void UpdateTexture(Texture2D texture, ReadOnlySpan<uint> buffer)
+    public unsafe virtual void UpdateTexture(Texture2D texture, ReadOnlySpan<uint> buffer)
     {
         if (!Debug)
         {
@@ -306,6 +306,11 @@ public class Emulator
             sw.Write($"cheat{i}_enable = \"{cht.Enabled.ToString().ToLower()}\"\n");
             sw.Write("\n");
         }
+    }
+
+    public string GetSaveStateName(int slot, string name)
+    {
+        return @$"{StateDirectory}/{Path.GetFileNameWithoutExtension(GameName)}_{slot}.gs";
     }
 
     public virtual void SaveState(int slot, StateResult res)

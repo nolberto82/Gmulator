@@ -66,6 +66,7 @@ internal class SnesDebugWindow : DebugWindow
         GetSpcState = Spc.GetRegisters;
         GetSpcFlags = Spc.GetFlags;
         GetPortState = snes.Apu.GetState;
+        GetDmaState = Dma.GetState;
         GetSpcPC = () => Spc.PC;
 
         if (Sa1 != null)
@@ -92,7 +93,7 @@ internal class SnesDebugWindow : DebugWindow
         MemRegions =
         [
             new("Work", mmu.ReadWram, mmu.WriteWram, 0x7e0000, 0x20000, 6, BpType.WramRead | BpType.WramWrite, RamType.Wram),
-            new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length,$"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead, RamType.Sram),
+            new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, 0, 0,  BpType.SramWrite | BpType.SramRead, RamType.Sram),
             new("Video", Ppu.ReadByte, Ppu.WriteByte, 0x0000, 0x10000, 4, BpType.VramWrite | BpType.VramRead, RamType.Vram),
             new("Oam", Ppu.ReadOram,Ppu.WriteOram, 0x0000, 0x220, 3, BpType.OramWrite | BpType.OramRead, RamType.Oram),
             new("Color", Ppu.ReadCram ,Ppu.WriteCram, 0x0000, 0x200, 3, BpType.CramWrite | BpType.CramRead, RamType.Cram),
@@ -107,7 +108,11 @@ internal class SnesDebugWindow : DebugWindow
             MemRegions.Add(new("Prg", Gsu.ReadPrg2, Gsu.WritePrg2, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
         }
         else
+        {
+            MemRegions[1] = new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length, $"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead, RamType.Sram);
             MemRegions.Add(new("Prg", Mapper.Read, Mapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
+        }
+
         MemRegions.Add(new("Register", null, null, -1, -1, -1, BpType.RegWrite | BpType.RegRead, RamType.Register));
 
     }
@@ -116,11 +121,11 @@ internal class SnesDebugWindow : DebugWindow
     {
         base.Draw(texture);
         DrawDebugger(Cpu.PBPC, Logger.LogMain, CpuType.Snes);
+        DrawCoProcessors();
         //DrawGsuInfo();
         //DrawStackInfo(Snes.Ram.AsSpan(0, 0x2000), Snes.Cpu.SP, 0x1fff, "cpu");
         DrawCartInfo(Mapper.GetCartInfo());
         DrawRegisters();
-        DrawDmaInfo();
         DrawMemory();
 
 #if DEBUG || DECKDEBUG
@@ -137,29 +142,61 @@ internal class SnesDebugWindow : DebugWindow
 
     public override void DrawMemory() => base.DrawMemory();
 
-    public override void DrawDmaInfo()
+    private void DrawCoProcessors()
     {
-        //ImGui.SetNextWindowPos(new(559, 680));
-        //ImGui.SetNextWindowSize(new(299, 291));
-        ImGui.Begin("Dma", NoScrollFlags);
-        for (int c = 0; c < 8; c++)
+        ImGui.Begin("Co Processors");
         {
-            if (ImGui.BeginTabBar("##dmatab"))
+            int index;
+            if (ImGui.BeginTabBar("##cocputabs"))
             {
-                if (ImGui.BeginTabItem($"{c:X2}"))
+                if (ImGui.BeginTabItem("Spc"))
                 {
-                    if (ImGui.BeginTable("##dmainfo", 3, ImGuiTableFlags.RowBg))
-                    {
-                        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 60);
-                        ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, 140);
-                        var v = Dma.GetIoRegs(c);
-                        for (int i = 0; i < v.Count; i++)
-                        {
-                            TableRowCol3(v[i].Address, v[i].Name, v[i].Value);
-                        }
-                        ImGui.EndTable();
-                    }
+                    SelectedCpu = CpuType.Spc;
+                    index = GetCpuIndex();
+                    ImGui.Columns(2);
+                    ImGui.SetColumnWidth(0, 210);
+                    SnesSpc spc = (Console as Snes).Spc;
+                    DrawButtons(SpcLogger.Logging, SelectedCpu);
+                    DrawDisassembly(spc.PC, index);
+                    ImGui.NextColumn();
+                    DrawCpuInfo(spc);
+                    DrawBreakpoints((int)SelectedCpu);
                     ImGui.EndTabItem();
+                    ImGui.Columns(1);
+                }
+
+                if (Console is Snes { Mapper.Coprocessor: SnesMapper.Sa1 } && ImGui.BeginTabItem("Sa1"))
+                {
+                    SelectedCpu = CpuType.Sa1;
+                    index = GetCpuIndex();
+                    ImGui.Columns(2);
+                    ImGui.SetColumnWidth(0, 210);
+                    SnesSa1 sa1 = (Console as Snes).Sa1;
+                    DrawButtons(Logger.LogSa1, SelectedCpu);
+                    (Console as Snes).Logger.IsSa1 = true;
+                    DrawDisassembly((Console as Snes).Sa1.PBPC, index);
+                    (Console as Snes).Logger.IsSa1 = false;
+                    ImGui.NextColumn();
+                    DrawCpuInfo(sa1);
+                    DrawBreakpoints((int)SelectedCpu);
+                    ImGui.EndTabItem();
+                    ImGui.Columns(1);
+                }
+
+                if (Console is Snes { Mapper.Coprocessor: SnesMapper.Gsu } && ImGui.BeginTabItem("Gsu"))
+                {
+                    SelectedCpu = CpuType.Gsu;
+                    index = GetCpuIndex();
+                    ImGui.Columns(2);
+                    ImGui.SetColumnWidth(0, 210);
+                    SnesGsu gsu = (Console as Snes).Gsu;
+                    DrawButtons(GsuLogger.Logging, SelectedCpu);
+                    DrawDisassembly((Console as Snes).Gsu.PC, index);
+                    ImGui.NextColumn();
+                    DrawCpuInfo(gsu);
+                    DrawBreakpoints((int)SelectedCpu);
+                    ImGui.EndTabItem();
+                    ImGui.Columns(1);
                 }
                 ImGui.EndTabBar();
             }

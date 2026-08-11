@@ -224,7 +224,7 @@ public sealed class SnesMapper(MemoryMap map) : ISaveState
                             if (RamSize == 0)
                                 RamSize = 0x10000;
                         }
-                        Sram = new byte[RamSize];
+                        //Sram = new byte[RamSize];
                         return true;
                     }
                 }

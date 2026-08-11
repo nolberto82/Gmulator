@@ -92,14 +92,6 @@ public class SnesSpcLogger()
             }
         }
 
-        //if (dops.Name == "mov")
-        //{
-        //    if (size == 1) { }
-        //    else if (size == 2)
-        //        data += $" [${Snes.Spc.Read(b[1], true):X2}]";
-        //    else if (size == 3) { }
-        //}
-
         string regtext = string.Empty;
 
         if (getRegisters)
@@ -117,7 +109,6 @@ public class SnesSpcLogger()
                     break;
                 s += f.Value.ToLower();
             }
-            regtext += new string([.. s.Reverse()]) + " ";
         }
 
         return (data, access, op, size);

@@ -4,31 +4,6 @@ namespace Gmulator.Core.Snes;
 
 public sealed partial class SnesPpu
 {
-    private int _nmiTimEn; ///4200
-    private int _wrIo; //4201
-    private int _hTimeLow; //4207
-    private int _hTimeHigh; //4208
-    private int _vTimeLow; //4209
-    private int _vTimeHigh; //420A
-    private int _mdmaEn; //420B
-    private int _hdmaEn; //420C
-    private int _rdNmi; //4210
-    private int _timeUp; //4211
-    private int _hvbJoy; //4212
-    private int _rdIo; //4213
-    private int _joy1L; //4218
-    private int _joy1H; //4219
-    private int _joy2L; //421A
-    private int _joy2H; //421B
-    private int _joy3L; //421C
-    private int _joy3H; //421D
-    private int _joy4L; //421E
-    private int _joy4H; //421F
-    private bool _counterLatch;
-    private bool _ophctLatch;
-    private bool _opvctLatch;
-    private int _multiplyRes;
-
     public int ReadIO(int addr)
     {
         switch (addr & 0xffff)

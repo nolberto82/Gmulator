@@ -25,6 +25,8 @@ public class SnesGsuMmu : ISaveState
 
     public void Write(int addr, int value)
     {
+        if (addr==1&&value==0xf0)
+        { }
         _ram[addr & _ramSize] = (byte)value;
         _saveTimer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }

@@ -229,7 +229,7 @@ public sealed class Snes : Emulator, IConsole
 
         lock (StateLock)
         {
-            var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Name)}{slot}.gs";
+            string name = GetSaveStateName(slot, Mapper.Name);
             if (name != "")
             {
                 using BinaryWriter bw = new(new FileStream(name, FileMode.Create, FileAccess.Write));
@@ -258,7 +258,7 @@ public sealed class Snes : Emulator, IConsole
 
         lock (StateLock)
         {
-            var name = $"{Environment.CurrentDirectory}\\{StateDirectory}\\{Path.GetFileNameWithoutExtension(Mapper.Name)}{slot}.gs";
+            string name = GetSaveStateName(slot, Mapper.Name);
             if (File.Exists(name))
             {
                 using FileStream fs = new(name, FileMode.Open, FileAccess.Read);

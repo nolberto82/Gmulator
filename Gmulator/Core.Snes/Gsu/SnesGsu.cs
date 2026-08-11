@@ -57,7 +57,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     private int _plotReg;
     private byte _colorReg;
     private byte _romBuffer;
-
+    private int _opcode;
     private byte _colorBpp;
 
     private int _srcReg;
@@ -102,10 +102,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
 
     public int SourceReg => _srcReg;
     public int DestinationReg => _dstReg;
-
-    public int Opcode { get => _opcode; private set => _opcode = value; }
     public ulong Cycles => _cycles;
-    private int _opcode;
 
     private readonly Snes Snes = snes;
     public SnesGsuMmu Mmu = new();
@@ -156,8 +153,8 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
 
         CpuMap.Sram(0x00, 0x3f, 0x6000, 0x7fff, ReadGsuRam, WriteGsuRam);
         CpuMap.Sram(0x80, 0xbf, 0x6000, 0x7fff, ReadGsuRam, WriteGsuRam);
-        CpuMap.Sram(0x70, 0x71, 0x0000, ramsize - 1, ReadGsuRam, WriteGsuRam);
-        CpuMap.Sram(0x7c, 0x7d, 0x0000, ramsize - 1, ReadGsuRam, WriteGsuRam);
+        CpuMap.Sram(0x70, 0x71, 0x0000, 0xffff, ReadGsuRam, WriteGsuRam);
+        CpuMap.Sram(0xf0, 0xf1, 0x0000, 0xffff, ReadGsuRam, WriteGsuRam);
 
         GsuMap.LoRom(0x00, 0x3f, 0x8000, 0xffff, ReadPrg, Write);
         GsuMap.LoRom(0x00, 0x3f, 0x0000, 0x7fff, ReadPrg, Write);
@@ -168,10 +165,6 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         CpuMap.LoRom(0xc0, 0xdf, 0x0000, 0xffff, Mapper.Read, Write);
 
         GsuMap.Sram(0x70, 0x71, 0x0000, ramsize - 1, ReadGsuRam, WriteGsuRam);
-        GsuMap.Sram(0x7c, 0x7d, 0x0000, ramsize - 1, ReadGsuRam, WriteGsuRam);
-        // GsuMap.LoRom(0xc0, 0xdf, 0x8000, 0xffff, Mapper.Read, Mapper.Write);
-
-        //CpuMap.Sram(0x40, 0x4f, 0x0000, 0xffff, Mapper.ReadSram, Mapper.WriteSram);
 
         CpuMap.Register(0x00, 0x3f, 0x2000, 0x2fff, Ppu.Read, Ppu.Write);
         CpuMap.Register(0x80, 0xbf, 0x2000, 0x2fff, Ppu.Read, Ppu.Write);
@@ -196,8 +189,8 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         PrevPC = 0;
         PrimaryCache = new PixelCache(0, 0, new int[8], 0);
         SecondaryCache = new PixelCache(0, 0, new int[8], 0);
-        Mmu.Reset(ramsize, Mapper.Name);
         SetMemoryMap(ramsize);
+        Mmu.Reset(ramsize, Mapper.Name);
     }
 
     public void Step(ulong cycles, bool step = false)
@@ -325,23 +318,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     public int ReadDebug(int addr)
     {
         addr = (addr & 0xff0000) | addr & 0xffff;
-        int cacheAddr = _registers[15] - _cacheBase;
-        //if (addr < 512)
-        //{
-        //return _cacheRam[cacheAddr];
-        //}
-        //else
-        {
-            if (_pbr <= 0x5f)
-            {
-
-            }
-            else
-            {
-
-            }
-            return ReadPrg(addr);
-        }
+        return ReadPrg(addr);
     }
 
     public int ReadByte(int addr)
@@ -384,7 +361,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         _rom[addr % _rom.Length] = (byte)value;
     }
 
-    public void Write(int addr, int value)
+    public static void Write(int addr, int value)
     {
     }
 
@@ -558,7 +535,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
             case 0x3030:
                 bool running = (StatusFlag & FG) == FG;
                 _statusFlag = (_statusFlag & 0xff00) | value & 0xff;
-                if (running&& (StatusFlag & FG) == 0)
+                if (running && (StatusFlag & FG) == 0)
                 {
                     _cacheBase = 0;
                     InvalidateCache();
@@ -736,10 +713,10 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         bw.Write(_colorHighNibble); bw.Write(_colorFreezeHigh);
         bw.Write(_objMode); bw.Write(_cacheBase);
         bw.Write(_plotReg); bw.Write(_colorReg);
-        bw.Write(_romBuffer); bw.Write(_colorBpp);
-        bw.Write(_srcReg); bw.Write(_dstReg);
-        bw.Write(_r15Changed); bw.Write(_clockSelect);
-        bw.Write(_stopped);
+        bw.Write(_romBuffer); bw.Write(_opcode);
+        bw.Write(_colorBpp); bw.Write(_srcReg);
+        bw.Write(_dstReg); bw.Write(_r15Changed);
+        bw.Write(_clockSelect); bw.Write(_stopped);
 
         bw.Write(PrimaryCache.X); bw.Write(PrimaryCache.Y);
         bw.Write(PrimaryCache.ValidBits); WriteArray(bw, PrimaryCache.Pixels);
@@ -766,10 +743,10 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         _colorHighNibble = br.ReadBoolean(); _colorFreezeHigh = br.ReadBoolean();
         _objMode = br.ReadBoolean(); _cacheBase = br.ReadInt32();
         _plotReg = br.ReadInt32(); _colorReg = br.ReadByte();
-        _romBuffer = br.ReadByte(); _colorBpp = br.ReadByte();
-        _srcReg = br.ReadInt32(); _dstReg = br.ReadInt32();
-        _r15Changed = br.ReadBoolean(); _clockSelect = br.ReadBoolean();
-        _stopped = br.ReadBoolean();
+        _romBuffer = br.ReadByte(); _opcode = br.ReadInt32();
+        _colorBpp = br.ReadByte(); _srcReg = br.ReadInt32();
+        _dstReg = br.ReadInt32(); _r15Changed = br.ReadBoolean();
+        _clockSelect = br.ReadBoolean(); _stopped = br.ReadBoolean();
 
         PrimaryCache.X = br.ReadInt32(); PrimaryCache.Y = br.ReadInt32();
         PrimaryCache.ValidBits = br.ReadInt32();

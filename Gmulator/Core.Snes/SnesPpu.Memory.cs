@@ -173,7 +173,7 @@ public sealed partial class SnesPpu
                 _currScrollX = value;
                 break;
             case 0x210e:
-                _scrollYMode7 = ((value << 8) | _mode7Latch) & 0x1fff;
+                _scrollYMode7 = ((value << 8) | _mode7Latch) & 0xffff;
                 _mode7Latch = value;
                 goto case 0x2110;
             case 0x2110:
@@ -219,7 +219,10 @@ public sealed partial class SnesPpu
             }
 
             case 0x211a:
-                _mode7Settings = [(value & 0x01) != 0, (value & 0x02) != 0, (value & 0x40) != 0, (value & 0x80) != 0];
+                _flipXMode7 = (value & 0x01) != 0;
+                _flipYMode7 = (value & 0x02) != 0;
+                _fill0Mode7 = (value & 0x40) != 0;
+                _largeMapMode7 = (value & 0x80) != 0;
                 break;
             case 0x211b:
                 _m7A = (value << 8) | _mode7Latch;

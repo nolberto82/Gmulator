@@ -4,33 +4,7 @@ namespace Gmulator.Shared;
 
 public class EmuState
 {
-    public const string Version = "1.20";
-
-    public static int SetInt(BinaryReader br, BinaryWriter bw, int v, bool save)
-    {
-        if (save)
-        {
-            bw.Write(v);
-            return v;
-        }
-        else
-        {
-            return br.ReadInt32();
-        }
-    }
-
-    public static int WriteInt(BinaryReader br, BinaryWriter bw, bool save, int v)
-    {
-        if (save)
-        {
-            bw.Write(v);
-            return v;
-        }
-        else
-        {
-            return br.ReadInt32();
-        }
-    }
+    public const string Version = "1.30";
 
     public static void WriteArray<T>(BinaryWriter bw, T[] v) where T : unmanaged
     {

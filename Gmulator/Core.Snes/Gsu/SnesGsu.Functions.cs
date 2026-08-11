@@ -373,8 +373,7 @@ public partial class SnesGsu
         }
         else
         {
-            value = value > 0x7f ? value | 0xff00 : value;
-            WriteRegister(reg, value);
+            WriteRegister(reg, (sbyte)value);
         }
         ResetFlags();
     }

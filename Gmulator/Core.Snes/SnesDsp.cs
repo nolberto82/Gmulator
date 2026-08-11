@@ -75,7 +75,7 @@ public sealed class SnesDsp : ISaveState
         _noiseRate = 0;
         _noiseCounter = 0;
         _rateCounter = new int[8];
-        _adsrState = new int[8] { 3, 3, 3, 3, 3, 3, 3, 3 };
+        _adsrState = [3, 3, 3, 3, 3, 3, 3, 3];
         _sustainLevel = new int[8];
         _useGain = new bool[8];
         _gainMode = new int[8];
@@ -88,7 +88,7 @@ public sealed class SnesDsp : ISaveState
         _volumeR = 0;
         _mute = true;
         _resetFlag = true;
-        _noteOff = new bool[8] { true, true, true, true, true, true, true, true };
+        _noteOff = [true, true, true, true, true, true, true, true];
         _sampleOut = new int[8];
         _dirPage = 0;
     }

@@ -9,12 +9,18 @@ namespace Gmulator.Core.Snes;
 
 public sealed partial class SnesPpu : ISaveState, IPpu
 {
+    public int VPos { get => _vPos; private set => _vPos = value; }
+    public int HPos { get => _hPos; private set => _hPos = value; }
+    public ulong Cycles { get => _cycles; private set => _cycles = value; }
+    public uint FrameCounter { get => (uint)_frameCounter; private set => _frameCounter = value; }
+    public bool FrameReady { get => _frameReady; set => _frameReady = value; }
+
     #region State
-    public int VPos { get; private set; }
-    public int HPos { get; private set; }
-    public ulong Cycles { get; private set; }
-    public uint FrameCounter { get; private set; }
-    public bool FrameReady { get; set; }
+    private int _vPos;
+    private int _hPos;
+    private ulong _cycles;
+    private ulong _frameCounter;
+    private bool _frameReady;
     private bool _cgRamToggle;
     private int _prevScrollX;
     private int _currScrollX;
@@ -24,6 +30,10 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private int _mosaicSize;
     private int _scrollXMode7;
     private int _scrollYMode7;
+    private bool _flipXMode7;
+    private bool _flipYMode7;
+    private bool _fill0Mode7;
+    private bool _largeMapMode7;
     private int _w1Left;
     private int _w1Right;
     private int _w2Left;
@@ -32,8 +42,6 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private bool _dirColor;
     private int _prevent;
     private int _clip;
-    private readonly int[] _objSizeWidth = [8, 8, 8, 16, 16, 32, 16, 16, 16, 32, 64, 32, 64, 64, 32, 32];
-    private readonly int[] _objSizeHeight = [8, 8, 8, 16, 16, 32, 32, 32, 16, 32, 64, 32, 64, 64, 64, 32];
     private int _objTable1;
     private int _objTable2;
     private int _objSize;
@@ -81,7 +89,30 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private int _opvct; //213D
     private int _stat77; //213E
     private int _stat78; //213F
-
+    private int _nmiTimEn; ///4200
+    private int _wrIo; //4201
+    private int _hTimeLow; //4207
+    private int _hTimeHigh; //4208
+    private int _vTimeLow; //4209
+    private int _vTimeHigh; //420A
+    private int _mdmaEn; //420B
+    private int _hdmaEn; //420C
+    private int _rdNmi; //4210
+    private int _timeUp; //4211
+    private int _hvbJoy; //4212
+    private int _rdIo; //4213
+    private int _joy1L; //4218
+    private int _joy1H; //4219
+    private int _joy2L; //421A
+    private int _joy2H; //421B
+    private int _joy3L; //421C
+    private int _joy3H; //421D
+    private int _joy4L; //421E
+    private int _joy4H; //421F
+    private bool _counterLatch;
+    private bool _ophctLatch;
+    private bool _opvctLatch;
+    private int _multiplyRes;
     private int[] _bgMapbase = [0, 0, 0, 0];
     private int[] _bgTilebase = [0, 0, 0, 0];
     private int[] _bgScrollX = [0, 0, 0, 0];
@@ -99,15 +130,13 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private bool[] _winMainBgs = new bool[5];
     private bool[] _winSubBgs = new bool[5];
     private bool[] _mosaicEnabled = new bool[4];
-    private bool[] _mode7Settings = new bool[4];
     private bool[] _bgCharSize = new bool[4];
-
     private ushort[] _vram;
     private ushort[] _cram;
     private byte[] _oam;
     private uint[] _screenBuffer;
-    public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
     #endregion
+    public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
 
     private int _cgBuffer;
     private readonly int[] _mainColors = new int[5];
@@ -118,6 +147,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
     private readonly int[] _subPriorities = new int[5];
     private readonly int[] _subPalette = new int[5];
     private int _subLayer;
+    private readonly int[] _objSizeWidth = [8, 8, 8, 16, 16, 32, 16, 16, 16, 32, 64, 32, 64, 64, 32, 32];
+    private readonly int[] _objSizeHeight = [8, 8, 8, 16, 16, 32, 32, 32, 16, 32, 64, 32, 64, 64, 64, 32];
 
     private int _spritesPerScanline;
 
@@ -224,12 +255,6 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             //else
             //    _hvbJoy &= 0x3f;
 
-            if (HPos == 1100)
-            {
-                if (!_vblank)
-                    ProcessHdma();
-            }
-
             if (GetHIrq && !GetVIrq)
             {
                 if (HPos == GetHTime * 4)
@@ -240,7 +265,15 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             }
             if (GetVIrq && VPos == GetVTime)
             {
-                if (HPos == GetHTime * 4)
+                if (!GetHIrq)
+                {
+                    if (HPos == 0)
+                    {
+                        SetIRQ();
+                        _timeUp = 0x80;
+                    }
+                }
+                else if (HPos == GetHTime * 4)
                 {
                     SetIRQ();
                     _timeUp = 0x80;
@@ -288,6 +321,12 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 }
             }
 
+            if (HPos == 1136)
+            {
+                if (!_vblank)
+                    ProcessHdma();
+            }
+
             HPos += 2;
             if (!_dramRefresh && HPos == 536)
             {
@@ -322,30 +361,19 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         Span<int> bpp = new(DictLayers[_bgMode][_bgMode == 1 || _bgMode == 7 ? 4 : 2]);
         int half;
         uint rgb;
-        bool math;
         int mainColor, subColor, mainLayer, subLayer;
 
         if (_bgMode == 7)
-        {
-            //int rx = _scrollXMode7;
-            int ry = _mode7Settings[1] ? 255 - y : y;
-            var cx = _scrollXMode7 - _m7X;
-            var cy = _scrollYMode7 - _m7Y;
-            int ch = (cx & 0x2000) != 0 ? cx | ~0x3ff : cx & 0x3ff;
-            int cv = (cy & 0x2000) != 0 ? cy | ~0x3ff : cy & 0x3ff;
-            int sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (_m7X << 8);
-            int sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (_m7Y << 8);
-            for (int x = 0; x < 256; x++)
-            {
-                _xCoordsMode7[x] = sx + (short)_m7A * x;
-                _yCoordsMode7[x] = sy + (short)_m7C * x;
-            }
-        }
+            InitCoordsMode7(y);
 
         for (int x = 0; x < 256; x++)
         {
             if (!_forcedBlank)
             {
+                if (y == 209)
+                { }
+
+
                 if (_bgMode < 7)
                     RenderMode(x, y, bpp);
                 else
@@ -366,9 +394,7 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                     mainColor = 0;
 
                 half = _colorMath[6] ? 1 : 0;
-                math = GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]);
-                int sr, sg, sb;
-                if (!_colorMath[7] && _addSub)
+                if (GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]) && _addSub)
                 {
                     (subColor, subLayer) = GetPriority(_bgMode, _subColors, _subPriorities);
                     if (subLayer == 5 && _bgMode != 7)
@@ -386,8 +412,9 @@ public sealed partial class SnesPpu : ISaveState, IPpu
                 int mb = (mainColor >> 10) & 0x1f;
 
                 int red = mr, green = mg, blue = mb;
+                int sr, sg, sb;
 
-                if (math)
+                if (GetMathEnabled(x, mainLayer, _mainPalette[mainLayer]))
                 {
                     sr = subColor & 0x1f;
                     sg = (subColor >> 5) & 0x1f;
@@ -422,9 +449,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private void RenderMode(int x, int y, Span<int> bpp)
     {
-        int mapaddr = 0;
-        int mx = 0, my = 0;
-        int color, pixel, palette;
+        int mapaddr, color, pixel, palette;
+        int mx = 0, my = 0, row, col;
         for (int i = 0; i < bpp.Length; i++)
         {
             int paletteOffset = _bgMode == 0 ? i * 32 : 0;
@@ -445,46 +471,35 @@ public sealed partial class SnesPpu : ISaveState, IPpu
             int sx = (ushort)(x - mx + _bgScrollX[i]);
             int sy = (ushort)(y - my + _bgScrollY[i]);
             int tx = sx;
-            int ty = sy;
-
-            if (x == 0 && y == 8 && i == 2)
-            { }
 
             if (_bgMode == 2)
             {
                 if (x > 7)
                 {
-                    int h = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2], _bgMapbase[2]);
-                    int v = GetMode2Tile(_bgScrollX[2] + (x - 8) & 0xf8, _bgScrollY[2] + 8, _bgMapbase[2]);
-                    var bit = i == 0 ? 13 : 14;
-                    if ((h & (1 << bit)) != 0)
-                        sx = (sx & 7) + (x & ~7) + h + _bgScrollX[i] & 0x1fff;
-                    if ((v & (1 << bit)) != 0)
-                        sy += v & 0x1fff;
+                    int xOff = x + (_bgScrollX[i] & 7);
+                    int hOff = GetMode2Tile(xOff - 8 + (_bgScrollX[2] & ~7), _bgScrollY[2], _bgMapbase[2]);
+                    int vOff = GetMode2Tile(xOff - 8 + (_bgScrollX[2] & ~7), _bgScrollY[2] + 8, _bgMapbase[2]);
+                    var bit = i == 0 ? 0x2000 : 0x4000;
+                    if ((hOff & bit) != 0)
+                        sx = xOff + (hOff & ~7) & 0x3f8;
+                    if ((vOff & bit) != 0)
+                        sy = (y + vOff) & 0x3ff;
                 }
-
-                mapaddr = _bgMapbase[i] + (sy & 0xff) / 8 * 32 + (sx & 0xff) / 8;
-                mapaddr += _bgSizeX[i] > 0xff ? (sx & 0x100) * 4 : 0;
-                mapaddr += (_bgSizeY[i] > 0xff ? ((sy & 0x100) * 8) : 0) & 0x7fff;
-            }
-            else
-            {
-
-                int col = sx >> 3;
-                int row = sy >> (_bgCharSize[i] ? 4 : 3);
-
-                if (_bgCharSize[i])
-                {
-                    col >>= 1;
-                }
-
-                mapaddr = _bgMapbase[i] | ((row & 0x1f) << 5 | (col & 0x1f));
-                mapaddr += _bgSizeX[i] == 0x1ff ? ((col & 0x20) << 5) : 0;
-                mapaddr += _bgSizeY[i] == 0x1ff ? ((row & 0x20) << (_bgSizeX[i] == 0x1ff ? 6 : 5)) : 0;
-                mapaddr &= 0x7fff;
             }
 
-            (color, pixel, palette) = GetColor(tx, ty, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
+            col = sx >> 3;
+            row = sy >> (_bgCharSize[i] ? 4 : 3);
+
+            if (_bgCharSize[i])
+                col >>= 1;
+
+            mapaddr = _bgMapbase[i] | ((row & 0x1f) << 5 | (col & 0x1f));
+            mapaddr += _bgSizeX[i] == 0x1ff ? ((col & 0x20) << 5) : 0;
+            mapaddr += _bgSizeY[i] == 0x1ff ? ((row & 0x20) << (_bgSizeX[i] == 0x1ff ? 6 : 5)) : 0;
+            mapaddr &= 0x7fff;
+
+            (color, pixel, palette) = GetColor(tx, sy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], paletteOffset);
+
             if (_mainBgs[i] && pixel != 0)
             {
                 _mainColors[i] = color | 1;
@@ -515,35 +530,61 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         int mapaddr;
         for (int i = 0; i < bpp.Length; i++)
         {
-            if (!_mainBgs[i])
-                continue;
+
+            int fx = _flipXMode7 ? 255 - x : x;
+            var ox = _xCoordsMode7[fx] >>= 8;
+            var oy = _yCoordsMode7[fx] >>= 8;
 
             _mainColors[i] = 0;
-            _mainPalette[i] = 0;
-            _mainPriorities[i] = 0;
+            //_mainPalette[i] = 0;
+            //_mainPriorities[i] = 0;
 
-            var ox = _xCoordsMode7[x] >>= 8;
-            var oy = _yCoordsMode7[x] >>= 8;
-
-            if (_mode7Settings[3] && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
+            bool transparent = false;
+            if (_largeMapMode7 && (ox < 0 || oy < 0 || ox >= 1024 || oy >= 1024))
             {
-                ox &= 7;
-                oy &= 7;
+                if (_fill0Mode7)
+                {
+                    ox &= 7;
+                    oy &= 7;
+                }
+                else
+                    transparent = true;
             }
 
-            if (!_mode7Settings[3])
-                mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
-            else
-                mapaddr = ((oy >> 3) * 128 + (ox >> 3)) & 0x7fff;
+
+            mapaddr = (((oy & 0x3ff) >> 3) * 128 + ((ox & 0x3ff) >> 3)) & 0x7fff;
 
             (_mainColors[i], _, _) = GetColor(ox, oy, mapaddr, _bgTilebase[i], _bgCharSize[i], bpp[i], 0);
+
+            if (transparent || (_winMainBgs[i] && !GetWindow(5, x)))
+                _mainColors[i] = 0;
+        }
+    }
+
+    private void InitCoordsMode7(int y)
+    {
+        int ry = _flipYMode7 ? 255 - y : y;
+        var hx = ((short)(_scrollXMode7 << 3) >> 3);
+        var hy = ((short)(_scrollYMode7 << 3) >> 3);
+        int cx = ((short)(_m7X << 3) >> 3);
+        int cy = ((short)(_m7Y << 3) >> 3);
+        int dx = hx - cx;
+        int dy = hy - cy;
+        int ch = (dx & 0x2000) != 0 ? dx | ~0x3ff : dx & 0x3ff;
+        int cv = (dy & 0x2000) != 0 ? dy | ~0x3ff : dy & 0x3ff;
+        int sx = ((short)_m7A * ch & ~63) + (((short)_m7B * cv) & ~63) + ((short)_m7B * ry & ~63) + (cx << 8);
+        int sy = (((short)_m7C * ch) & ~63) + (((short)_m7D * cv) & ~63) + ((short)_m7D * ry & ~63) + (cy << 8);
+        for (int x = 0; x < 256; x++)
+        {
+            _xCoordsMode7[x] = sx + (short)_m7A * x;
+            _yCoordsMode7[x] = sy + (short)_m7C * x;
         }
     }
 
     private void RenderSprites(int x, int y)
     {
-        bool main = _mainBgs[4];// && !GetWindow(5, x);
-        bool sub = _subBgs[4];// && !GetWindow(5, x);
+        bool main = _mainBgs[4];// && !GetWindow(4, x);
+        bool sub = _subBgs[4];// && !GetWindow(4, x);
         if (main || sub)
         {
             _mainColors[4] = _subColors[4] = 0;
@@ -572,8 +613,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
                 if (colorid != 0)
                 {
-                    //if (_winMainBgs[4] && !GetWindow(5, x))
-                    //    continue;
+                    if (_winMainBgs[4] && GetWindow(4, x))
+                        continue;
 
                     if (main)
                     {
@@ -658,19 +699,15 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     private bool GetMathEnabled(int x, int layer, int palette)
     {
-        bool prev = false;
-        if (_prevent == 1)
-            prev = !GetWindow(5, x);
-        else if (_prevent == 2 || _prevent == 3)
-            prev = GetWindow(5, x);
-
-        if (prev)
+        if (_prevent == 1 && !GetWindow(5, x))
+            return false;
+        else if ((_prevent == 2 || _prevent == 3) && GetWindow(5, x))
             return false;
 
-        if (!_colorMath[layer])
-            return false;
+        if (_colorMath[layer] && (layer != 4 || palette >= 0xc0))
+            return true;
 
-        return layer != 4 || palette >= 0xc0;
+        return false;
     }
 
     private (int, int) GetPriority(int mode, int[] colors, int[] priorities)
@@ -755,20 +792,33 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
             int paletteSize = bpp switch { 4 => 16, 8 => 256, _ => 4 };
             palette = paloff + palid * paletteSize + pixel;
-            ushort cramVal = _cram[palette & 0xff];
-            return (cramVal | (pixel != 0 ? 1 : 0), pixel, palette);
+            ushort color = _cram[palette & 0xff];
+            return (color | (pixel != 0 ? 1 : 0), pixel, palette);
         }
         else
         {
             int tileid = vramVal & 0xff;
             int ta = (tileid * 64 + ((sy & 7) * 8) + (sx & 7)) & 0x3fff;
             palette = _vram[ta] >> 8;
-            ushort cramVal = _cram[palette & 0xff];
-            return (cramVal != 0 ? cramVal | 1 : 0, pixel, palette);
+            if (palette == 0)
+                return (0, 0, 0);
+            ushort color = _cram[palette & 0x7f];
+            return (color | 1, pixel, palette);
         }
     }
 
-    private int GetMode2Tile(int x, int y, int mapaddr) => _vram[(mapaddr + y / 8 * 32 + x / 8) & 0x7fff];
+    private int GetMode2Tile(int x, int y, int mapaddr)
+    {
+        int col = x >> 3;
+        int row = y >> (_bgCharSize[2] ? 4 : 3);
+        int offset = (row & 0x1f) << 5 | (col & 0x1f);
+        if ((col & 0x20) != 0)
+            offset += 0x400;
+        if ((row & 0x20) != 0)
+            offset += 0x800;
+
+        return _vram[(mapaddr + offset) & 0x7fff];
+    }
 
     private int GetPixel(int tileAddr, int fx, int bpp)
     {
@@ -938,8 +988,8 @@ public sealed partial class SnesPpu : ISaveState, IPpu
         [6] = [[4, 0, 4, 4, 0, 4],
                [3, 1, 2, 1, 0, 0],
                [4]],
-        [7] = [[4, 4, 4, 0, 4], [4, 4, 1, 4, 0, 4, 1],
-               [3, 2, 1, 0, 0], [3, 2, 1, 1, 0, 0, 0],
+        [7] = [[4, 4, 1, 4, 0, 4, 1], [4, 4, 1, 4, 0, 4, 1],
+               [3, 2, 1, 1, 0, 0, 0], [3, 2, 1, 1, 0, 0, 0],
                [8]],
     };
 
@@ -967,101 +1017,129 @@ public sealed partial class SnesPpu : ISaveState, IPpu
 
     public void Save(BinaryWriter bw)
     {
-        bw.Write(VPos); bw.Write(HPos); bw.Write(Cycles); bw.Write(FrameCounter);
-        bw.Write(_cgRamToggle); bw.Write(_prevScrollX); bw.Write(_currScrollX); bw.Write(FrameReady);
-        bw.Write(_vblank); bw.Write(_hblank); bw.Write(_autoJoyCounter); bw.Write(_mosaicSize);
-        bw.Write(_scrollXMode7); bw.Write(_scrollYMode7); bw.Write(_w1Left); bw.Write(_w1Right);
-        bw.Write(_w2Left); bw.Write(_w2Right); bw.Write(_addSub); bw.Write(_dirColor);
-        bw.Write(_prevent); bw.Write(_clip); bw.Write(_objTable1); bw.Write(_objTable2);
-        bw.Write(_objSize); bw.Write(_objPrioRotation); bw.Write(_objPrioIndex); bw.Write(_oamAddr);
-        bw.Write(_interOamAddr); bw.Write(_brightness); bw.Write(_forcedBlank); bw.Write(_bgMode);
-        bw.Write(_mode1Bg3Priority); bw.Write(_ramAddrLow); bw.Write(_ramAddrMedium); bw.Write(_ramAddrHigh);
-        bw.Write(_multiplyA); bw.Write(_multiplyB); bw.Write(_dividend); bw.Write(_divisor);
-        bw.Write(_vramAddrIncrease); bw.Write(_vramAddrRemap); bw.Write(_vramAddrMode); bw.Write(_vramAddr);
-        bw.Write(_vramLatch); bw.Write(_overscanMode); bw.Write(_hiResMode); bw.Write(_extBgMode);
-        bw.Write(_m7A); bw.Write(_m7B); bw.Write(_m7C); bw.Write(_m7D);
-        bw.Write(_m7X); bw.Write(_m7Y); bw.Write(_cgAdd); bw.Write(_cgData);
-        bw.Write(_colData); bw.Write(_mpyL); bw.Write(_mpyM); bw.Write(_mpyH);
-        bw.Write(_slhv); bw.Write(_oamDataRead); bw.Write(_vmDataLowRead); bw.Write(_vmDataHighRead);
-        bw.Write(_cgDataRead); bw.Write(_ophct); bw.Write(_opvct); bw.Write(_stat77);
-        bw.Write(_stat78); bw.Write(_nmiTimEn); bw.Write(_wrIo); bw.Write(_hTimeLow);
-        bw.Write(_hTimeHigh); bw.Write(_vTimeLow); bw.Write(_vTimeHigh); bw.Write(_mdmaEn);
-        bw.Write(_hdmaEn); bw.Write(_rdNmi); bw.Write(_timeUp); bw.Write(_hvbJoy);
-        bw.Write(_rdIo); bw.Write(_joy1L); bw.Write(_joy1H); bw.Write(_joy2L);
-        bw.Write(_joy2H); bw.Write(_joy3L); bw.Write(_joy3H); bw.Write(_joy4L);
-        bw.Write(_joy4H); bw.Write(_counterLatch); bw.Write(_ophctLatch); bw.Write(_opvctLatch);
+        bw.Write(_vPos); bw.Write(_hPos);
+        bw.Write(_cycles); bw.Write(_frameCounter);
+        bw.Write(_frameReady); bw.Write(_cgRamToggle);
+        bw.Write(_prevScrollX); bw.Write(_currScrollX);
+        bw.Write(_vblank); bw.Write(_hblank);
+        bw.Write(_autoJoyCounter); bw.Write(_mosaicSize);
+        bw.Write(_scrollXMode7); bw.Write(_scrollYMode7);
+        bw.Write(_flipXMode7); bw.Write(_flipYMode7);
+        bw.Write(_fill0Mode7); bw.Write(_largeMapMode7);
+        bw.Write(_w1Left); bw.Write(_w1Right);
+        bw.Write(_w2Left); bw.Write(_w2Right);
+        bw.Write(_addSub); bw.Write(_dirColor);
+        bw.Write(_prevent); bw.Write(_clip);
+        bw.Write(_objTable1); bw.Write(_objTable2);
+        bw.Write(_objSize); bw.Write(_objPrioRotation);
+        bw.Write(_objPrioIndex); bw.Write(_oamAddr);
+        bw.Write(_interOamAddr); bw.Write(_brightness);
+        bw.Write(_forcedBlank); bw.Write(_bgMode);
+        bw.Write(_mode1Bg3Priority); bw.Write(_ramAddrLow);
+        bw.Write(_ramAddrMedium); bw.Write(_ramAddrHigh);
+        bw.Write(_multiplyA); bw.Write(_multiplyB);
+        bw.Write(_dividend); bw.Write(_divisor);
+        bw.Write(_vramAddrIncrease); bw.Write(_vramAddrRemap);
+        bw.Write(_vramAddrMode); bw.Write(_vramAddr);
+        bw.Write(_vramLatch); bw.Write(_overscanMode);
+        bw.Write(_hiResMode); bw.Write(_extBgMode);
+        bw.Write(_m7A); bw.Write(_m7B);
+        bw.Write(_m7C); bw.Write(_m7D);
+        bw.Write(_m7X); bw.Write(_m7Y);
+        bw.Write(_cgAdd); bw.Write(_cgData);
+        bw.Write(_colData); bw.Write(_mpyL);
+        bw.Write(_mpyM); bw.Write(_mpyH);
+        bw.Write(_slhv); bw.Write(_oamDataRead);
+        bw.Write(_vmDataLowRead); bw.Write(_vmDataHighRead);
+        bw.Write(_cgDataRead); bw.Write(_ophct);
+        bw.Write(_opvct); bw.Write(_stat77);
+        bw.Write(_stat78); bw.Write(_nmiTimEn);
+        bw.Write(_wrIo); bw.Write(_hTimeLow);
+        bw.Write(_hTimeHigh); bw.Write(_vTimeLow);
+        bw.Write(_vTimeHigh); bw.Write(_mdmaEn);
+        bw.Write(_hdmaEn); bw.Write(_rdNmi);
+        bw.Write(_timeUp); bw.Write(_hvbJoy);
+        bw.Write(_rdIo); bw.Write(_joy1L);
+        bw.Write(_joy1H); bw.Write(_joy2L);
+        bw.Write(_joy2H); bw.Write(_joy3L);
+        bw.Write(_joy3H); bw.Write(_joy4L);
+        bw.Write(_joy4H); bw.Write(_counterLatch);
+        bw.Write(_ophctLatch); bw.Write(_opvctLatch);
         bw.Write(_multiplyRes); WriteArray(bw, _bgMapbase);
-        WriteArray(bw, _bgTilebase);
-        WriteArray(bw, _bgScrollX);
-        WriteArray(bw, _bgScrollY);
-        WriteArray(bw, _bgSizeX);
-        WriteArray(bw, _bgSizeY);
-        WriteArray(bw, _colorMath);
-        WriteArray(bw, _win1Enabled);
-        WriteArray(bw, _win1Inverted);
-        WriteArray(bw, _win2Enabled);
-        WriteArray(bw, _win2Inverted);
-        WriteArray(bw, _winLogic);
-        WriteArray(bw, _mainBgs);
-        WriteArray(bw, _subBgs);
-        WriteArray(bw, _winMainBgs);
-        WriteArray(bw, _winSubBgs);
-        WriteArray(bw, _mosaicEnabled);
-        WriteArray(bw, _mode7Settings);
-        WriteArray(bw, _bgCharSize);
-        WriteArray(bw, _vram);
-        WriteArray(bw, _cram);
-        WriteArray(bw, _oam);
+        WriteArray(bw, _bgTilebase); WriteArray(bw, _bgScrollX);
+        WriteArray(bw, _bgScrollY); WriteArray(bw, _bgSizeX);
+        WriteArray(bw, _bgSizeY); WriteArray(bw, _colorMath);
+        WriteArray(bw, _win1Enabled); WriteArray(bw, _win1Inverted);
+        WriteArray(bw, _win2Enabled); WriteArray(bw, _win2Inverted);
+        WriteArray(bw, _winLogic); WriteArray(bw, _mainBgs);
+        WriteArray(bw, _subBgs); WriteArray(bw, _winMainBgs);
+        WriteArray(bw, _winSubBgs); WriteArray(bw, _mosaicEnabled);
+        WriteArray(bw, _bgCharSize); WriteArray(bw, _vram);
+        WriteArray(bw, _cram); WriteArray(bw, _oam);
         WriteArray(bw, _screenBuffer);
     }
 
     public void Load(BinaryReader br)
     {
-        VPos = br.ReadInt32(); HPos = br.ReadInt32(); Cycles = br.ReadUInt64(); FrameCounter = br.ReadUInt32();
-        _cgRamToggle = br.ReadBoolean(); _prevScrollX = br.ReadInt32(); _currScrollX = br.ReadInt32(); FrameReady = br.ReadBoolean();
-        _vblank = br.ReadBoolean(); _hblank = br.ReadBoolean(); _autoJoyCounter = br.ReadInt32(); _mosaicSize = br.ReadInt32();
-        _scrollXMode7 = br.ReadInt32(); _scrollYMode7 = br.ReadInt32(); _w1Left = br.ReadInt32(); _w1Right = br.ReadInt32();
-        _w2Left = br.ReadInt32(); _w2Right = br.ReadInt32(); _addSub = br.ReadBoolean(); _dirColor = br.ReadBoolean();
-        _prevent = br.ReadInt32(); _clip = br.ReadInt32(); _objTable1 = br.ReadInt32(); _objTable2 = br.ReadInt32();
-        _objSize = br.ReadInt32(); _objPrioRotation = br.ReadBoolean(); _objPrioIndex = br.ReadInt32(); _oamAddr = br.ReadInt32();
-        _interOamAddr = br.ReadInt32(); _brightness = br.ReadInt32(); _forcedBlank = br.ReadBoolean(); _bgMode = br.ReadInt32();
-        _mode1Bg3Priority = br.ReadBoolean(); _ramAddrLow = br.ReadInt32(); _ramAddrMedium = br.ReadInt32(); _ramAddrHigh = br.ReadInt32();
-        _multiplyA = br.ReadInt32(); _multiplyB = br.ReadInt32(); _dividend = br.ReadInt32(); _divisor = br.ReadInt32();
-        _vramAddrIncrease = br.ReadInt32(); _vramAddrRemap = br.ReadInt32(); _vramAddrMode = br.ReadBoolean(); _vramAddr = br.ReadInt32();
-        _vramLatch = br.ReadInt32(); _overscanMode = br.ReadBoolean(); _hiResMode = br.ReadBoolean(); _extBgMode = br.ReadBoolean();
-        _m7A = br.ReadInt32(); _m7B = br.ReadInt32(); _m7C = br.ReadInt32(); _m7D = br.ReadInt32();
-        _m7X = br.ReadInt32(); _m7Y = br.ReadInt32(); _cgAdd = br.ReadInt32(); _cgData = br.ReadInt32();
-        _colData = br.ReadInt32(); _mpyL = br.ReadInt32(); _mpyM = br.ReadInt32(); _mpyH = br.ReadInt32();
-        _slhv = br.ReadInt32(); _oamDataRead = br.ReadInt32(); _vmDataLowRead = br.ReadInt32(); _vmDataHighRead = br.ReadInt32();
-        _cgDataRead = br.ReadInt32(); _ophct = br.ReadInt32(); _opvct = br.ReadInt32(); _stat77 = br.ReadInt32();
-        _stat78 = br.ReadInt32(); _nmiTimEn = br.ReadInt32(); _wrIo = br.ReadInt32(); _hTimeLow = br.ReadInt32();
-        _hTimeHigh = br.ReadInt32(); _vTimeLow = br.ReadInt32(); _vTimeHigh = br.ReadInt32(); _mdmaEn = br.ReadInt32();
-        _hdmaEn = br.ReadInt32(); _rdNmi = br.ReadInt32(); _timeUp = br.ReadInt32(); _hvbJoy = br.ReadInt32();
-        _rdIo = br.ReadInt32(); _joy1L = br.ReadInt32(); _joy1H = br.ReadInt32(); _joy2L = br.ReadInt32();
-        _joy2H = br.ReadInt32(); _joy3L = br.ReadInt32(); _joy3H = br.ReadInt32(); _joy4L = br.ReadInt32();
-        _joy4H = br.ReadInt32(); _counterLatch = br.ReadBoolean(); _ophctLatch = br.ReadBoolean(); _opvctLatch = br.ReadBoolean();
+        _vPos = br.ReadInt32(); _hPos = br.ReadInt32();
+        _cycles = br.ReadUInt64(); _frameCounter = br.ReadUInt64();
+        _frameReady = br.ReadBoolean(); _cgRamToggle = br.ReadBoolean();
+        _prevScrollX = br.ReadInt32(); _currScrollX = br.ReadInt32();
+        _vblank = br.ReadBoolean(); _hblank = br.ReadBoolean();
+        _autoJoyCounter = br.ReadInt32(); _mosaicSize = br.ReadInt32();
+        _scrollXMode7 = br.ReadInt32(); _scrollYMode7 = br.ReadInt32();
+        _flipXMode7 = br.ReadBoolean(); _flipYMode7 = br.ReadBoolean();
+        _fill0Mode7 = br.ReadBoolean(); _largeMapMode7 = br.ReadBoolean();
+        _w1Left = br.ReadInt32(); _w1Right = br.ReadInt32();
+        _w2Left = br.ReadInt32(); _w2Right = br.ReadInt32();
+        _addSub = br.ReadBoolean(); _dirColor = br.ReadBoolean();
+        _prevent = br.ReadInt32(); _clip = br.ReadInt32();
+        _objTable1 = br.ReadInt32(); _objTable2 = br.ReadInt32();
+        _objSize = br.ReadInt32(); _objPrioRotation = br.ReadBoolean();
+        _objPrioIndex = br.ReadInt32(); _oamAddr = br.ReadInt32();
+        _interOamAddr = br.ReadInt32(); _brightness = br.ReadInt32();
+        _forcedBlank = br.ReadBoolean(); _bgMode = br.ReadInt32();
+        _mode1Bg3Priority = br.ReadBoolean(); _ramAddrLow = br.ReadInt32();
+        _ramAddrMedium = br.ReadInt32(); _ramAddrHigh = br.ReadInt32();
+        _multiplyA = br.ReadInt32(); _multiplyB = br.ReadInt32();
+        _dividend = br.ReadInt32(); _divisor = br.ReadInt32();
+        _vramAddrIncrease = br.ReadInt32(); _vramAddrRemap = br.ReadInt32();
+        _vramAddrMode = br.ReadBoolean(); _vramAddr = br.ReadInt32();
+        _vramLatch = br.ReadInt32(); _overscanMode = br.ReadBoolean();
+        _hiResMode = br.ReadBoolean(); _extBgMode = br.ReadBoolean();
+        _m7A = br.ReadInt32(); _m7B = br.ReadInt32();
+        _m7C = br.ReadInt32(); _m7D = br.ReadInt32();
+        _m7X = br.ReadInt32(); _m7Y = br.ReadInt32();
+        _cgAdd = br.ReadInt32(); _cgData = br.ReadInt32();
+        _colData = br.ReadInt32(); _mpyL = br.ReadInt32();
+        _mpyM = br.ReadInt32(); _mpyH = br.ReadInt32();
+        _slhv = br.ReadInt32(); _oamDataRead = br.ReadInt32();
+        _vmDataLowRead = br.ReadInt32(); _vmDataHighRead = br.ReadInt32();
+        _cgDataRead = br.ReadInt32(); _ophct = br.ReadInt32();
+        _opvct = br.ReadInt32(); _stat77 = br.ReadInt32();
+        _stat78 = br.ReadInt32(); _nmiTimEn = br.ReadInt32();
+        _wrIo = br.ReadInt32(); _hTimeLow = br.ReadInt32();
+        _hTimeHigh = br.ReadInt32(); _vTimeLow = br.ReadInt32();
+        _vTimeHigh = br.ReadInt32(); _mdmaEn = br.ReadInt32();
+        _hdmaEn = br.ReadInt32(); _rdNmi = br.ReadInt32();
+        _timeUp = br.ReadInt32(); _hvbJoy = br.ReadInt32();
+        _rdIo = br.ReadInt32(); _joy1L = br.ReadInt32();
+        _joy1H = br.ReadInt32(); _joy2L = br.ReadInt32();
+        _joy2H = br.ReadInt32(); _joy3L = br.ReadInt32();
+        _joy3H = br.ReadInt32(); _joy4L = br.ReadInt32();
+        _joy4H = br.ReadInt32(); _counterLatch = br.ReadBoolean();
+        _ophctLatch = br.ReadBoolean(); _opvctLatch = br.ReadBoolean();
         _multiplyRes = br.ReadInt32(); _bgMapbase = ReadArray<int>(br, _bgMapbase.Length);
-        _bgTilebase = ReadArray<int>(br, _bgTilebase.Length);
-        _bgScrollX = ReadArray<int>(br, _bgScrollX.Length);
-        _bgScrollY = ReadArray<int>(br, _bgScrollY.Length);
-        _bgSizeX = ReadArray<int>(br, _bgSizeX.Length);
-        _bgSizeY = ReadArray<int>(br, _bgSizeY.Length);
-        _colorMath = ReadArray<bool>(br, _colorMath.Length);
-        _win1Enabled = ReadArray<bool>(br, _win1Enabled.Length);
-        _win1Inverted = ReadArray<bool>(br, _win1Inverted.Length);
-        _win2Enabled = ReadArray<bool>(br, _win2Enabled.Length);
-        _win2Inverted = ReadArray<bool>(br, _win2Inverted.Length);
-        _winLogic = ReadArray<int>(br, _winLogic.Length);
-        _mainBgs = ReadArray<bool>(br, _mainBgs.Length);
-        _subBgs = ReadArray<bool>(br, _subBgs.Length);
-        _winMainBgs = ReadArray<bool>(br, _winMainBgs.Length);
-        _winSubBgs = ReadArray<bool>(br, _winSubBgs.Length);
-        _mosaicEnabled = ReadArray<bool>(br, _mosaicEnabled.Length);
-        _mode7Settings = ReadArray<bool>(br, _mode7Settings.Length);
-        _bgCharSize = ReadArray<bool>(br, _bgCharSize.Length);
-        _vram = ReadArray<ushort>(br, _vram.Length);
-        _cram = ReadArray<ushort>(br, _cram.Length);
-        _oam = ReadArray<byte>(br, _oam.Length);
+        _bgTilebase = ReadArray<int>(br, _bgTilebase.Length); _bgScrollX = ReadArray<int>(br, _bgScrollX.Length);
+        _bgScrollY = ReadArray<int>(br, _bgScrollY.Length); _bgSizeX = ReadArray<int>(br, _bgSizeX.Length);
+        _bgSizeY = ReadArray<int>(br, _bgSizeY.Length); _colorMath = ReadArray<bool>(br, _colorMath.Length);
+        _win1Enabled = ReadArray<bool>(br, _win1Enabled.Length); _win1Inverted = ReadArray<bool>(br, _win1Inverted.Length);
+        _win2Enabled = ReadArray<bool>(br, _win2Enabled.Length); _win2Inverted = ReadArray<bool>(br, _win2Inverted.Length);
+        _winLogic = ReadArray<int>(br, _winLogic.Length); _mainBgs = ReadArray<bool>(br, _mainBgs.Length);
+        _subBgs = ReadArray<bool>(br, _subBgs.Length); _winMainBgs = ReadArray<bool>(br, _winMainBgs.Length);
+        _winSubBgs = ReadArray<bool>(br, _winSubBgs.Length); _mosaicEnabled = ReadArray<bool>(br, _mosaicEnabled.Length);
+        _bgCharSize = ReadArray<bool>(br, _bgCharSize.Length); _vram = ReadArray<ushort>(br, _vram.Length);
+        _cram = ReadArray<ushort>(br, _cram.Length); _oam = ReadArray<byte>(br, _oam.Length);
         _screenBuffer = ReadArray<uint>(br, _screenBuffer.Length);
     }
 }

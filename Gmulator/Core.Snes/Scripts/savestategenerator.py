@@ -1,15 +1,4 @@
 
-s = '''
-    protected ushort _pc, _sp, _ra, _rx, _ry, _dpr;
-    protected byte _ps, _dbr, _pbr;
-    protected bool _emulationMode;
-    public bool FastMem { get; set; }
-    public bool NmiEnabled { get; set; }
-    public bool IrqEnabled { get; set; }
-    public bool IrqActive { get; set; }
-
-    private ulong cycles;
-'''
 
 types = {
     "byte": "Byte",
@@ -22,6 +11,17 @@ types = {
     "ulong": "UInt64",
     "bool": "Boolean",
 }
+
+s = []
+print("Type variables: ")
+while(True):
+    line = input()
+    if line:
+        s.append(line)
+    else:
+        break
+
+s = "\n".join(s)
 
 writes = []
 reads = []
@@ -47,9 +47,9 @@ for x in s:
             if n==-1:
                 n=0
 
-            t = f'bw.Write({x[j+n:k].replace(";","").strip()});'
+            t = f'bw.Write({x[j+n:k].replace(";","").strip()}); '
             if "[]" in x[j:j+n]:
-                t = f'WriteArray(bw,{x[j+n:k].replace(";","").strip()});'
+                t = f'WriteArray(bw,{x[j+n:k].replace(";","").strip()}); '
 
             writes.append(t)
 
@@ -75,27 +75,28 @@ for x in s:
                 n=0
 
             if "[]" in x[j:j+n]:
-                t = f'{x[j+n:k].replace(";","").strip()} = ReadArray<{x[j:j+n-2]}>(br,{x[j+n:k].replace(";","").strip()}.Length);'
+                t = f'{x[j+n:k].replace(";","").strip()} = ReadArray<{x[j:j+n-2]}>(br,{x[j+n:k].replace(";","").strip()}.Length); '
             else:
-                t = f'{x[j+n:k].replace(";","").strip()} = br.Read{types[type]}();'
+                t = f'{x[j+n:k].replace(";","").strip()} = br.Read{types[type]}(); '
 
             reads.append(t)
 
-with open("savestate.txt", "w") as f:
-    i = -1
-    for t in writes:
-        i += 1
-        if i % 2 > 0:
-            f.write(f'{t}\n')
-        else:
-            f.write(t)
+i = -1
+for t in writes:
+    if i % 2 > 0:
+        print(f'{t}', end=" ")
+    else:
+        print(t)
+    i += 1
 
-    f.write("\n\n")
+print("\n")
 
-    i = -1
-    for t in reads:
-        i += 1
-        if i % 2 > 0:
-            f.write(f'{t}\n')
-        else:
-            f.write(t)
+i = -1
+for t in reads:
+    if i % 2 > 0:
+        print(f'{t}', end=" ")
+    else:
+        print(t)
+    i += 1
+
+print("\n")
