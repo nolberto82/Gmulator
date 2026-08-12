@@ -119,7 +119,7 @@ public class SnesSpcLogger()
         if (!Logging) return;
         if (Outfile != null && Outfile.BaseStream.CanWrite)
         {
-            var (disasm, _, _, size) = Disassemble(Spc.PC, true);
+            var (disasm, _, _, _) = Disassemble(Spc.PC, true);
             Outfile.WriteLine($"{Spc.PC:X4}  {disasm,-31}");
         }
     }

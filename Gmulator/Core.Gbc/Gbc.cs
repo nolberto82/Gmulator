@@ -152,7 +152,7 @@ namespace Gmulator.Core.Gbc
 
             lock (StateLock)
             {
-                string name = GetSaveStateName(slot, Mapper.Name);
+                string name = GetSaveStateName(slot);
                 if (name != "")
                 {
                     using BinaryWriter bw = new(new FileStream(name, FileMode.OpenOrCreate, FileAccess.Write));
@@ -176,7 +176,7 @@ namespace Gmulator.Core.Gbc
 
             lock (StateLock)
             {
-                string name = GetSaveStateName(slot, Mapper.Name);
+                string name = GetSaveStateName(slot);
                 if (File.Exists(name))
                 {
                     using BinaryReader br = new(new FileStream(name, FileMode.Open, FileAccess.Read));

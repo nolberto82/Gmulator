@@ -308,9 +308,9 @@ public class Emulator
         }
     }
 
-    public string GetSaveStateName(int slot, string name)
+    public string GetSaveStateName(int slot)
     {
-        return @$"{StateDirectory}/{Path.GetFileNameWithoutExtension(GameName)}_{slot}.gs";
+        return @$"{StateDirectory}/{Path.GetFileNameWithoutExtension(GameName)}_{slot}.gms";
     }
 
     public virtual void SaveState(int slot, StateResult res)

@@ -110,7 +110,7 @@ internal class SnesDebugWindow : DebugWindow
         else
         {
             MemRegions[1] = new("Save", Mapper.ReadSram, Mapper.WriteSram, 0x0000, Mapper.Sram.Length, $"{Mapper.Sram.Length}".Length, BpType.SramWrite | BpType.SramRead, RamType.Sram);
-            MemRegions.Add(new("Prg", Mapper.Read, Mapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
+            MemRegions.Add(new("Prg", Mapper.Read, SnesMapper.Write, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
         }
 
         MemRegions.Add(new("Register", null, null, -1, -1, -1, BpType.RegWrite | BpType.RegRead, RamType.Register));

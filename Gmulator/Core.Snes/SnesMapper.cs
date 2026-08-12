@@ -96,7 +96,7 @@ public sealed class SnesMapper(MemoryMap map) : ISaveState
         return Rom[a % Rom.Length];
     }
 
-    public void Write(int addr, int value)
+    public static void Write(int addr, int value)
     {
 
     }
@@ -105,7 +105,6 @@ public sealed class SnesMapper(MemoryMap map) : ISaveState
     {
         if (!SramEnabled || Sram == null)
             return 0;
-        int a = MemoryHandler[addr >> 12].Offset + (addr & 0xfff);
         return Sram[addr & (Sram.Length - 1)];
     }
 
@@ -113,7 +112,6 @@ public sealed class SnesMapper(MemoryMap map) : ISaveState
     {
         if (!SramEnabled || Sram == null)
             return;
-        int a = MemoryHandler[addr >> 12].Offset + (addr & 0xfff);
         Sram[addr & (Sram.Length - 1)] = (byte)value;
         _saveTimer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }

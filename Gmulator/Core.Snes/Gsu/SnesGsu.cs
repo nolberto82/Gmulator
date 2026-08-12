@@ -106,11 +106,6 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
 
     private readonly Snes Snes = snes;
     public SnesGsuMmu Mmu = new();
-
-    private readonly List<Breakpoint> Breakpoints = snes.Breakpoints;
-    private readonly Action<DebugState> SetState;
-    private readonly Func<int, bool> ExecuteCheck;
-    private readonly Func<int, int, int, bool, bool> AccessCheckSpc;
     private int PrevPC;
 
     public MemoryMap GsuMap = new(0x1000);
@@ -329,7 +324,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
         int value = GsuMap.Handlers[b].Read(addr);
         if (Snes.Debug)
             Snes.Debugger.Watchpoint(addr, value, CpuType.Gsu, false);
-        return (byte)value;
+        return Snes.ApplyGameGenieCheats(addr, value);
     }
 
     public void WriteByte(int addr, int value)
@@ -378,7 +373,7 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     private int ReadOpcode()
     {
         int v = _opcode;
-        _opcode = ReadByte();
+        _opcode = ReadGsuByte();
         return v;
     }
 
@@ -386,11 +381,11 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     {
         int v = _opcode;
         _registers[15]++;
-        _opcode = ReadByte();
+        _opcode = ReadGsuByte();
         return v;
     }
 
-    private int ReadByte()
+    private int ReadGsuByte()
     {
         int addr = PrevPC = _pbr << 16 | _registers[15];
         ushort cacheAddr = (ushort)(_registers[15] - _cacheBase);
