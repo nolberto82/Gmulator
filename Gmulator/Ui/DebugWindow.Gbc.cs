@@ -1,4 +1,5 @@
 ﻿using Gmulator.Core.Gbc;
+using Gmulator.Core.Nes;
 using Gmulator.Interfaces;
 using ImGuiNET;
 
@@ -78,7 +79,12 @@ namespace Gmulator.Ui
 
         public override void Reset() => base.Reset();
 
-        public override void Continue() => base.Continue();
+        public override void Continue()
+        {
+            Gbc.DbgState = DebugState.Running;
+            Gbc.Run = true;
+            base.Continue();
+        }
 
         public override void StepInto() => base.StepInto();
 

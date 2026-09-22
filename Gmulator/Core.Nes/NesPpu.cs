@@ -296,7 +296,7 @@ namespace Gmulator.Core.Nes
                 case 0x2000:
                 {
                     _tempAddr = _tempAddr & ~0xc00 | (value & 3) << 10;
-                    _nametable = value >> 1 & 3;
+                    _nametable = value & 3;
                     _vaddrIncrease = value >> 2 & 1;
                     _sprTable = (value >> 3 & 1) != 0;
                     _bgTable = value >> 4 & 1;
@@ -386,8 +386,6 @@ namespace Gmulator.Core.Nes
 
         private void RenderPixels()
         {
-            //if (Nes.FastForward && FrameCounter % Nes.Config.FrameSkip == 0) return;
-
             int x = Cycle - 1;
             int y = Scanline;
             int bg_pixel = 0;
@@ -396,7 +394,6 @@ namespace Gmulator.Core.Nes
             int spr_pal = 0;
             int attrib = 0;
 
-            // Cache Lp.Fx for repeated use
             int fx_shift = 15 - _fineX;
             int at_shift = 7 - _fineX;
 
@@ -410,7 +407,6 @@ namespace Gmulator.Core.Nes
             if (_sprite && !(x < 8 && !_spriteLeft))
             {
                 int bgaddr = _sprTable ? 0x1000 : 0x0000;
-                // Use for loop for better performance than != 0
                 int spriteCount = SpriteScan.Count;
                 for (int i = 0; i < spriteCount; i++)
                 {
@@ -420,7 +416,6 @@ namespace Gmulator.Core.Nes
                     int fx = x - spr.X;
                     int fy = (y - (spr.Y + 1)) & (_spriteSize ? 15 : 7);
 
-                    // Fast path: skip invisible sprites
                     if (spr.X == 255 || spr.Y > 238 || fx < 0 || fx > 7)
                         continue;
 
@@ -433,7 +428,6 @@ namespace Gmulator.Core.Nes
                     else
                         spraddr = bgaddr + tile * 16 + fy;
 
-                    // Cache Read(spraddr) and Read(spraddr+8)
                     int spr_lo = Read(spraddr);
                     int spr_hi = Read(spraddr + 8);
                     spr_pixel = (spr_lo >> fx & 1) | ((spr_hi >> fx & 1) << 1);
@@ -464,7 +458,6 @@ namespace Gmulator.Core.Nes
                 offset = spr_pixel + spr_pal * 4 + 0x10;
             }
 
-            // Avoid modulo if offset is always in range (0..63)
             int paletteIndex = Read(0x3f00 + offset);
             if ((uint)paletteIndex >= (uint)pixPalettes.Length)
                 paletteIndex %= pixPalettes.Length;

@@ -107,9 +107,9 @@ namespace Gmulator.Ui
             {
                 ImGui.Columns(2);
                 ImGui.SetColumnWidth(0, 210);
-                SelectedCpu = CpuType.Snes;
-                DrawButtons(logging, CpuType.Snes);
-                DrawDisassembly(pc, 2);
+                SelectedCpu = n;
+                DrawButtons(logging, n);
+                DrawDisassembly(pc, index);
                 ImGui.NextColumn();
                 DrawCpuInfo(Cpu);
                 DrawBreakpoints((int)n);

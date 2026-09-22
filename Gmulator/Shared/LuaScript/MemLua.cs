@@ -9,6 +9,8 @@ public partial class MemLua
     private readonly Func<int, int> Read;
     private readonly Action<int, int> Write;
     private readonly Func<int, int> ReadVramByte;
+    private readonly Func<int, int> ReadGsu;
+    private readonly Action<int, int> WriteGsu;
     private readonly Func<string, int> GetRegister;
     private readonly Action<string, int> SetRegister;
 
@@ -21,10 +23,18 @@ public partial class MemLua
         GetRegister = console.Cpu.GetReg;
         SetRegister = console.Cpu.SetReg;
 
+        if (console.Gsu != null)
+        {
+            ReadGsu = console.Gsu.ReadGsu;
+            WriteGsu = console.Gsu.WriteGsu;
+        }
+
         _state.NewTable("mem");
         _state.RegisterFunction("mem.readbyte", this, typeof(MemLua).GetMethod("ReadByte"));
+        _state.RegisterFunction("mem.readbytegsu", this, typeof(MemLua).GetMethod("ReadByteGsu"));
         _state.RegisterFunction("mem.readword", this, typeof(MemLua).GetMethod("ReadWord"));
         _state.RegisterFunction("mem.writebyte", this, typeof(MemLua).GetMethod("WriteByte"));
+        _state.RegisterFunction("mem.writebytegsu", this, typeof(MemLua).GetMethod("WriteByteGsu"));
         _state.RegisterFunction("mem.writeword", this, typeof(MemLua).GetMethod("WriteWord"));
         _state.RegisterFunction("emu.getregister", this, typeof(MemLua).GetMethod("GetReg"));
         _state.RegisterFunction("emu.setregister", this, typeof(MemLua).GetMethod("SetReg"));
@@ -34,6 +44,7 @@ public partial class MemLua
     public int ReadByte(int addr) => Read(addr);
 
     public int ReadWord(int addr) => Read(addr) | Read(addr + 1) << 8;
+    public int ReadByteGsu(int addr) => ReadGsu(addr);
 
     public int ReadVramWord(int addr) => ReadVramByte(addr) | ReadVramByte(addr + 1) << 8;
 
@@ -44,6 +55,8 @@ public partial class MemLua
         Write(addr, (byte)value);
         Write(addr + 1, (byte)(value >> 8));
     }
+
+    public void WriteByteGsu(int addr, int value) => WriteGsu(addr, value);
 
     public int GetReg(string register)
     {

@@ -22,6 +22,8 @@ public class Nes : Emulator, IConsole
     public Debugger Debugger { get; set; }
     public DebugState DbgState { get; set; }
 
+    public IGsu Gsu => null;
+
     public Nes()
     {
         Console = this;
@@ -76,11 +78,14 @@ public class Nes : Emulator, IConsole
                         return;
                     }
 
-                    if (Breakpoints.Count > 0)
-                        Debugger.Execute(pc, CpuType.Nes);
-
                     if (Logger.Logging)
                         Logger.Log();
+
+                    if (Breakpoints.Count > 0 && DbgState == DebugState.Running)
+                    {
+                        if (!Run && Debugger.Execute(pc, CpuType.Nes))
+                            DbgState = DebugState.Break;
+                    }
                 }
 
                 if (DbgState == DebugState.Break)
@@ -88,6 +93,7 @@ public class Nes : Emulator, IConsole
 
                 Cpu.Step();
                 Lua?.OnExec(pc);
+                Run = false;
             }
             Ppu.Cycles -= cyclesframe;
 

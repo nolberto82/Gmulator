@@ -247,8 +247,8 @@ public partial class GbcCpu : ICpu, ISaveState
 
     public void Load(BinaryReader br)
     {
-        _pc = br.ReadInt32(); _sp = br.ReadInt32(); _a = br.ReadByte(); _f = br.ReadByte(); _b = br.ReadByte(); _c = br.ReadByte(); _d = br.ReadByte(); _e = br.ReadByte(); _h = br.ReadByte(); _l = br.ReadByte(); _ie = br.ReadByte(); _if = br.ReadByte();
-        _sb = br.ReadByte(); _sc = br.ReadByte(); _halt = br.ReadBoolean(); _ime = br.ReadBoolean();
+        _pc = br.ReadInt32(); _sp = br.ReadInt32(); _a = br.ReadInt32(); _f = br.ReadInt32(); _b = br.ReadInt32(); _c = br.ReadInt32(); _d = br.ReadInt32(); _e = br.ReadInt32(); _h = br.ReadInt32(); _l = br.ReadInt32(); _ie = br.ReadInt32(); _if = br.ReadInt32();
+        _sb = br.ReadInt32(); _sc = br.ReadInt32(); _halt = br.ReadBoolean(); _ime = br.ReadBoolean();
         _stop = br.ReadInt32(); _imeDelay = br.ReadInt32();
     }
 

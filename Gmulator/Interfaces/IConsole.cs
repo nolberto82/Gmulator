@@ -4,6 +4,7 @@ public interface IConsole
 {
     ICpu Cpu { get; }
     IPpu Ppu { get; }
+    IGsu Gsu { get; }
     IMmu Mmu { get; }
     DebugState DbgState { get; set; }
     List<Breakpoint> Breakpoints { get; set; }

@@ -89,8 +89,8 @@ public class Noise : BaseChannel, ISaveState
     {
         Width = br.ReadInt32(); Divisor = br.ReadInt32(); LFSR = br.ReadInt32(); Frequency = br.ReadInt32();
         LengthCounter = br.ReadInt32(); Duty = br.ReadInt32(); EnvVolume = br.ReadInt32(); CurrentVolume = br.ReadInt32();
-        Timer = br.ReadInt32(); _nr41 = br.ReadByte(); _nr42 = br.ReadByte(); _nr43 = br.ReadByte();
-        _nr44 = br.ReadByte();
+        Timer = br.ReadInt32(); _nr41 = br.ReadInt32(); _nr42 = br.ReadInt32(); _nr43 = br.ReadInt32();
+        _nr44 = br.ReadInt32();
     }
 
     public List<RegisterInfo> GetState() =>

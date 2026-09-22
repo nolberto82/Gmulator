@@ -4,6 +4,8 @@
     {
         public int Read(int a) => a switch
         {
+            0xff01 => _sb,
+            0xff02 => _sc | 0x7c,
             0xff40 => _lcdc,
             0xff41 => _stat,
             0xff42 => _scy,
@@ -35,6 +37,8 @@
         {
             switch (addr)
             {
+                case 0xff01: _sb = value; break;
+                case 0xff02: _sc = value; break;
                 case 0xff40: _lcdc = value; break;
                 case 0xff41:
                     _stat = (byte)(value & 0x78 | _stat & 7 | 0x80);

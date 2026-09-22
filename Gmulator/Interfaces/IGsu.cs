@@ -4,7 +4,9 @@ using System.Text;
 
 namespace Gmulator.Interfaces;
 
-internal interface IGsu
+public interface IGsu
 {
+    int ReadGsu(int addr);
+    void WriteGsu(int addr, int value);
     List<RegisterInfo> GetMisc();
 }

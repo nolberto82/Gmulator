@@ -1,12 +1,7 @@
 ﻿
 using ImGuiNET;
 using NLua;
-using System;
-using System.Collections.Generic;
-using System.Diagnostics;
 using System.Numerics;
-using System.Security.Cryptography.X509Certificates;
-using System.Text;
 
 namespace Gmulator.Shared.LuaScript;
 

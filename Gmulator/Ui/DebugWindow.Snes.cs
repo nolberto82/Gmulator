@@ -104,7 +104,7 @@ internal class SnesDebugWindow : DebugWindow
             MemRegions.Add(new("Sa1", Sa1.Mmu.ReadIram, Sa1.WriteIram, 0x0000, 0x800, 3, BpType.Sa1Write | BpType.Sa1Read, RamType.Iram));
         if (Mapper.Coprocessor == SnesMapper.Gsu)
         {
-            MemRegions[1] = new("Gsu", Gsu.Mmu.Read, Gsu.Mmu.Write, 0x0000, Mapper.RamSize, 4, BpType.GsuWrite | BpType.GsuRead, RamType.GsuRam);
+            MemRegions[1] = new("Gsu", Gsu.Mmu.ReadByte, Gsu.Mmu.WriteByte, 0x0000, Mapper.RamSize, 4, BpType.GsuWrite | BpType.GsuRead, RamType.GsuRam);
             MemRegions.Add(new("Prg", Gsu.ReadPrg2, Gsu.WritePrg2, 0x0000, Mapper.Rom.Length, 6, BpType.CodeExec, RamType.Rom));
         }
         else

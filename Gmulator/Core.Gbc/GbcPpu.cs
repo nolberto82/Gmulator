@@ -14,7 +14,7 @@ public partial class GbcPpu : IPpu, ISaveState
     private const int LcdDots = 172;
 
     private readonly GbcMmu Mmu;
-    private  LuaManager LuaApi => Gbc.Lua;
+    private LuaManager LuaApi => Gbc.Lua;
     private readonly Action<uint[]> UpdateScreen;
     private readonly Gbc Gbc;
     private readonly List<Sprite> _sprites;
@@ -26,6 +26,7 @@ public partial class GbcPpu : IPpu, ISaveState
     private bool _cgb;
     private int _oamDma;
     private int _key1;
+    private int _sb, _sc;
     private int _ly, _lyc, _lcdc, _stat;
     private int _scy, _scx;
     private int _wy, _wx, _wly;
@@ -67,6 +68,7 @@ public partial class GbcPpu : IPpu, ISaveState
         _cgbBkgPal = new byte[64];
         _cgbObjPal = new byte[64];
 
+        gbc.CpuMap.Set(0x00, 0x01, 0xff01, 0xff02, Read, Write, RamType.Register, 1);
         gbc.CpuMap.Set(0x00, 0x01, 0xff40, 0xff70, Read, Write, RamType.Register, 1);
     }
 
@@ -397,6 +399,9 @@ public partial class GbcPpu : IPpu, ISaveState
         Array.Fill<byte>(_cgbBkgPal, 0x00);
         Array.Fill<byte>(_cgbObjPal, 0x00);
 
+        Write(0xff01, 0x00);
+        Write(0xff02, cgb ? 0x7f : 0x7e);
+
         _screenBuffer = ClearBuffer(_screenBuffer);
     }
 
@@ -413,13 +418,13 @@ public partial class GbcPpu : IPpu, ISaveState
 
     public void Load(BinaryReader br)
     {
-        _dots = br.ReadInt32(); _cgb = br.ReadBoolean(); _oamDma = br.ReadByte(); _key1 = br.ReadByte();
-        _ly = br.ReadByte(); _lyc = br.ReadByte(); _lcdc = br.ReadByte(); _stat = br.ReadByte();
-        _scy = br.ReadByte(); _scx = br.ReadByte(); _wy = br.ReadByte(); _wx = br.ReadByte();
-        _wly = br.ReadByte(); _bgp = br.ReadByte(); _obp0 = br.ReadByte(); _obp1 = br.ReadByte();
-        _bgpi = br.ReadByte(); _bgpd = br.ReadByte(); _obpi = br.ReadByte(); _obpd = br.ReadByte();
-        _hdma1 = br.ReadByte(); _hdma2 = br.ReadByte(); _hdma3 = br.ReadByte(); _hdma4 = br.ReadByte();
-        _hdma5 = br.ReadByte(); _cgbBkgPal = ReadArray<byte>(br, _cgbBkgPal.Length); _cgbObjPal = ReadArray<byte>(br, _cgbObjPal.Length); _screenBuffer = ReadArray<uint>(br, _screenBuffer.Length);
+        _dots = br.ReadInt32(); _cgb = br.ReadBoolean(); _oamDma = br.ReadInt32(); _key1 = br.ReadInt32();
+        _ly = br.ReadInt32(); _lyc = br.ReadInt32(); _lcdc = br.ReadInt32(); _stat = br.ReadInt32();
+        _scy = br.ReadInt32(); _scx = br.ReadInt32(); _wy = br.ReadInt32(); _wx = br.ReadInt32();
+        _wly = br.ReadInt32(); _bgp = br.ReadInt32(); _obp0 = br.ReadInt32(); _obp1 = br.ReadInt32();
+        _bgpi = br.ReadInt32(); _bgpd = br.ReadInt32(); _obpi = br.ReadInt32(); _obpd = br.ReadInt32();
+        _hdma1 = br.ReadInt32(); _hdma2 = br.ReadInt32(); _hdma3 = br.ReadInt32(); _hdma4 = br.ReadInt32();
+        _hdma5 = br.ReadInt32(); _cgbBkgPal = ReadArray<byte>(br, _cgbBkgPal.Length); _cgbObjPal = ReadArray<byte>(br, _cgbObjPal.Length); _screenBuffer = ReadArray<uint>(br, _screenBuffer.Length);
     }
 
     public List<RegisterInfo> GetState() =>

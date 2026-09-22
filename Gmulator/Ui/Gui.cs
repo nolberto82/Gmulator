@@ -149,7 +149,7 @@ public abstract class Gui
         Raylib.CloseWindow();
     }
 
-    public virtual void Init(bool isdeck)
+    public unsafe virtual void Init(bool isdeck)
     {
         Raylib.SetConfigFlags(ConfigFlags.VSyncHint | ConfigFlags.ResizableWindow | ConfigFlags.HighDpiWindow);
         Raylib.InitWindow(DeckWidth, DeckHeight, EmulatorName);

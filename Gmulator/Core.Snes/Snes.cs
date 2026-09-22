@@ -34,6 +34,8 @@ public sealed class Snes : Emulator, IConsole
     public Debugger Debugger { get; set; }
     public DebugState DbgState { get; set; }
 
+    IGsu IConsole.Gsu => ((IConsole)Gsu)?.Gsu;
+
     public Snes() : base()
     {
         CpuMap = new(0x1000);

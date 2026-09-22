@@ -19,6 +19,7 @@ namespace Gmulator.Core.Gbc
         ICpu IConsole.Cpu => Cpu;
         IPpu IConsole.Ppu => Ppu;
         IMmu IConsole.Mmu => Mmu;
+        public IGsu Gsu => null;
 
         public Debugger Debugger { get; set; }
         public DebugState DbgState { get; set; }
@@ -69,13 +70,11 @@ namespace Gmulator.Core.Gbc
                         if (Logger?.Logging == true)
                             Logger?.Log();
 
-                        if (Breakpoints?.Count > 0)
+                        if (Breakpoints.Count > 0 && DbgState == DebugState.Running)
                         {
-                            Debugger.Execute(pc,CpuType.Gbc);
+                            if (!Run && Debugger.Execute(pc, CpuType.Gbc))
+                                DbgState = DebugState.Break;
                         }
-
-                        //if (DbgState != DebugState.Running)
-                        //    DbgState = DebugState.Break;
 
                         if (DbgState == DebugState.Break)
                             return;
@@ -83,6 +82,7 @@ namespace Gmulator.Core.Gbc
 
                     Cpu?.Step();
                     Lua?.OnExec(pc);
+                    Run = false;
                 }
                 Cpu?.Cycles -= cyclesframe;
                 Mmu.ApplyParCheats();

@@ -46,7 +46,6 @@ public abstract class BaseMapper : ISaveState
     public abstract void WriteRom1(int addr, int value);
 
     public virtual void Write() =>
-        //Sram[addr % Sram.Length] = value;
         Timer ??= new Timer(SaveSram, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
 
     public void LoadSram()

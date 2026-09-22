@@ -65,6 +65,7 @@ public partial class SnesSa1(Snes snes) : SnesCpu, IConsole
     public IPpu Ppu => Snes.Ppu;
 
     IMmu IConsole.Mmu => null;
+    public IGsu Gsu => null;
     public DebugState DbgState { get; set; }
     public bool Run { get; set; }
     public Debugger Debugger { get; set; }

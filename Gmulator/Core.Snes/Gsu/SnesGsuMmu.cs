@@ -3,7 +3,7 @@ using System.Xml.Linq;
 
 namespace Gmulator.Core.Snes.Gsu;
 
-public class SnesGsuMmu : ISaveState
+public class SnesGsuMmu : ISaveState, IMmu
 {
     private byte[] _ram;
     private string _gameName;
@@ -18,12 +18,12 @@ public class SnesGsuMmu : ISaveState
         LoadSram();
     }
 
-    public int Read(int addr)
+    public int ReadByte(int addr)
     {
         return _ram[addr & _ramSize];
     }
 
-    public void Write(int addr, int value)
+    public void WriteByte(int addr, int value)
     {
         if (addr==1&&value==0xf0)
         { }
@@ -64,5 +64,35 @@ public class SnesGsuMmu : ISaveState
     public void Load(BinaryReader br)
     {
         _ram = ReadArray<byte>(br, _ram.Length);
+    }
+
+    public int ReadWord(int addr)
+    {
+        return 0;
+    }
+
+    public void WriteWord(int addr, int value)
+    {
+        
+    }
+
+    public int ReadLong(int addr)
+    {
+        return 0;
+    }
+
+    public void WriteLong(int addr, int value)
+    {
+        
+    }
+
+    public int ReadVram(int addr)
+    {
+        return 0;
+    }
+
+    public int GetOffset(int addr)
+    {
+        return 0;
     }
 }

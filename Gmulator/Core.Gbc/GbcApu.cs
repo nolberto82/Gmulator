@@ -192,9 +192,9 @@ public class GbcApu : ISaveState
 
     public void Load(BinaryReader br)
     {
-        _nr50 = br.ReadByte(); _nr51 = br.ReadByte(); _nr52 = br.ReadByte(); _frameSequencer = br.ReadInt32();
-        _frameSequencerCycles = br.ReadInt32(); _nextSampleTimer = br.ReadInt32(); _bufferPosition = br.ReadInt32(); _volumeLeft = br.ReadByte();
-        _volumeRight = br.ReadByte();
+        _nr50 = br.ReadInt32(); _nr51 = br.ReadInt32(); _nr52 = br.ReadInt32(); _frameSequencer = br.ReadInt32();
+        _frameSequencerCycles = br.ReadInt32(); _nextSampleTimer = br.ReadInt32(); _bufferPosition = br.ReadInt32(); _volumeLeft = br.ReadInt32();
+        _volumeRight = br.ReadInt32();
         Square1.Load(br); Square2.Load(br); Wave.Load(br); Noise.Load(br);
     }
 

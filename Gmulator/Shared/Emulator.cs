@@ -277,6 +277,9 @@ public class Emulator
 
                 foreach (var r in rawcodes)
                 {
+                    if (SystemType == SnesConsole)
+                        r.Address80 |= 0x800000;
+
                     if (!Cheats.ContainsKey((r.Address, r.Address80)))
                         Cheats.Add((r.Address, r.Address80), new(cht.Description, r.Address, r.Value, r.Compare, r.Type, enabledAll || r.Enabled, cht.Codes));
                 }

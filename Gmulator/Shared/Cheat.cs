@@ -35,7 +35,7 @@ public class Cheat
     public class RawCode(int address, byte compare, byte value, int type, bool enabled)
     {
         public int Address { get; set; } = address & 0xfffff;
-        public int Address80 { get; set; } = address | 0x800000;
+        public int Address80 { get; set; } = address;
         public byte Compare { get; set; } = compare;
         public byte Value { get; set; } = value;
         public int Type { get; set; } = type;

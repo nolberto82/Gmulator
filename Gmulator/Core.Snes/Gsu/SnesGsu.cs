@@ -140,6 +140,8 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     public Action Tick { get; set; }
     public int StepOverAddr { get; set; }
 
+    public IGsu Gsu => this;
+
     private void SetMemoryMap(int ramsize)
     {
         var Mapper = Snes.Mapper;
@@ -362,12 +364,12 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
 
     private int ReadGsuRam(int addr)
     {
-        return Mmu.Read(addr & Snes.CpuMap.Handlers[addr >> 12].Mask);
+        return Mmu.ReadByte(addr & Snes.CpuMap.Handlers[addr >> 12].Mask);
     }
 
     private void WriteGsuRam(int addr, int value)
     {
-        Mmu.Write(addr & Snes.CpuMap.Handlers[addr >> 12].Mask, value);
+        Mmu.WriteByte(addr & Snes.CpuMap.Handlers[addr >> 12].Mask, value);
     }
 
     private int ReadOpcode()
@@ -756,5 +758,15 @@ public partial class SnesGsu(Snes snes) : IConsole, ICpu, IGsu
     public void Reset(string name, bool reset)
     {
 
+    }
+
+    public int ReadGsu(int addr)
+    {
+        return Mmu.ReadByte(addr);
+    }
+
+    public void WriteGsu(int addr, int value)
+    {
+        Mmu.WriteByte(addr, value);
     }
 }

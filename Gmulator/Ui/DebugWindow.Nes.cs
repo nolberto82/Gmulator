@@ -1,4 +1,5 @@
 ﻿using Gmulator.Core.Nes;
+using Gmulator.Core.Snes;
 using Gmulator.Interfaces;
 
 namespace Gmulator.Ui
@@ -69,7 +70,12 @@ namespace Gmulator.Ui
             base.AddBreakpoint(addr, type, ramType, cpuType, index, access, condition, write);
 
         public override void Reset() => base.Reset();
-        public override void Continue() => base.Continue();
+        public override void Continue()
+        {
+            Nes.DbgState = DebugState.Running;
+            Nes.Run = true;
+            base.Continue();
+        }
 
         public override void StepInto() => base.StepInto();
 
