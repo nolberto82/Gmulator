@@ -47,7 +47,7 @@ public class NesMmu(Dictionary<(int, int), Cheat> cheats) : IMmu, ISaveState
     private int ApplyGameGenieCheats(int addr, int value)
     {
         if (Cheats.Count == 0) return value;
-        var addr80 = addr | 0x800000;
+        var addr80 = addr;
         if (Cheats.TryGetValue((addr, addr80), out Cheat cheat) && cheat.Enabled && cheat.Type == GameGenie)
         {
             if (value == Cheats[(addr, addr80)].Compare)

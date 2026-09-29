@@ -32,7 +32,7 @@ internal partial class GuiLua
         if (args.Length < 4)
             return;
 
-        var fontsize = 25;
+        int fontsize = args.Length == 6 && args[5] != null ? Convert.ToInt32(args[5]) : 25;
 
         uint textcolor = 0xffffffff;
         if (args.Length > 4 && args[3] != null)
@@ -46,7 +46,7 @@ internal partial class GuiLua
         if (args.Length == 5)
             Raylib.DrawRectangleRec(textRect, GetColor(args[4] == null ? 0x00000000 : Convert.ToUInt32(args[4])));
 
-        Raylib.DrawTextEx(_guiFont, text, new(x + textRect.Width / 2 - textureSize.X / 2, y + _menuHeight), textureSize.Y , 0f, GetColor(textcolor));
+        Raylib.DrawTextEx(_guiFont, text, new(x + textRect.Width / 2 - textureSize.X / 2, y + _menuHeight), textureSize.Y, 0f, GetColor(textcolor));
 
     }
 

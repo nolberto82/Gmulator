@@ -233,11 +233,11 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
         return rom;
     }
 
-    private byte ApplyGameGenieCheats(int ba, int v)
+    private byte ApplyGameGenieCheats(int addr, int v)
     {
-        var cht = Cheats.ContainsKey((ba, ba)) && Cheats[(ba, ba)].Enabled && Cheats[(ba, ba)].Compare == v && Cheats[(ba, ba)].Type == GameGenie;
+        var cht = Cheats.ContainsKey((addr, addr)) && Cheats[(addr, addr)].Enabled && Cheats[(addr, addr)].Compare == v && Cheats[(addr, addr)].Type == GameGenie;
         if (cht)
-            return Cheats[(ba, ba)].Value;
+            return Cheats[(addr, addr)].Value;
         return (byte)v;
     }
 
