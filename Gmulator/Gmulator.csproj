@@ -78,6 +78,9 @@
 		<None Update="Assets\naga10.ttf">
 		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
+		<None Update="Assets\PressStart2P.ttf">
+		  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 		<None Update="Assets\Super Mario World (USA).lua">
 		  <CopyToOutputDirectory>Never</CopyToOutputDirectory>
 		</None>

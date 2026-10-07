@@ -102,7 +102,7 @@ public abstract class Gui
 
         if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceUp, false) && TabIndex == Tab.Games)
             DeleteFileMode = !DeleteFileMode;
-        else if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceRight, false) && TabIndex == Tab.Games)
+        else if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceLeft, false) && TabIndex == Tab.Games)
             CopyHacks(isdeck);
 
         if (ImGui.IsKeyPressed(ImGuiKey.GamepadL1, false))
@@ -310,6 +310,8 @@ public abstract class Gui
             if (File.Exists($"{CheatDirectory}/{filename}.cht"))
                 File.Delete($"{CheatDirectory}/{filename}.cht");
             if (File.Exists($"{CheatDirectory}/{filename}.lua"))
+                File.Delete($"{CheatDirectory}/{filename}.lua");
+            if (File.Exists($"{CheatDirectory}/{filename}.gms"))
                 File.Delete($"{CheatDirectory}/{filename}.lua");
         }
     }

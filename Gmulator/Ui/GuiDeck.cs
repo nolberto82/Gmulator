@@ -19,6 +19,7 @@ internal class GuiDeck : Gui
         _initial = new bool[MaxTabs];
         var io = ImGui.GetIO();
         io.ConfigFlags |= ImGuiConfigFlags.NavEnableGamepad;
+        io.ConfigFlags |= ImGuiConfigFlags.NavEnableKeyboard;
         io.ConfigFlags |= ImGuiConfigFlags.NoMouse;
         //io.ConfigFlags |= ImGuiConfigFlags.NoMouseCursorChange;
 
@@ -33,12 +34,12 @@ internal class GuiDeck : Gui
 
         _tabActions = new Dictionary<int, Action<int>>
         {
-            { (int)Tab.Games, (i) => DrawGames(i) },
-            { (int)Tab.Cheats, (i) => DrawCheats(i) },
-            { (int)Tab.ChtBrowser, (i) => DrawCheatBrowser(i) },
-            { (int)Tab.Lua, (i) => DrawLua(i) },
-            { (int)Tab.Options, (i) => DrawOptions(i) },
-            { (int)Tab.About, (i) => DrawAbout(i) }
+            { (int)Tab.Games, DrawGames },
+            { (int)Tab.Cheats, DrawCheats },
+            { (int)Tab.ChtBrowser, DrawCheatBrowser },
+            { (int)Tab.Lua, DrawLua },
+            { (int)Tab.Options, DrawOptions },
+            { (int)Tab.About, DrawAbout }
         };
     }
 
@@ -81,7 +82,6 @@ internal class GuiDeck : Gui
         ImGui.SetNextWindowSize(new(vp.Size.X, vp.Size.Y));
         ImGui.SetNextWindowPos(new(0, 0));
         ImGui.Begin("Menu", NoScrollFlags | ImGuiWindowFlags.NoFocusOnAppearing | ImGuiWindowFlags.NoCollapse);
-
         if (ImGui.BeginTabBar("MainTabBar"))
         {
             for (int i = 0; i < MainEntries.Length; i++)
@@ -101,6 +101,10 @@ internal class GuiDeck : Gui
                     }
 
                     action?.Invoke(i);
+                    if (!ImGui.IsItemActive())
+                    {
+                        ImGui.GetIO().AddKeyEvent(ImGuiKey.GamepadFaceRight, true);
+                    }
                     ImGui.EndChild();
                     ImGui.EndTabItem();
                 }
@@ -110,7 +114,6 @@ internal class GuiDeck : Gui
 
         ImGui.BeginChild("Footer", new(vp.Size.X, _buttonFont.FontSize));
 
-
         ImGui.PushFont(_buttonFont); ImGui.Text("X"); ImGui.PopFont(); ImGui.SameLine();
         ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2);
         ImGui.Text("Choose  "); ImGui.SameLine();
@@ -119,6 +122,10 @@ internal class GuiDeck : Gui
             ImGui.PushFont(_buttonFont); ImGui.Text("T"); ImGui.PopFont(); ImGui.SameLine();
             ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2);
             ImGui.Text("Toggle Delete  "); ImGui.SameLine();
+
+            ImGui.PushFont(_buttonFont); ImGui.Text("C"); ImGui.PopFont(); ImGui.SameLine();
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 2);
+            ImGui.Text("Copy Hacks  "); ImGui.SameLine();
         }
 
         ImGui.PushFont(_buttonFont); ImGui.Text("lr"); ImGui.PopFont(); ImGui.SameLine();
@@ -141,7 +148,6 @@ internal class GuiDeck : Gui
     private void DrawGames(int index)
     {
         Enumerate(RomDirectory);
-
         for (int i = 0; i < GameFiles.Count; i++)
         {
             FileDetails file = GameFiles[i];
@@ -149,7 +155,10 @@ internal class GuiDeck : Gui
             if (ImGui.Selectable(Path.GetFileName(GameFiles[i].Name), SelectedItem[index] == i))
             {
                 if (DeleteFileMode && ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown, false))
+                {
                     DeleteFile(file);
+                    ImGui.SetKeyboardFocusHere();
+                }
                 else if (ImGui.IsKeyPressed(ImGuiKey.GamepadFaceDown))
                 {
                     if (File.Exists(file.Name))
@@ -162,8 +171,15 @@ internal class GuiDeck : Gui
             }
             ImGui.PopStyleColor();
 
+
+
             if (ImGui.IsItemFocused())
-                SelectedItem[index] = i;
+            {
+                if (SelectedItem[index] != i)
+                {
+                    SelectedItem[index] = i;
+                }
+            }
         }
     }
 
