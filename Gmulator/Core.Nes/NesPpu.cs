@@ -94,6 +94,8 @@ namespace Gmulator.Core.Nes
         private uint[] _screenBuffer;
         public ReadOnlySpan<uint> ScreenBuffer => _screenBuffer;
 
+        private Action<uint[]> UpdateScreen;
+
         private Nes Nes;
 
         private readonly uint[] pixPalettes = new uint[192 / 3];
@@ -118,6 +120,8 @@ namespace Gmulator.Core.Nes
             Nes = nes;
             Mmu = nes.Mmu;
             Apu = nes.Apu;
+            UpdateScreen = nes.UpdateScreen;
+
             _screenBuffer = new uint[NesWidth * NesHeight * 4];
 
             MemoryHandlers = [];
@@ -198,6 +202,7 @@ namespace Gmulator.Core.Nes
                         _vBlank = true;
                         if (_nmi && !NoNmi)
                             Nes.Cpu.NmiTriggered = 1;
+                        UpdateScreen(_screenBuffer);
                     }
                 }
                 else if (Scanline == (int)ScanlineState.Pre)

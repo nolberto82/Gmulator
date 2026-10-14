@@ -162,15 +162,15 @@ public partial class GbcPpu : IPpu, ISaveState
 
     private void DrawScanline()
     {
-        if (!Gbc.FastForward || Gbc.FastForward && FrameCounter % Gbc.Config.FrameSkip == 0)
-        {
-            Array.Fill<byte>(_lineBGColors, 0);
-            DrawBackground();
-            if (WindowEnabled)
-                DrawWindow();
-            if (SpriteEnabled)
-                DrawSprites();
-        }
+        //if (!Gbc.FastForward || Gbc.FastForward && FrameCounter % Gbc.Config.FrameSkip == 0)
+        //{
+        Array.Fill<byte>(_lineBGColors, 0);
+        DrawBackground();
+        if (WindowEnabled)
+            DrawWindow();
+        if (SpriteEnabled)
+            DrawSprites();
+        //}
     }
 
     private void DrawBackground()

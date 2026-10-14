@@ -78,7 +78,7 @@ public class GbcJoypad
                 _buttons[i] = false;
         }
 
-        if (frame % 2 == 0)
+        if (frame % 8 == 0)
         {
             if (Raylib.IsGamepadButtonDown(0, BtnX))
                 _buttons[0] = true;

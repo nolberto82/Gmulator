@@ -24,8 +24,6 @@ public sealed class SnesDma(Snes snes) : ISaveState
     private readonly bool[] Repeat = new bool[MaxChannels];
     private readonly bool[] TransferEnabled = new bool[MaxChannels];
 
-    private readonly int _byteCount;
-
     private readonly Action Idle8 = snes.Cpu.Idle8;
 
     private readonly Snes Snes = snes;

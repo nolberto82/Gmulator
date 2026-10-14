@@ -97,8 +97,6 @@ public class Nes : Emulator, IConsole
             }
             Ppu.Cycles -= cyclesframe;
 
-            UpdateTexture(Screen.Texture, Ppu.ScreenBuffer);
-
             if (Cheats.Count > 0)
                 Mmu.ApplyParCheats();
         }
