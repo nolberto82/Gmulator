@@ -132,7 +132,8 @@ public abstract class Gui
                     config.Volume = Options[1].Value;
                     config.RotateAB = Options[2].Value;
                     Audio.SetVolume(config.Volume);
-                    config.Save();
+                    config.Save(_gameName);
+                    Emulator.RotateAB(Options[2].Value);
                 }
                 break;
         }
@@ -141,7 +142,7 @@ public abstract class Gui
     public virtual void Unload()
     {
         Emulator?.Close();
-        Emulator?.Config.Save();
+        Emulator?.Config.Save(_gameName);
         LuaApi?.Unload();
         Raylib.UnloadFont(GuiFont);
         Raylib.UnloadRenderTexture(Screen);
@@ -192,7 +193,7 @@ public abstract class Gui
             Notifications.SetFont(DebugFont[0], GuiFont);
         }
 
-        Emulator?.Config = new();
+        Emulator?.Config = new("", Emulator.RotateAB);
         Config.CreateDirectories(isdeck);
         Emulator.Config.Load();
         FileExtensions = [".gb", ".gbc", ".nes", ".sfc", ".smc", ".sms", ".gg"];
@@ -202,6 +203,13 @@ public abstract class Gui
             Raylib.SetWindowIcon(Raylib.LoadImage("Assets/GBC_1.png"));
 
         Cheat = new();
+
+        Options = new()
+        {
+            new("Frameskip", [Emulator.Config.FrameSkip, 1, 1, 99], null, false, ChangeOption, null),
+            new("Volume", [Emulator.Config.Volume, 1, 0, 100], null, false, ChangeOption, null),
+            new("Rotate AB Buttons", [Emulator.Config.RotateAB, 1, 0, 1], ["OFF", "ON"], true, ChangeOption, null),
+        };
     }
 
     public void Open(Config config)
@@ -219,13 +227,12 @@ public abstract class Gui
         Opened = true;
         OpenDialog = true;
 
-        Options =
-        [
-            new("Frameskip", [config.FrameSkip, 1, 1, 99], null, false, ChangeOption, null),
-            new("Volume", [config.Volume, 1, 0, 100], null, false, ChangeOption, null),
-            new("Rotate AB Buttons", [config.RotateAB, 1, 0, 1],["OFF","ON"], true, ChangeOption, null),
-            //new("Copy Hacks", [0, 0, 0, 0], [""], true, null, CopyHacks),
-        ];
+        Options = new()
+        {
+            new("Frameskip", [Emulator.Config.FrameSkip, 1, 1, 99], null, false, ChangeOption, null),
+            new("Volume", [Emulator.Config.Volume, 1, 0, 100], null, false, ChangeOption, null),
+            new("Rotate AB Buttons", [Emulator.Config.RotateAB, 1, 0, 1], ["OFF", "ON"], true, ChangeOption, null),
+        };
     }
 
     private int ChangeOption(Option o)
@@ -289,8 +296,9 @@ public abstract class Gui
             Screen = Emulator.Screen;
             LuaApi = Emulator?.Lua;
             Emulator.Reset(name, false);
-            Emulator.Config = new();
+            Emulator.Config = new(name, Emulator.RotateAB);
             Emulator?.Config.Load();
+            Emulator?.RotateAB(Emulator.Config.RotateAB);
             LuaApi?.Reset();
         }
 
@@ -447,7 +455,8 @@ public abstract class Gui
 
     public void LoadGame(string filename)
     {
-        Emulator.Config?.Save();
+        Emulator.Config?.Load();
+        //Emulator.Config?.Save(filename);
         Opened = false;
         ResetGame(CurrentName = filename);
     }

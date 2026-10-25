@@ -70,6 +70,8 @@ public class Emulator
             GameName = name;
     }
 
+    public virtual void RotateAB(int rotate) { }
+
     public virtual void RunFrame(bool opened) { }
 
     public virtual void Render(float MenuHeight)
@@ -156,7 +158,10 @@ public class Emulator
 
     public virtual void Input() { }
 
-    public virtual void Close() { }
+    public virtual void Close()
+    {
+        Config?.Save(GameName);
+    }
 
     public string ConvertCodes(string description, string cheats, bool add)
     {

@@ -311,6 +311,6 @@ public partial class GbcCpu : ICpu, ISaveState
 
     public int[] GetRegValues()
     {
-        throw new NotImplementedException();
+        return Array.Empty<int>();
     }
 }

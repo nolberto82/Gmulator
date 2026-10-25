@@ -4,7 +4,7 @@ namespace Gmulator.Shared;
 
 public class EmuState
 {
-    public const string Version = "1.30";
+    public const string Version = "1.40";
 
     public static void WriteArray<T>(BinaryWriter bw, T[] v) where T : unmanaged
     {

@@ -60,4 +60,12 @@ public class NesJoypad()
                 _buttons[1] = true;
         }
     }
+
+    public void RotateAB(int rotate)
+    {
+        if (rotate != 0)
+            (Pad[0], Pad[1]) = (Pad[1], Pad[0]);
+        else
+            (Pad[0], Pad[1]) = (BtnA, BtnB);
+    }
 }

@@ -94,6 +94,11 @@ namespace Gmulator.Core.Gbc
             //Input.Update(this, GbcConsole, Ppu.FrameCounter);
         }
 
+        public override void RotateAB(int rotate)
+        {
+            Joypad?.RotateAB(rotate);
+        }
+
         public override void Input()
         {
             if (Raylib.IsGamepadAvailable(0))
@@ -121,7 +126,7 @@ namespace Gmulator.Core.Gbc
                 CpuMap.Set(0x00, 0x00, 0xa000, 0xbfff, Mmu.ReadSram, Mmu.WriteSram, RamType.Sram, 1);
                 CpuMap.Set(0x00, 0x00, 0xc000, 0xdfff, Mmu.ReadWram, Mmu.WriteWram, RamType.Wram, 1);
                 CpuMap.Set(0x00, 0x00, 0xfe00, 0xfe9f, Mmu.ReadOam, (a, v) => { }, RamType.Oram, 1);
-                CpuMap.Set(0x00, 0x00, 0xff80, 0xfffe, Mmu.ReadRam, Mmu.WriteRam, RamType.Register, 1);
+                CpuMap.Set(0x00, 0x00, 0xff80, 0xfffe, Mmu.ReadIo, Mmu.WriteIo, RamType.Register, 1);
 
             }
 

@@ -140,7 +140,7 @@ public class GuiDesktop : Gui
                                 if (file.Name == "..")
                                 {
                                     Emulator.Config.WorkingDir = WorkingDirectory = Path.GetFullPath(@$"{WorkingDirectory}/..");
-                                    Emulator.Config.Save();
+                                    Emulator.Config.Save(Emulator.GameName);
                                     Enumerate("");
                                 }
                                 else
@@ -181,7 +181,7 @@ public class GuiDesktop : Gui
                                         else
                                         {
                                             Emulator.Config.WorkingDir = WorkingDirectory = file.Name;
-                                            Emulator.Config.Save();
+                                            Emulator.Config.Save(Emulator.GameName);
                                             GameFiles.Clear();
                                             Enumerate("");
                                             ImGui.PopStyleColor();

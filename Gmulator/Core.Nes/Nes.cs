@@ -102,6 +102,11 @@ public class Nes : Emulator, IConsole
         }
     }
 
+    public override void RotateAB(int rotate)
+    {
+        Joypad1?.RotateAB(rotate);
+    }
+
     public override void Input()
     {
         if (Raylib.IsGamepadAvailable(0))

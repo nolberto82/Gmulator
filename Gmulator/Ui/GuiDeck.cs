@@ -288,20 +288,17 @@ internal class GuiDeck : Gui
 
     private void DrawOptions(int index)
     {
-        if (string.IsNullOrEmpty(Emulator.GameName))
-        {
-            ImGui.Selectable("No game loaded.", true);
-            return;
-        }
-
         ImGui.BeginTable("options", 2);
         ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed, ImGui.GetMainViewport().Size.X - Raylib.MeasureText("OFF", (int)ImGui.GetFontSize() * 2));
         ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed);
         for (int i = 0; i < Options.Count; i++)
         {
+            var option = Options[i];
+            if (string.IsNullOrEmpty(Emulator.GameName) && option.Name == "Rotate AB Buttons")
+                continue;
+
             ImGui.TableNextColumn();
             ImGui.PushID(i);
-            var option = Options[i];
             if (ImGui.Selectable(option.Name, SelectedItem[index] == i))
             {
 
@@ -311,6 +308,7 @@ internal class GuiDeck : Gui
                 SelectedItem[index] = i;
 
             ImGui.TableNextColumn();
+
             ImGui.Text(option.Status != null ? $"{option.Status[option.Value],3}" : $"{option.Value,3}");
             ImGui.PopID();
         }

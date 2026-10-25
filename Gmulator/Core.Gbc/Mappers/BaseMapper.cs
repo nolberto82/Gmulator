@@ -125,6 +125,7 @@ public abstract class BaseMapper : ISaveState
         bw.Write(Rambank);
         bw.Write(CartRamEnabled);
         bw.Write(CGB);
+        WriteArray(bw, Sram);
     }
 
     public void Load(BinaryReader br)
@@ -135,5 +136,6 @@ public abstract class BaseMapper : ISaveState
         Rambank = br.ReadInt32();
         CartRamEnabled = br.ReadBoolean();
         CGB = br.ReadBoolean();
+        Sram = ReadArray<byte>(br, Sram.Length);
     }
 }

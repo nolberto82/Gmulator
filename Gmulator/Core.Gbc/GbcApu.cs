@@ -29,6 +29,7 @@ public class GbcApu : ISaveState
     public const int MaxSamples = 4096;
     public const int SampleRate = 44100;
     public readonly int SamplesCpu;
+    private const int MaxBufferLength = MaxSamples * 2 - 1;
 
     public GbcApu(Gbc gbc, int cpuclock)
     {
@@ -106,13 +107,13 @@ public class GbcApu : ISaveState
 
             if (Raylib.IsWindowResized())
             {
-                AudioBuffer[_bufferPosition++] = 0;
-                AudioBuffer[_bufferPosition++] = 0;
+                AudioBuffer[_bufferPosition++ & MaxBufferLength] = 0;
+                AudioBuffer[_bufferPosition++ & MaxBufferLength] = 0;
             }
             else
             {
-                AudioBuffer[_bufferPosition++] = l / 64;
-                AudioBuffer[_bufferPosition++] = r / 64;
+                AudioBuffer[_bufferPosition++ & MaxBufferLength] = l / 64;
+                AudioBuffer[_bufferPosition++ & MaxBufferLength] = r / 64;
             }
 
             if (_bufferPosition >= AudioBuffer.Length)

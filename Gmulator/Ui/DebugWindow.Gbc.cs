@@ -97,7 +97,7 @@ namespace Gmulator.Ui
             if (inst.Name == "call" || inst.Name == "rst")
             {
                 Cpu.StepOverAddr = pc + inst.Size;
-                SetState(DebugState.Running);
+                base.StepOver();
             }
             else
                 StepInto();

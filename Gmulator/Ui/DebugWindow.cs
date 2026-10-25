@@ -128,8 +128,8 @@ namespace Gmulator.Ui
                 if (ImGui.BeginPopupContextWindow($"gotomenu{n}"))
                     JumpTo(n);
 
-                if (ImGui.IsKeyPressed(ImGuiKey.F5))
-                    SetState(DebugState.Running);
+                //if (ImGui.IsKeyPressed(ImGuiKey.F5))
+                //    SetState(DebugState.Running);
 
                 for (int i = 0; i < DisasmMaxLines - 1; i++)
                 {
@@ -373,7 +373,6 @@ namespace Gmulator.Ui
             var oldline = Ppu.GetScanline();
             while (oldline == Ppu.GetScanline())
                 CpuStep();
-            SetState(DebugState.Break);
             FollowPc = true;
         }
 

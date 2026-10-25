@@ -11,9 +11,13 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
     public int RomSize { get; private set; }
     public bool IsBios { get; private set; }
 
-    private byte[] _ram = new byte[0x10000];
+    //private byte[] _ram = new byte[0x10000];
     private byte[] _vram = new byte[0x4000];
+    private byte[] _oram = new byte[0xa0];
+    private byte[] _iram = new byte[0x80];
+    private byte[] _hram = new byte[0x80];
     public byte[] Wram { get; set; } = new byte[0x8000];
+
     private byte[] _rom;
 
     public byte VramBank { get; set; }
@@ -52,13 +56,13 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
         MemoryHandlers[addr].Write(addr, value);
     }
 
-    public int ReadRam(int addr) => _ram[addr];
-    public void WriteRam(int addr, int value) => _ram[addr] = (byte)value;
-    public int ReadIo(int addr) => (byte)MemoryHandlers[0xff00 + (addr & 0xff)].Read(0xff00 + (addr & 0xff));
-    public void WriteIo(int addr, int value) => _ram[0xff00 + addr & 0xff] = (byte)value;
-    public int ReadHram(int addr) => (byte)MemoryHandlers[0xff80 + (addr & 0xff)].Read(0xff80 + (addr & 0xff));
+    public int ReadRam(int addr) => Wram[addr];
+    public void WriteRam(int addr, int value) => Wram[addr] = (byte)value;
+    public int ReadIo(int addr) => _iram[addr & 0x7f];
+    public void WriteIo(int addr, int value) => _iram[addr & 0x7f] = (byte)value;
+    public int ReadHram(int addr) => _hram[addr & 0x7f];
 
-    public void WriteHram(int addr, int value) => _ram[0xff80 + addr & 0xff] = (byte)value;
+    public void WriteHram(int addr, int value) => _hram[addr & 0x7f] = (byte)value;
 
     public int ReadVramBank(int addr) => _vram[(addr & 0x1fff) + (0x2000 * VramBank) & 0x3fff];
 
@@ -68,7 +72,7 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
 
     public void WriteVramBank(int addr, int value) => _vram[(addr & 0x1fff) + (0x2000 * VramBank)] = (byte)value;
 
-    public int ReadOam(int addr) => _ram[addr];
+    public int ReadOam(int addr) => _oram[addr & 0xff];
 
     public int ReadSram(int addr)
     {
@@ -82,22 +86,23 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
         if (Mapper.CartRamEnabled)
         {
             Mapper.Sram[(addr - 0xa000 + 0x2000 * Mapper.Rambank) & 0x1fff] = (byte)value;
-            _ram[addr] = (byte)value;
             Mapper.Write();
         }
     }
 
-    public int ReadWram(int addr) => Wram[addr < 0xd000 ? addr % 0x1000 : addr % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))];
+    public int ReadWram(int addr)
+    {
+        return Wram[addr < 0xd000 ? addr % 0x1000 : addr % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))];
+    }
 
     public void WriteWram(int addr, int value)
     {
         Wram[addr < 0xd000 ? addr % 0x1000 : addr % 0x1000 + (0x1000 * (WramBank == 0 ? 1 : WramBank))] = (byte)value;
-        _ram[addr] = (byte)value;
     }
 
     public void WriteBlock(int src, int dst, int size)
     {
-        Span<byte> srcbytes;
+        Span<byte> srcbytes = new();
         Span<byte> dstbytes;
         if (src <= 0x7fff)
             srcbytes = Mapper.ReadRomBlock(src, size);
@@ -105,8 +110,6 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
             srcbytes = new Span<byte>(Mapper.Sram, src, size);
         else if (src >= 0xd000 && src <= 0xdfff)
             srcbytes = new Span<byte>(Wram, src - 0xd000 + (WramBank * 0x1000), size);
-        else
-            srcbytes = new Span<byte>(_ram, src, size);
 
         dstbytes = new Span<byte>(_vram, (dst - 0x8000 + VramBank * 0x2000) & 0x3fff, size);
         srcbytes.CopyTo(dstbytes);
@@ -124,8 +127,7 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
             return _vram[addr - 0x8000 + (0x2000 * VramBank)];
         else if (addr >= 0xd000 && addr <= 0xdfff)
             return Wram[addr - 0xd000 + (0x1000 * WramBank)];
-        else
-            return _ram[addr];
+        return 0;
     }
 
     public void WriteDMA(int addr, byte value)
@@ -134,23 +136,21 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
         if (addr >= 0x8000 && addr <= 0x9fff)
         {
             _vram[addr - 0x8000 + 0x2000 * VramBank] = value;
-            _ram[addr] = value;
         }
         else if (addr >= 0xd000 && addr <= 0xdfff)
         {
             Wram[addr - 0xd000 + (WramBank * 0x1000)] = value;
-            _ram[addr] = value;
         }
         else if (addr >= 0xfe00 && addr <= 0xfe9f)
-            _ram[addr] = value;
+            _oram[addr] = value;
     }
 
-    public ushort ReadWord(int addr) => (ushort)(_ram[addr] | _ram[addr + 1] << 8);
+    public ushort ReadWord(int addr) => (ushort)(Wram[addr] | Wram[addr + 1] << 8);
 
-    public byte[] ReadWram() => _ram;
+    public byte[] ReadWram() => Wram;
     public byte[] ReadVram() => _vram;
     public byte[] ReadSram() => Mapper.Sram;
-    public byte[] ReadOram() => _ram.AsSpan(0xfe00, 0x100).ToArray();
+    public byte[] ReadOram() => _oram;
     public byte[] ReadRom() => _rom;
 
     public void WriteDMA(int v)
@@ -159,16 +159,16 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
         Span<byte> srcbytes = (a >> 12) switch
         {
             <= 0x07 => Mapper.ReadRomBlock(a, 0xa0),
-            <= 0x09 => Mapper.CGB ? new Span<byte>(_vram, a, 0xa0) : new(_ram, a, 0xa0),
+            <= 0x09 => Mapper.CGB ? new Span<byte>(_vram) : new(_oram),
             <= 0x0b => new Span<byte>(Gbc.Mapper.Sram, a - 0xa000 + (Mapper.Rambank * 0x2000), 0xa0),
-            <= 0x0c => Mapper.CGB ? new Span<byte>(_ram, a, 0xa0) : new(_ram, a, 0xa0),
-            <= 0x0d => Mapper.CGB ? new Span<byte>(Wram, a - 0xd000 + WramBank * 0x1000, 0xa0) : new(_ram, a, 0xa0),
+            <= 0x0c => Mapper.CGB ? new Span<byte>(Wram, 0, 0xa0) : new(Wram, 0, 0xa0),
+            <= 0x0d => Mapper.CGB ? new Span<byte>(Wram, a - 0xd000 + WramBank * 0x1000, 0xa0) : new(_oram),
             _ => null,
         };
 
         if (!srcbytes.IsEmpty)
         {
-            Span<byte> dstbytes = new(_ram, 0xfe00, 0xa0);
+            Span<byte> dstbytes = new(_oram);
             srcbytes.CopyTo(dstbytes);
         }
     }
@@ -214,7 +214,6 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
 
     public void Reset()
     {
-        Array.Fill<byte>(_ram, 0x00, 0xc000, 0x4000);
         WramBank = VramBank = 0;
     }
 
@@ -250,7 +249,7 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
             if (c.Value.Address <= 0xbfff)
                 Mapper.Sram[c.Value.Address & 0xfff] = c.Value.Value;
             else if (c.Value.Address <= 0xcfff)
-                _ram[c.Value.Address] = c.Value.Value;
+                Wram[c.Value.Address] = c.Value.Value;
             else if (c.Value.Address <= 0xdfff)
                 Wram[(c.Value.Address & 0xfff) + c.Value.Bank * 0x1000] = c.Value.Value;
         }
@@ -258,12 +257,16 @@ public class GbcMmu(Gbc gbc, Dictionary<(int, int), Cheat> cheats) : IMmu, ISave
 
     public void Save(BinaryWriter bw)
     {
-        WriteArray(bw, _ram); WriteArray(bw, _vram); WriteArray(bw, Wram);
+        WriteArray(bw, _vram); WriteArray(bw, _oram);
+        WriteArray(bw, _iram); WriteArray(bw, _hram);
+        WriteArray(bw, Wram);
     }
 
     public void Load(BinaryReader br)
     {
-        _ram = ReadArray<byte>(br, _ram.Length); _vram = ReadArray<byte>(br, _vram.Length); Wram = ReadArray<byte>(br, Wram.Length);
+        _vram = ReadArray<byte>(br, _vram.Length); _oram = ReadArray<byte>(br, _oram.Length);
+        _iram = ReadArray<byte>(br, _iram.Length); _hram = ReadArray<byte>(br, _hram.Length);
+        Wram = ReadArray<byte>(br, Wram.Length);
     }
 
     int IMmu.ReadWord(int a)
