@@ -13,6 +13,7 @@ NLua | https://github.com/NLua/NLua |
 
 * naga10 font by Sadakazu Nagao
 * PSX Buttons font by WhoAmI Design
+* Font from Mesen CE
 
 # References
 
