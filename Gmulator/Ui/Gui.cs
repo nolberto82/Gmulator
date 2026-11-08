@@ -175,7 +175,7 @@ public abstract class Gui
         {
             if (File.Exists(FontName))
             {
-                GuiFont = Raylib.LoadFontEx(FontName, 10, null, 0);
+                GuiFont = Raylib.LoadFont(FontName);
                 Raylib.SetTextureFilter(GuiFont.Texture, TextureFilter.Point);
                 Notifications.SetFont(null, GuiFont);
             }
@@ -189,7 +189,7 @@ public abstract class Gui
             DebugFont = [null, null];
             DebugFont[0] = io.Fonts.AddFontFromFileTTF(FontName, 23f);
             DebugFont[1] = io.Fonts.AddFontFromFileTTF(FontName, 15f);
-            GuiFont = Raylib.LoadFontEx(FontName, 10, null, 0);
+            GuiFont = Raylib.LoadFont(FontName);
             Raylib.SetTextureFilter(GuiFont.Texture, TextureFilter.Point);
             rlImGui.ReloadFonts();
             Notifications.SetFont(DebugFont[0], GuiFont);
